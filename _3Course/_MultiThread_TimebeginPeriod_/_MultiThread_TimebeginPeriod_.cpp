@@ -14,6 +14,10 @@ bool bOn = true;
 
 HANDLE hStartEvent;
 
+unsigned Add(void *arg);
+unsigned BlockThread(void *arg);
+unsigned MonitorThread(void *arg);
+
 struct stTimePeriod
 {
     stTimePeriod()
@@ -25,6 +29,43 @@ struct stTimePeriod
         timeEndPeriod(1);
     }
 };
+
+int main()
+{
+    stTimePeriod stPeriod;
+
+    for (int i = 0; i < THREADCNT; i++)
+        _beginthreadex(nullptr, 0, BlockThread, nullptr, 0, nullptr);
+    _beginthreadex(nullptr, 0, Add, nullptr, 0, nullptr);
+    _beginthreadex(nullptr, 0, MonitorThread, nullptr, 0, nullptr);
+
+    hStartEvent = CreateEvent(nullptr, true, 0, nullptr);
+    if (hStartEvent == nullptr)
+    {
+        __debugbreak();
+    }
+    while (1)
+    {
+        if (_kbhit())
+        {
+            char ch = _getch();
+
+            if (ch == 'a' || ch == 'A')
+            {
+                SetEvent(hStartEvent);
+            }
+            else if (ch == 's' || ch == 'S')
+            {
+                bOn = FALSE;
+                return 0;
+            }
+        }
+    }
+
+
+}
+
+
 unsigned Add(void *arg)
 {
     WaitForSingleObject(hStartEvent, INFINITE);
@@ -70,46 +111,11 @@ unsigned MonitorThread(void *arg)
                 toTal += g_num;
                 toTal /= 2;
             }
-            printf("g_num %lld Aver : %lld \n", g_num , toTal);
+            printf("g_num %lld Aver : %lld \n", g_num, toTal);
             InterlockedExchange64(&g_num, 0);
 
             nextTime += 1000;
         }
     }
     return 0;
-}
-
-stTimePeriod stPeriod;
-
-int main()
-{
-    for (int i = 0; i < THREADCNT; i++)
-        _beginthreadex(nullptr, 0, BlockThread, nullptr, 0, nullptr);
-    _beginthreadex(nullptr, 0, Add, nullptr, 0, nullptr);
-    _beginthreadex(nullptr, 0, MonitorThread, nullptr, 0, nullptr);
-
-    hStartEvent = CreateEvent(nullptr, true, 0, nullptr);
-    if (hStartEvent == nullptr)
-    {
-        __debugbreak();
-    }
-    while (1)
-    {
-        if (_kbhit())
-        {
-            char ch = _getch();
-
-            if (ch == 'a' || ch == 'A')
-            {
-                SetEvent(hStartEvent);
-            }
-            if (ch == 's' || ch == 'S')
-            {
-                bOn = FALSE;
-                return 0;
-            }
-        }
-    }
-
-
 }
