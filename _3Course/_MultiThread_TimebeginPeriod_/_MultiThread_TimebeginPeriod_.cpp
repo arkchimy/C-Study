@@ -9,7 +9,7 @@
 #pragma comment(lib, "winmm.lib")
 
 #define THREADCNT 4
-long g_num;
+long long g_num;
 bool bOn = true;
 
 HANDLE hStartEvent;
@@ -30,8 +30,7 @@ unsigned Add(void *arg)
     WaitForSingleObject(hStartEvent, INFINITE);
     while (bOn)
     {
-        InterlockedIncrement(&g_num);
-        Sleep(0);
+        InterlockedIncrement64(&g_num);
     }
     return 0;
 }
@@ -54,14 +53,25 @@ unsigned MonitorThread(void *arg)
     DWORD currentTime = timeGetTime();
     DWORD nextTime = currentTime + 1000;
 
+    long long toTal = 0;
+
     while (bOn)
     {
 
         currentTime = timeGetTime();
         if (nextTime <= currentTime)
         {
-            printf("g_num %d \n", g_num);
-            InterlockedExchange(&g_num, 0);
+            if (toTal == 0)
+            {
+                toTal = g_num;
+            }
+            else
+            {
+                toTal += g_num;
+                toTal /= 2;
+            }
+            printf("g_num %lld Aver : %lld \n", g_num , toTal);
+            InterlockedExchange64(&g_num, 0);
 
             nextTime += 1000;
         }
@@ -69,7 +79,7 @@ unsigned MonitorThread(void *arg)
     return 0;
 }
 
-//stTimePeriod stPeriod;
+stTimePeriod stPeriod;
 
 int main()
 {
