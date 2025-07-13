@@ -4,6 +4,9 @@
 #include <conio.h>
 #include <iostream>
 #include <thread>
+#include <vector>
+
+#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
 
 #pragma comment(lib, "winmm.lib")
 
@@ -19,9 +22,9 @@ void SpinLock_LoopYield_UnLock();
 void CriticaSectionlLock();
 void CriticalSectionUnLock();
 
-#define THREADCNT 4
-#define TARGETCNT 10000000
-#define LOOPCNT 100
+int THREADCNT;
+int TARGETCNT;
+int LOOPCNT = 1;
 
 alignas(64) long lSpinlock;
 
@@ -38,7 +41,9 @@ unsigned SpinLockLoopYeildThread(void *arg);
 void MyCreateThread(unsigned (*type)(void *))
 {
 
-    HANDLE hThread[THREADCNT];
+    std::vector<HANDLE> hThread;
+    hThread.resize(THREADCNT);
+
     QueryPerformanceFrequency(&Freq);
 
     for (int i = 0; i < THREADCNT; i++)
@@ -54,7 +59,7 @@ void MyCreateThread(unsigned (*type)(void *))
 
     QueryPerformanceCounter(&endTime);
 
-    WaitForMultipleObjects(THREADCNT, hThread, true, INFINITE);
+    WaitForMultipleObjects(THREADCNT, &hThread[0], true, INFINITE);
     ResetEvent(hStartEvent);
     ResetEvent(hEndEvent);
 }
@@ -63,6 +68,14 @@ int main()
 {
     timeBeginPeriod(1);
 
+    {
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
+        parser.GetValue(L"THREADCNT", THREADCNT);
+        parser.GetValue(L"LOOPCNT", LOOPCNT);
+        parser.GetValue(L"TARGETCNT", TARGETCNT);
+
+    }
     hStartEvent = CreateEvent(nullptr, 1, false, nullptr);
     hEndEvent = CreateEvent(nullptr, 1, false, nullptr);
 
@@ -73,6 +86,7 @@ int main()
             char ch = _getch();
             LARGE_INTEGER total;
             total.QuadPart = 0;
+            printf("Start Logic\n");
             switch (ch)
             {
             case '1':
@@ -81,7 +95,7 @@ int main()
                     MyCreateThread(SpinLockThread);
                     total.QuadPart += endTime.QuadPart - startTime.QuadPart;
                 }
-                printf(" SpinLockThread time %20.3lf us \n", total.QuadPart * (1e6 / Freq.QuadPart) );
+                printf(" g_Num : %d \t SpinLockThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
                 break;
             case '2':
                 for (int i = 0; i < LOOPCNT; i++)
@@ -89,7 +103,7 @@ int main()
                     MyCreateThread(SpinLockYeildThread);
                     total.QuadPart += endTime.QuadPart - startTime.QuadPart;
                 }
-                printf(" SpinLockYeildThread time %20.3lf us \n", total.QuadPart * (1e6 / Freq.QuadPart) );
+                printf(" g_Num : %d \t  SpinLockYeildThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
                 break;
             case '3':
                 for (int i = 0; i < LOOPCNT; i++)
@@ -97,7 +111,7 @@ int main()
                     MyCreateThread(SpinLockLoopYeildThread);
                     total.QuadPart += endTime.QuadPart - startTime.QuadPart;
                 }
-                printf(" SpinLockLoopYeildThread time %20.3lf us \n", total.QuadPart * (1e6 / Freq.QuadPart) );
+                printf(" g_Num : %d \t  SpinLockLoopYeildThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
                 break;
 
             case '0':
@@ -164,7 +178,7 @@ unsigned SpinLockLoopYeildThread(void *arg)
     while (1)
     {
         SpinLock_LoopYield_Lock();
-        if (g_num == LOOPCNT)
+        if (g_num == TARGETCNT)
         {
             SpinLock_LoopYield_UnLock();
             SetEvent(hEndEvent);
@@ -182,7 +196,7 @@ unsigned SpinLockYeildThread(void *arg)
     while (1)
     {
         SpinLock_Yield_Lock();
-        if (g_num == LOOPCNT)
+        if (g_num == TARGETCNT)
         {
             SpinLock_Yield_UnLock();
             SetEvent(hEndEvent);
@@ -200,7 +214,7 @@ unsigned SpinLockThread(void *arg)
     while (1)
     {
         SpinLock();
-        if (g_num == LOOPCNT)
+        if (g_num == TARGETCNT)
         {
             SpinUnLock();
             SetEvent(hEndEvent);
