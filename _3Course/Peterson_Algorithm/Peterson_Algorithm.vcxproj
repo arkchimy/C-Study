@@ -125,7 +125,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CPeterson.cpp" />
     <ClCompile Include="Peterson_Algorithm.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CPeterson.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
