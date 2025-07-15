@@ -3,6 +3,9 @@
 //&infos[info_seqNum % 100]
 #define LoopCnt 50000000
 #define INFOSIZE 100
+
+using ull = unsigned long long;
+
 enum class EMode
 {
     // 어떤 동작을 하였는지
@@ -66,13 +69,13 @@ class CPeterson
     void InfoUpdate(EMode mode, int val)
     {
         stDebugInfo info;
-        long seqNum;
+        ull seqNum;
 
         info.threadID = GetCurrentThreadId();
         info.mode = mode;
         info.val = val;
 
-        seqNum = InterlockedIncrement(&info_seqNum);
+        seqNum = _InterlockedIncrement(&info_seqNum);
         info.seqNum = seqNum;
         infos[seqNum % INFOSIZE] = info;
     }
@@ -80,6 +83,6 @@ class CPeterson
     long m_flag[2];
 
     long bCSEnterFlag = 0; // 진입 여부
-    long info_seqNum;
+    ull info_seqNum;
     stDebugInfo infos[INFOSIZE];
 };

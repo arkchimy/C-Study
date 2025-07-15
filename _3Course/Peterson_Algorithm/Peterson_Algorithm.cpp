@@ -16,6 +16,9 @@ long g_num; // 공유 자원
 
 int main()
 {
+    hStartEvent = CreateEvent(nullptr, 1, false, nullptr);
+    if (hStartEvent == 0)
+        return -1;
 
     while (1)
     {
@@ -38,9 +41,6 @@ void CreatePetersonThread()
     HANDLE hThread[2];
     g_num = 0;
     printf("Start \n");
-    hStartEvent = CreateEvent(nullptr, 1, false, nullptr);
-    if (hStartEvent == 0)
-        return;
 
     CPeterson peterson;
 
