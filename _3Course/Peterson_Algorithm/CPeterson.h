@@ -36,14 +36,14 @@ class CPeterson
 
         while (1)
         {
-            local_flag = m_flag[other];
-            if (local_flag == false) // load m_flag[other] 아무와도 관련없음
+            local_flag = m_flag[other];// store local_flag , load m_flag[other] 아무와도 관련없음
+            if (local_flag == false)   // load local_flag
             {
                 InfoUpdate(EMode::Flag, local_flag);
                 break;
             }
-            local_turn = m_turn;
-            if (local_turn != threadID) // load m_turn  3
+            local_turn = m_turn;        // store local_turn , load m_turn 아무와도 관련없음
+            if (local_turn != threadID) // load local_turn  3
             {
                 InfoUpdate(EMode::Turn, local_turn);
                 break;
