@@ -13,14 +13,14 @@
 void SpinLock();
 void SpinUnLock();
 
+void SpinLock_Sleep();
+void SpinUnLock_Sleep();
+
 void SpinLock_Yield_Lock();
 void SpinLock_Yield_UnLock();
 
 void SpinLock_LoopYield_Lock();
 void SpinLock_LoopYield_UnLock();
-
-void CriticaSectionlLock();
-void CriticalSectionUnLock();
 
 int THREADCNT;
 int TARGETCNT;
@@ -36,7 +36,9 @@ alignas(64) long g_num;
 
 unsigned SpinLockThread(void *arg);
 unsigned SpinLockYeildThread(void *arg);
-unsigned SpinLockLoopYeildThread(void *arg);
+unsigned SpinLockIFYeildThread(void *arg);
+unsigned SpinLockLoopYieldThread(void *arg);
+unsigned SpinLockSleepThread(void *arg);
 
 void MyCreateThread(unsigned (*type)(void *))
 {
@@ -74,7 +76,6 @@ int main()
         parser.GetValue(L"THREADCNT", THREADCNT);
         parser.GetValue(L"LOOPCNT", LOOPCNT);
         parser.GetValue(L"TARGETCNT", TARGETCNT);
-
     }
     hStartEvent = CreateEvent(nullptr, 1, false, nullptr);
     hEndEvent = CreateEvent(nullptr, 1, false, nullptr);
@@ -93,6 +94,7 @@ int main()
                 for (int i = 0; i < LOOPCNT; i++)
                 {
                     MyCreateThread(SpinLockThread);
+
                     total.QuadPart += endTime.QuadPart - startTime.QuadPart;
                 }
                 printf(" g_Num : %d \t SpinLockThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
@@ -101,6 +103,7 @@ int main()
                 for (int i = 0; i < LOOPCNT; i++)
                 {
                     MyCreateThread(SpinLockYeildThread);
+
                     total.QuadPart += endTime.QuadPart - startTime.QuadPart;
                 }
                 printf(" g_Num : %d \t  SpinLockYeildThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
@@ -108,12 +111,30 @@ int main()
             case '3':
                 for (int i = 0; i < LOOPCNT; i++)
                 {
-                    MyCreateThread(SpinLockLoopYeildThread);
+                    MyCreateThread(SpinLockIFYeildThread);
+
                     total.QuadPart += endTime.QuadPart - startTime.QuadPart;
                 }
-                printf(" g_Num : %d \t  SpinLockLoopYeildThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
+                printf(" g_Num : %d \t  SpinLockIFYeildThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
                 break;
+            case '4':
+                for (int i = 0; i < LOOPCNT; i++)
+                {
+                    MyCreateThread(SpinLockLoopYieldThread);
 
+                    total.QuadPart += endTime.QuadPart - startTime.QuadPart;
+                }
+                printf(" g_Num : %d \t  SpinLockLoopYieldThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
+                break;
+            case '5':
+                for (int i = 0; i < LOOPCNT; i++)
+                {
+                    MyCreateThread(SpinLockSleepThread);
+
+                    total.QuadPart += endTime.QuadPart - startTime.QuadPart;
+                }
+                printf(" g_Num : %d \t  SpinLockSleepThread time %20.3lf us \n", g_num, total.QuadPart * (1e6 / Freq.QuadPart) / LOOPCNT);
+                break;
             case '0':
                 timeEndPeriod(1);
                 return 0;
@@ -136,6 +157,38 @@ void SpinUnLock()
     _InterlockedExchange(&lSpinlock, 0);
 }
 
+void SpinLock_Sleep()
+{
+    while (_InterlockedExchange(&lSpinlock, 1) == 1)
+    {
+        Sleep(0);
+    }
+}
+
+void SpinUnLock_Sleep()
+{
+    _InterlockedExchange(&lSpinlock, 0);
+}
+
+void SpinLock_IFYield_Lock()
+{
+    while (1)
+    {
+        if (lSpinlock == 0)
+        {
+            if (_InterlockedExchange(&lSpinlock, 1) == 1)
+                YieldProcessor();
+            else
+                break;
+        }
+        YieldProcessor();
+    }
+}
+
+void SpinLock_IFYield_UnLock()
+{
+    _InterlockedExchange(&lSpinlock, 0);
+}
 void SpinLock_Yield_Lock()
 {
     while (_InterlockedExchange(&lSpinlock, 1) == 1)
@@ -163,15 +216,7 @@ void SpinLock_LoopYield_UnLock()
     _InterlockedExchange(&lSpinlock, 0);
 }
 
-void CriticaSectionlLock()
-{
-}
-
-void CriticalSectionUnLock()
-{
-}
-
-unsigned SpinLockLoopYeildThread(void *arg)
+unsigned SpinLockLoopYieldThread(void *arg)
 {
     WaitForSingleObject(hStartEvent, INFINITE);
 
@@ -186,6 +231,24 @@ unsigned SpinLockLoopYeildThread(void *arg)
         }
         g_num++;
         SpinLock_LoopYield_UnLock();
+    }
+}
+
+unsigned SpinLockSleepThread(void *arg)
+{
+    WaitForSingleObject(hStartEvent, INFINITE);
+
+    while (1)
+    {
+        SpinLock_Sleep();
+        if (g_num == TARGETCNT)
+        {
+            SpinUnLock_Sleep();
+            SetEvent(hEndEvent);
+            return 0;
+        }
+        g_num++;
+        SpinUnLock_Sleep();
     }
 }
 
@@ -204,6 +267,24 @@ unsigned SpinLockYeildThread(void *arg)
         }
         g_num++;
         SpinLock_Yield_UnLock();
+    }
+}
+
+unsigned SpinLockIFYeildThread(void *arg)
+{
+    WaitForSingleObject(hStartEvent, INFINITE);
+
+    while (1)
+    {
+        SpinLock_IFYield_Lock();
+        if (g_num == TARGETCNT)
+        {
+            SpinLock_IFYield_UnLock();
+            SetEvent(hEndEvent);
+            return 0;
+        }
+        g_num++;
+        SpinLock_IFYield_UnLock();
     }
 }
 
