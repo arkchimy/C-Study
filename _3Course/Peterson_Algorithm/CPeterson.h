@@ -27,10 +27,15 @@ struct stDebugInfo
 class CPeterson
 {
   public:
+    CPeterson() 
+    {
+        total.QuadPart = 0;
+    }
     void PetersonLock(DWORD threadID, bool turn, bool other);
     void PetersonUnLock(bool turn);
     void InfoUpdate(EMode mode, int val);
-   
+    
+
   private:
     long m_turn;
     long m_flag[2];
@@ -39,4 +44,7 @@ class CPeterson
     long bCSEnterFlag = 0; // 진입 여부
     ull info_seqNum;
     stDebugInfo infos[INFOSIZE];
+
+    LARGE_INTEGER total;
+
 };

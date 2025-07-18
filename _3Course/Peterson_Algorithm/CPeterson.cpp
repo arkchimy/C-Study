@@ -1,14 +1,53 @@
 #include "CPeterson.h"
+#include <iostream>
 
 void CPeterson::PetersonLock(DWORD threadID, bool turn, bool other)
 {
     long local_flag;
     long local_turn;
-
+    int rand_type = rand() % 3;
     m_flag[turn] = true; // store m_flag  1
     m_turn = threadID;   // store m_turn  2
+    LARGE_INTEGER currentTime, endTime, feq;
+    currentTime.QuadPart = 0;
 
-    //_mm_mfence();
+    MemoryBarrier();
+    __faststorefence();
+    _mm_mfence();
+
+    QueryPerformanceCounter(&currentTime);
+    switch (rand_type)
+    {
+    case 0:
+        for (int i = 0; i < 1024 * 1024 * 1024; i++)
+            MemoryBarrier();
+        break;
+    case 1:
+        for (int i = 0; i < 1024 * 1024 * 1024; i++)
+            _mm_mfence();
+        break;
+    case 2:
+        for (int i = 0; i < 1024 * 1024 * 1024; i++)
+            __faststorefence();
+        break;
+    }
+
+    QueryPerformanceCounter(&endTime);
+    total.QuadPart = endTime.QuadPart - currentTime.QuadPart;
+    QueryPerformanceFrequency(&feq);
+    switch (rand_type)
+    {
+    case 0:
+        printf("  MemoryBarrier() %20.3lf us \n", total.QuadPart * (1e6 / feq.QuadPart) / (1024 * 1024 * 1024));
+        break;
+
+    case 1:
+        printf("_mm_mfence :  %20.3lf us \n", total.QuadPart * (1e6 / feq.QuadPart) / (1024 * 1024 * 1024));
+        break;
+    case 2:
+        printf("__faststorefence :  %20.3lf us \n", total.QuadPart * (1e6 / feq.QuadPart) / (1024 * 1024 * 1024));
+        break;
+    }
 
     while (1)
     {
