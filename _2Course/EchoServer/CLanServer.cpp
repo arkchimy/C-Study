@@ -15,7 +15,7 @@ CLanServer::CLanServer(unsigned short port)
         ServerLogFile("socket() %d \n", GetLastError());
 
     bind(listen_sock, (sockaddr *)&addr, sizeof(addr));
-    listen(listen_sock, SOMAXCONN_HINT(65535));
+    listen(listen_sock, SOMAXCONN);
 }
 
 void CLanServer::AcceptThread()
