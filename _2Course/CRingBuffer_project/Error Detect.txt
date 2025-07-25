@@ -2,3 +2,13 @@ Cnt : 388
 Cnt : 123
 Cnt : 694
 Cnt : 312
+Cnt : 271
+Cnt : 262
+Cnt : 330
+Cnt : 0
+Cnt : 5
+Cnt : 5
+Cnt : 5
+Cnt : 5
+Cnt : 5
+Cnt : 9

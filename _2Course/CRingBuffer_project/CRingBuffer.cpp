@@ -152,7 +152,8 @@ ringBufferSize CRingBuffer::DirectEnqueueSize(void)
 ringBufferSize CRingBuffer::DirectDequeueSize(void)
 {
     char *f = _frontPtr, *r = _rearPtr;
-
+    if (r == _begin)
+        return _end - f;
     return f <= r ? r - f : _end - f;
 }
 
