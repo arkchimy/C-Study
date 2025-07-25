@@ -31,7 +31,18 @@ ringBufferSize CRingBuffer::GetUseSize(void)
 {
     char *f = _frontPtr;
     char *r = _rearPtr;
-
+    if (f == _begin && r == _begin)
+    {
+        return 0;
+    }
+    else if (f == _begin)
+    {
+        return _end - f + r - _begin;
+    }
+    else if (r == _begin)
+    {
+        return r - f;
+    }
     return f <= r ? r - f
                   : _end - f + r - _begin;
 }
@@ -41,6 +52,19 @@ ringBufferSize CRingBuffer::GetFreeSize(void)
     // 가득 채우면 안되므로 -1
     char *f = _frontPtr;
     char *r = _rearPtr;
+
+    if (f == _begin && r == _begin)
+    {
+        return 0;
+    }
+    else if (f == _begin)
+    {
+        return f - r - 1;
+    }
+    else if (r == _begin)
+    {
+        return (_end - r) + (f - _begin) - 1;
+    }
 
     return f <= r ? (_end - r) + (f - _begin) - 1
                   : f - r - 1;
@@ -65,16 +89,9 @@ bool CRingBuffer::ReSize()
 
 bool CRingBuffer::Enqueue(const char *chpSrc, ringBufferSize iSize)
 {
-    ringBufferSize directSize;
-    //= DirectEnqueueSize();
+    ringBufferSize directSize = DirectEnqueueSize();
     char *f = _frontPtr, *r = _rearPtr;
 
-    if (f == _begin)
-    {
-        directSize = _end - r - 1;
-    }
-    directSize = f <= r ? _end - r
-                        : f - r - 1;
 
     if (GetFreeSize() <= iSize)
     {
@@ -107,11 +124,11 @@ bool CRingBuffer::Dequeue(char *chpDest, ringBufferSize iSize)
 
     // TODO : 비순차적 문제는 없을까? Store라 괜찮음
 
-    // DirectDeqSize = DirectDequeueSize();
+    DirectDeqSize = DirectDequeueSize();
 
     f = _frontPtr;
     r = _rearPtr;
-    DirectDeqSize = f <= r ? r - f : _end - f;
+   
     if (iSize <= DirectDeqSize)
     {
         memcpy(chpDest, f, iSize);
@@ -141,10 +158,17 @@ ringBufferSize CRingBuffer::DirectEnqueueSize(void)
 {
     char *f = _frontPtr, *r = _rearPtr;
 
-    if (f == _begin)
+    if (f == _begin && r == _begin)
+        return _end - _begin - 1;
+    else if (f == _begin)
     {
         return _end - r - 1;
     }
+    else if (r == _begin)
+    {
+        return  f - r  - 1;
+    }
+
     return f <= r ? _end - r
                   : f - r - 1;
 }
@@ -152,8 +176,16 @@ ringBufferSize CRingBuffer::DirectEnqueueSize(void)
 ringBufferSize CRingBuffer::DirectDequeueSize(void)
 {
     char *f = _frontPtr, *r = _rearPtr;
-    if (r == _begin)
+    if (f == _begin && r == _begin)
+        return 0;
+    else if (f == _begin)
+    {
+        return _end - r;
+    }
+    else if (r == _begin)
+    {
         return _end - f;
+    }
     return f <= r ? r - f : _end - f;
 }
 

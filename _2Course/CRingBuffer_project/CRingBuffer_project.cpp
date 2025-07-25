@@ -114,92 +114,93 @@ void TogleDeQThread()
 
 int main()
 {
-    std::list<long> list;
-    srand(1);
-    long num = 0;
-    long cmpNum = 0;
-    unsigned long long cnt = 0;
-    char LogBuffer[1000];
-
-    list.push_back(num);
-
-    while (1)
+    bool dddd = 1;
+    if (dddd == 0)
     {
-        
-       
-        while (ringBuffer.Enqueue(reinterpret_cast<char *>(&num), sizeof(long)))
+        std::list<long> list;
+        srand(1);
+        long num = 0;
+        long cmpNum = 0;
+        unsigned long long cnt = 0;
+        char LogBuffer[1000];
+
+        list.push_back(num);
+
+        while (1)
         {
-            cnt++;
-            num = rand() % 100;
-            list.push_back(num);
-        }
-        if (ringBuffer.Dequeue(reinterpret_cast<char *>(&cmpNum), sizeof(long)))
-        {
-            num = list.front();
-            list.pop_front();
-            if (num != cmpNum)
+
+            while (ringBuffer.Enqueue(reinterpret_cast<char *>(&num), sizeof(long)))
             {
-                FILE *file;
+                cnt++;
+                num = rand() % 100;
+                list.push_back(num);
+            }
+            if (ringBuffer.Dequeue(reinterpret_cast<char *>(&cmpNum), sizeof(long)))
+            {
+                num = list.front();
+                list.pop_front();
+                if (num != cmpNum)
+                {
+                    FILE *file;
 
-                fopen_s(&file, "Error Detect.txt", "a+");
-                if (file == nullptr)
-                    return -3;
-                std::string s = "Cnt : ";
-                s.append(std::to_string(cnt));
-                s.append("\n");
+                    fopen_s(&file, "Error Detect.txt", "a+");
+                    if (file == nullptr)
+                        return -3;
+                    std::string s = "Cnt : ";
+                    s.append(std::to_string(cnt));
+                    s.append("\n");
 
-                fwrite(s.c_str(), 1, s.size(), file);
-                fclose(file);
-                __debugbreak();
-                return -1;
+                    fwrite(s.c_str(), 1, s.size(), file);
+                    fclose(file);
+                    __debugbreak();
+                    return -1;
+                }
             }
         }
-        
     }
-    /*
-    HANDLE hThread[2];
-
-    hStartEvent = CreateEvent(nullptr,true,false,nullptr);
-    hExitEvent = CreateEvent(nullptr,true,false,nullptr);
-
-    hEnQThread[0] = CreateEvent(nullptr, true, false, nullptr);
-    hDeQThread[0] = CreateEvent(nullptr, true, false, nullptr);
-
-    hEnQThread[1] = hExitEvent;
-    hDeQThread[1] = hExitEvent;
-
-
-    hThread[0] = (HANDLE)_beginthreadex(nullptr, 0, EnQThread, nullptr, 0, nullptr);
-    hThread[1] = (HANDLE)_beginthreadex(nullptr, 0, DeQThread, nullptr, 0, nullptr);
-
-    Sleep(1000);
-    SetEvent(hStartEvent);
-    while (1)
+    else
     {
-        if (_kbhit())
+        HANDLE hThread[2];
+
+        hStartEvent = CreateEvent(nullptr, true, false, nullptr);
+        hExitEvent = CreateEvent(nullptr, true, false, nullptr);
+
+        hEnQThread[0] = CreateEvent(nullptr, true, false, nullptr);
+        hDeQThread[0] = CreateEvent(nullptr, true, false, nullptr);
+
+        hEnQThread[1] = hExitEvent;
+        hDeQThread[1] = hExitEvent;
+
+        hThread[0] = (HANDLE)_beginthreadex(nullptr, 0, EnQThread, nullptr, 0, nullptr);
+        hThread[1] = (HANDLE)_beginthreadex(nullptr, 0, DeQThread, nullptr, 0, nullptr);
+
+        Sleep(1000);
+        SetEvent(hStartEvent);
+        while (1)
         {
-            char ch = _getch();
-            switch (ch)
+            if (_kbhit())
             {
-            case 'e':
-            case 'E':
-                TogleEnQThread();
-                break;
-            case 'd':
-            case 'D':
-                TogleDeQThread();
-                break;
+                char ch = _getch();
+                switch (ch)
+                {
+                case 'e':
+                case 'E':
+                    TogleEnQThread();
+                    break;
+                case 'd':
+                case 'D':
+                    TogleDeQThread();
+                    break;
 
-            case VK_ESCAPE:
-                ResetEvent(hEnQThread[0]);
-                ResetEvent(hDeQThread[0]);
-                SetEvent(hExitEvent);
-                goto exitline;
+                case VK_ESCAPE:
+                    ResetEvent(hEnQThread[0]);
+                    ResetEvent(hDeQThread[0]);
+                    SetEvent(hExitEvent);
+                    goto exitline;
+                }
             }
-
-
         }
-    }
     exitline:
-    WaitForMultipleObjects(2, hThread, true, INFINITE);*/
+        WaitForMultipleObjects(2, hThread, true, INFINITE);
+    }
 }
