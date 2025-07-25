@@ -4,9 +4,9 @@
 CRingBuffer::CRingBuffer(enBufferMode mode)
 {
     _mode = mode;
-    _begin = _mode == enBufferMode::Recv ? (char *)_aligned_malloc(2048 * 2, 4096)
-                                         : (char *)_aligned_malloc(2048, 4096);
-    _end = _begin + 1001;
+    _begin = _mode == enBufferMode::Recv ? (char *)_aligned_malloc(18 * 2, 4096)
+                                         : (char *)_aligned_malloc(18, 4096);
+    _end = _begin + 18;
     ClearBuffer();
 }
 
@@ -65,9 +65,17 @@ bool CRingBuffer::ReSize()
 
 bool CRingBuffer::Enqueue(const char *chpSrc, ringBufferSize iSize)
 {
-    ringBufferSize directSize = DirectEnqueueSize();
+    ringBufferSize directSize;
+    //= DirectEnqueueSize();
     char *f = _frontPtr, *r = _rearPtr;
-    
+
+    if (f == _begin)
+    {
+        directSize = _end - r - 1;
+    }
+    directSize = f <= r ? _end - r
+                        : f - r - 1;
+
     if (GetFreeSize() <= iSize)
     {
         bool bChk = ReSize();
@@ -97,13 +105,13 @@ bool CRingBuffer::Dequeue(char *chpDest, ringBufferSize iSize)
     if (useSize < iSize)
         return false;
 
-    //TODO : 비순차적 문제는 없을까? Store라 괜찮음
+    // TODO : 비순차적 문제는 없을까? Store라 괜찮음
 
-    DirectDeqSize = DirectDequeueSize();
+    // DirectDeqSize = DirectDequeueSize();
 
     f = _frontPtr;
     r = _rearPtr;
-
+    DirectDeqSize = f <= r ? r - f : _end - f;
     if (iSize <= DirectDeqSize)
     {
         memcpy(chpDest, f, iSize);
@@ -150,9 +158,9 @@ ringBufferSize CRingBuffer::DirectDequeueSize(void)
 
 void CRingBuffer::MoveRear(ringBufferSize iSize)
 {
-    char* pChk = _rearPtr + iSize;
+    char *pChk = _rearPtr + iSize;
     char *distance = reinterpret_cast<char *>(pChk - _end);
-   
+
     if (_end <= pChk)
     {
         char *distance = reinterpret_cast<char *>(pChk - _end);
@@ -163,7 +171,6 @@ void CRingBuffer::MoveRear(ringBufferSize iSize)
     {
         _rearPtr = pChk;
     }
-  
 }
 
 void CRingBuffer::MoveFront(ringBufferSize iSize)
@@ -180,4 +187,3 @@ void CRingBuffer::MoveFront(ringBufferSize iSize)
         _frontPtr = pChk;
     }
 }
-

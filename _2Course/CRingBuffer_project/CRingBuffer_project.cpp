@@ -55,10 +55,12 @@ unsigned DeQThread(void *arg)
         retval = WaitForMultipleObjects(2, hDeQThread, false, INFINITE);
         if (retval == WAIT_OBJECT_0 + 1)
             return 0;
+        if (cnt == 388)
+            __debugbreak();
         if (ringBuffer.Dequeue(reinterpret_cast<char *>(&cmpNum), sizeof(long)) == true)
         {
             cnt++;
-
+        
             printf("DeQue cnt : %lld  \t   UseSize :  % lld \n", cnt,ringBuffer.GetUseSize());
             num = rand() % 100;
             if (num != cmpNum)
