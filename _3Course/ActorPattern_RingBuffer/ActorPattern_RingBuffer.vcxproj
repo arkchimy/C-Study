@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{54d6ac8d-2167-40bf-a475-07df99ac540c}</ProjectGuid>
-    <RootNamespace>CRingBufferproject</RootNamespace>
+    <ProjectGuid>{db302890-2593-4919-977e-42d26de521ea}</ProjectGuid>
+    <RootNamespace>ActorPatternRingBuffer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -76,7 +76,6 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -91,12 +90,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -126,21 +122,18 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CRingBuffer.cpp" />
-    <ClCompile Include="CRingBuffer_project.cpp" />
+    <ClCompile Include="ActorPattern_RingBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CRingBuffer.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Documents\C-Study\_1Course\lib\Parser_lib\Parser_lib.vcxproj">
+    <ProjectReference Include="..\..\_1Course\lib\Parser_lib\Parser_lib.vcxproj">
       <Project>{aeaec43e-1516-4224-889b-858c678ce028}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\lib\MT_CRingBuffer_lib\MT_CRingBuffer_lib.vcxproj">
+      <Project>{c5117940-f3ef-4c6c-b22e-4d1f42f22d81}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

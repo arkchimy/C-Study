@@ -1,4 +1,7 @@
-#pragma once
+ï»¿#pragma once
+
+#define WIN32_LEAN_AND_MEAN             // ê±°ì˜ ì‚¬ìš©ë˜ì§€ ì•ŠëŠ” ë‚´ìš©ì„ Windows í—¤ë”ì—ì„œ ì œì™¸í•©ë‹ˆë‹¤.
+
 using ringBufferSize = _int64;
 
 class CRingBuffer
@@ -10,7 +13,7 @@ class CRingBuffer
 
     ringBufferSize GetUseSize(void);
     ringBufferSize GetFreeSize(void);
-    bool ReSize(); // RecvBuffer ¸¸  °íÀ¯ÀûÀ¸·Î µÊ. SendBufferÀÇ °æ¿ì Æ¨±â´Â°É ÀÇµµÇÒ °ÍÀÓ.
+    bool ReSize(); // RecvBuffer ï¿½ï¿½  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½. SendBufferï¿½ï¿½ ï¿½ï¿½ï¿½ Æ¨ï¿½ï¿½Â°ï¿½ ï¿½Çµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
 
     bool Enqueue(const char *chpData, ringBufferSize iSize);
     bool Dequeue(char *chpDest, ringBufferSize iSize);

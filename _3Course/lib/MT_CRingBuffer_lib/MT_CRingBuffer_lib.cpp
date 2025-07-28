@@ -1,4 +1,9 @@
-#include "CRingBuffer.h"
+ï»¿// MT_CRingBuffer_lib.cpp : ì •ì  ë¼ì´ë¸ŒëŸ¬ë¦¬ë¥¼ ìœ„í•œ í•¨ìˆ˜ë¥¼ ì •ì˜í•©ë‹ˆë‹¤.
+//
+
+#include "framework.h"
+#include "pch.h"
+
 #include <memory>
 
 CRingBuffer::CRingBuffer()
@@ -34,7 +39,7 @@ ringBufferSize CRingBuffer::GetUseSize(void)
 
 ringBufferSize CRingBuffer::GetFreeSize(void)
 {
-    // °¡µæ Ã¤¿ì¸é ¾ÈµÇ¹Ç·Î -1
+    // ê°€ë“ ì±„ìš°ë©´ ì•ˆë˜ë¯€ë¡œ -1
     char *f = _frontPtr;
     char *r = _rearPtr;
 
@@ -46,7 +51,7 @@ bool CRingBuffer::ReSize()
 {
     char *f = _frontPtr, *r = _rearPtr;
 
-    // TODO : ÀÌ°Ô ¸Ö¾²¿¡¼­ ¾ÈÀüÇÑ°¡?
+    // TODO : ì´ê²Œ ë©€ì“°ì—ì„œ ì•ˆì „í•œê°€?
     /* if (f <= r)
      {
          _end += _end - _begin;
@@ -108,7 +113,7 @@ bool CRingBuffer::Dequeue(char *chpDest, ringBufferSize iSize)
     if (useSize < iSize)
         return false;
 
-    // TODO : ºñ¼øÂ÷Àû ¹®Á¦´Â ¾øÀ»±î? Store¶ó ±¦ÂúÀ½
+    // TODO : ë¹„ìˆœì°¨ì  ë¬¸ì œëŠ” ì—†ì„ê¹Œ? Storeë¼ ê´œì°®ìŒ
 
     DirectDeqSize = f <= r ? r - f : _end - f;
 
@@ -128,7 +133,27 @@ bool CRingBuffer::Dequeue(char *chpDest, ringBufferSize iSize)
 
 ringBufferSize CRingBuffer::Peek(char *chpDest, ringBufferSize iSize)
 {
-    return ringBufferSize();
+    char *f = _frontPtr, *r = _rearPtr;
+    ringBufferSize useSize, DirectDeqSize;
+
+    useSize = f <= r ? r - f
+                     : _end - f + r - _begin;
+
+    if (iSize > useSize)
+        return useSize;
+
+    DirectDeqSize = f <= r ? r - f : _end - f;
+
+    if (iSize <= DirectDeqSize)
+    {
+        memcpy(chpDest, f, iSize);
+    }
+    else
+    {
+        memcpy(chpDest, f, DirectDeqSize);
+        memcpy(chpDest + DirectDeqSize, _begin, iSize - DirectDeqSize);
+    }
+    return iSize;
 }
 
 void CRingBuffer::ClearBuffer(void)

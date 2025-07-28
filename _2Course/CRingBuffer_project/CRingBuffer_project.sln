@@ -5,6 +5,8 @@ VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CRingBuffer_project", "CRingBuffer_project.vcxproj", "{54D6AC8D-2167-40BF-A475-07DF99AC540C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Parser_lib", "..\..\..\..\Documents\C-Study\_1Course\lib\Parser_lib\Parser_lib.vcxproj", "{AEAEC43E-1516-4224-889B-858C678CE028}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{54D6AC8D-2167-40BF-A475-07DF99AC540C}.Release|x64.Build.0 = Release|x64
 		{54D6AC8D-2167-40BF-A475-07DF99AC540C}.Release|x86.ActiveCfg = Release|Win32
 		{54D6AC8D-2167-40BF-A475-07DF99AC540C}.Release|x86.Build.0 = Release|Win32
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Debug|x64.ActiveCfg = Debug|x64
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Debug|x64.Build.0 = Debug|x64
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Debug|x86.ActiveCfg = Debug|Win32
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Debug|x86.Build.0 = Debug|Win32
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Release|x64.ActiveCfg = Release|x64
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Release|x64.Build.0 = Release|x64
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Release|x86.ActiveCfg = Release|Win32
+		{AEAEC43E-1516-4224-889B-858C678CE028}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

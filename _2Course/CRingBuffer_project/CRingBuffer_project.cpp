@@ -7,8 +7,9 @@
 #include <string>
 #include <thread>
 #include <windows.h >
+#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
 
-CRingBuffer ringBuffer(CRingBuffer::Recv);
+CRingBuffer ringBuffer(17);
 
 HANDLE hEnQThread[2];
 HANDLE hDeQThread[2];
@@ -110,55 +111,10 @@ void TogleDeQThread()
         a = 0;
     }
 }
-#include <list>
 
 int main()
 {
-    bool dddd = 1;
-    if (dddd == 0)
-    {
-        std::list<long> list;
-        srand(1);
-        long num = 0;
-        long cmpNum = 0;
-        unsigned long long cnt = 0;
-        char LogBuffer[1000];
 
-        list.push_back(num);
-
-        while (1)
-        {
-
-            while (ringBuffer.Enqueue(reinterpret_cast<char *>(&num), sizeof(long)))
-            {
-                cnt++;
-                num = rand() % 100;
-                list.push_back(num);
-            }
-            if (ringBuffer.Dequeue(reinterpret_cast<char *>(&cmpNum), sizeof(long)))
-            {
-                num = list.front();
-                list.pop_front();
-                if (num != cmpNum)
-                {
-                    FILE *file;
-
-                    fopen_s(&file, "Error Detect.txt", "a+");
-                    if (file == nullptr)
-                        return -3;
-                    std::string s = "Cnt : ";
-                    s.append(std::to_string(cnt));
-                    s.append("\n");
-
-                    fwrite(s.c_str(), 1, s.size(), file);
-                    fclose(file);
-                    __debugbreak();
-                    return -1;
-                }
-            }
-        }
-    }
-    else
     {
         HANDLE hThread[2];
 
