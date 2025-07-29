@@ -49,6 +49,7 @@ tpsType msg_count[dfJOB_MAX];
 
 SRWLOCK ringBuffer_srw;
 SRWLOCK list_srw;
+DWORD frameInterval;
 
 HANDLE hExitEvent, hStartEvent, hMSG_Event;
 int workerCnt = 0;
@@ -70,7 +71,7 @@ int main()
     HANDLE *hWorkerThread;
     HANDLE hMonitorThread;
 
-    DWORD frameInterval, retVal;
+    DWORD retVal;
 
     Initalize(&hWorkerThread); // workerCnt 갯수 가져옴.
     hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, hWorkerThread, 0, nullptr);
@@ -113,7 +114,8 @@ int main()
                 CreateExitMsg();
             if (ch == 'a' || ch == 'A')
             {
-                frameInterval--;
+                if (frameInterval > 0)
+                    frameInterval--;
                 std::cout << "frameInterval : " << frameInterval << "\n";
             }
             else if (ch == 'd' || ch == 'D')
@@ -124,7 +126,7 @@ int main()
         }
     }
     WaitForMultipleObjects(workerCnt, hWorkerThread, true, INFINITE);
-  
+
     WaitForSingleObject(hMonitorThread, INFINITE);
 
     std::cout << "정상 종료 \n";
@@ -246,7 +248,7 @@ unsigned WorkerThread(void *arg)
             }
             MSG_count(head.shType); // 메세지 카운팅
             ReleaseSRWLockExclusive(&list_srw);
-
+            Sleep(0);
             break;
         case dfJOB_QUIT:
             printf("WorkerThread ID :  %d  return \n", currentThreadID);
@@ -281,7 +283,7 @@ unsigned MonitorThread(void *arg)
         // PrintfMsg_TYPE();
         // PrintfTPS();
         // PrintfMsgQ();
-        std::cout << "=========================================================== \n";
+        std::cout << "====================== frameInterval :  " << frameInterval << " ========================= \n ";
 
         for (auto &element : m_Tps)
         {
