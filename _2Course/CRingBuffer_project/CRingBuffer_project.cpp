@@ -1,15 +1,17 @@
 ﻿// CRingBuffer_project.cpp : 이 파일에는 'main' 함수가 포함됩니다. 거기서 프로그램 실행이 시작되고 종료됩니다.
 //
 
-#include "CRingBuffer.h"
+//#include "CRingBuffer.h"
 #include <conio.h>
 #include <iostream>
 #include <string>
 #include <thread>
 #include <windows.h >
 #include "../../_1Course/lib/Parser_lib/Parser_lib.h"
+#include "../../_3Course/lib/MT_CRingBuffer_lib/framework.h"
 
-CRingBuffer ringBuffer(17);
+
+CRingBuffer ringBuffer(3001);
 
 HANDLE hEnQThread[2];
 HANDLE hDeQThread[2];
@@ -59,8 +61,8 @@ unsigned DeQThread(void *arg)
         if (ringBuffer.Dequeue(reinterpret_cast<char *>(&cmpNum), sizeof(long)) == true)
         {
             cnt++;
-
-            printf("DeQue cnt : %lld  \t   UseSize :  % lld \n", cnt, ringBuffer.GetUseSize());
+            if (cnt % 10000  == 0)
+                printf("DeQue cnt : %lld  \t   UseSize :  % lld \n", cnt, ringBuffer.GetUseSize());
             num = rand() % 100;
             if (num != cmpNum)
             {

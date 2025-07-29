@@ -66,7 +66,7 @@ bool CRingBuffer::Enqueue(const char *chpSrc, ringBufferSize iSize)
     ringBufferSize directEnQSize, freeSize;
     char *f = _frontPtr, *r = _rearPtr;
 
-    if (f == _begin)
+    if (f == _begin && r == _end)
     {
         directEnQSize = _end - r - 1;
     }
@@ -166,7 +166,7 @@ ringBufferSize CRingBuffer::DirectEnqueueSize(void)
 {
     char *f = _frontPtr, *r = _rearPtr;
 
-    if (f == _begin)
+    if (f == _begin && r == _end)
     {
         return _end - r - 1;
     }
