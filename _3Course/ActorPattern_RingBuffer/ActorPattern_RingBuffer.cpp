@@ -35,7 +35,7 @@
 #define dfJOB_QUIT 5
 #define dfJOB_MAX 6
 
-#define RINGBUFFER_SIZE 30000
+#define RINGBUFFER_SIZE 3000000
 using tpsType = long long;
 
 struct st_MSG_HEAD
@@ -162,7 +162,6 @@ unsigned WorkerThread(void *arg)
 
         WaitForMultipleObjects(2, hWaitThread, false, INFINITE);
     ReEnter:
-        m_Tps[currentThreadID]++;
         AcquireSRWLockExclusive(&ringBuffer_srw);
 
         useSize = ringBuffer.GetUseSize();
@@ -236,10 +235,12 @@ unsigned WorkerThread(void *arg)
             break;
         case dfJOB_PRINT:
             AcquireSRWLockExclusive(&list_srw);
-      
-            
+            for (int i = 0; i < 10000; i++)
+            {
+                YieldProcessor();
+            }
             ReleaseSRWLockExclusive(&list_srw);
-            Sleep(0);
+            Sleep(5);
             break;
         case dfJOB_QUIT:
             printf("WorkerThread ID :  %d  return \n", currentThreadID);
@@ -247,6 +248,7 @@ unsigned WorkerThread(void *arg)
             return 0;
         }
         MSG_count(head.shType); // 메세지 카운팅
+        m_Tps[currentThreadID]++;
         useSize = ringBuffer.GetUseSize();
         if (useSize >= sizeof(head))
             goto ReEnter;
