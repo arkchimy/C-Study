@@ -35,7 +35,7 @@
 #define dfJOB_QUIT 5
 #define dfJOB_MAX 6
 
-#define RINGBUFFER_SIZE 3000000
+#define RINGBUFFER_SIZE 30000
 using tpsType = long long;
 
 struct st_MSG_HEAD
@@ -131,6 +131,7 @@ int main()
 
     std::cout << "정상 종료 \n";
     timeEndPeriod(1);
+    delete[] hWorkerThread;
     return 0;
 }
 
@@ -142,10 +143,8 @@ unsigned WorkerThread(void *arg)
 
     DWORD currentThreadID;
 
-    wchar_t *str = nullptr;
+    wchar_t str[100];
     std::wstring element;
-    std::list<std::wstring> temp;
-    temp.clear();
     hWaitThread[0] = hExitEvent;
     hWaitThread[1] = hMSG_Event;
 
@@ -183,15 +182,10 @@ unsigned WorkerThread(void *arg)
 
         if (head.shType == dfJOB_ADD || head.shType == dfJOB_FIND)
         {
-            str = (wchar_t *)malloc(head.shPayLoadLen + 1);
-            if (nullptr == str)
-            {
-                printf("malloc Failed \n");
+          
+            if (ringBuffer.Dequeue(reinterpret_cast<char *>(&head), sizeof(head)) == false)
                 __debugbreak();
-            }
-            ringBuffer.Dequeue(reinterpret_cast<char *>(&head), sizeof(head));
-            str[head.shPayLoadLen / 2] = 0;
-
+           
             if (ringBuffer.Dequeue((char *)str, head.shPayLoadLen) == false)
                 __debugbreak();
         }
@@ -208,26 +202,27 @@ unsigned WorkerThread(void *arg)
             AcquireSRWLockExclusive(&list_srw);
             element = str;
             g_List.push_back(element);
-            free(str);
-            MSG_count(head.shType); // 메세지 카운팅
+      
+            
             ReleaseSRWLockExclusive(&list_srw);
             break;
         case dfJOB_DEL:
             AcquireSRWLockExclusive(&list_srw);
             if (g_List.empty() == false)
                 g_List.pop_front();
-            MSG_count(head.shType); // 메세지 카운팅
+            
             ReleaseSRWLockExclusive(&list_srw);
             break;
         case dfJOB_SORT:
             AcquireSRWLockExclusive(&list_srw);
             g_List.sort();
-            MSG_count(head.shType); // 메세지 카운팅
+         
             ReleaseSRWLockExclusive(&list_srw);
             break;
         case dfJOB_FIND:
             AcquireSRWLockExclusive(&list_srw);
-            element = str;
+            element.clear();
+            element.append(str);
             for (auto data : g_List)
             {
                 if (lstrcmpW(data.c_str(), element.c_str()) == 0)
@@ -236,25 +231,22 @@ unsigned WorkerThread(void *arg)
                     break;
                 }
             }
-            free(str);
-            MSG_count(head.shType); // 메세지 카운팅
+       
             ReleaseSRWLockExclusive(&list_srw);
             break;
         case dfJOB_PRINT:
             AcquireSRWLockExclusive(&list_srw);
-            for (auto data : g_List)
-            {
-                temp.push_back(data);
-            }
-            MSG_count(head.shType); // 메세지 카운팅
+      
+            
             ReleaseSRWLockExclusive(&list_srw);
             Sleep(0);
             break;
         case dfJOB_QUIT:
             printf("WorkerThread ID :  %d  return \n", currentThreadID);
-            MSG_count(head.shType); // 메세지 카운팅
+        
             return 0;
         }
+        MSG_count(head.shType); // 메세지 카운팅
         useSize = ringBuffer.GetUseSize();
         if (useSize >= sizeof(head))
             goto ReEnter;
@@ -283,7 +275,7 @@ unsigned MonitorThread(void *arg)
         // PrintfMsg_TYPE();
         // PrintfTPS();
         // PrintfMsgQ();
-        std::cout << "====================== frameInterval :  " << frameInterval << " ========================= \n ";
+        std::cout << "====================== frameInterval :  " << frameInterval << " g_List  :  " << g_List.size() << "========================= \n ";
 
         for (auto &element : m_Tps)
         {
@@ -353,14 +345,19 @@ void CreateMsg()
 
     wchar_t EnqStr[100];
     st_MSG_HEAD head;
+    size_t list_len;
 
+    AcquireSRWLockShared(&list_srw);
+    list_len = g_List.size();
+    ReleaseSRWLockShared(&list_srw);
     head.shType = rand() % dfJOB_QUIT;
+
     switch (head.shType)
     {
     case dfJOB_ADD:
         head.shPayLoadLen = (rand() % strlen) * sizeof(wchar_t);
         memcpy(EnqStr, chars.c_str(), head.shPayLoadLen);
-        EnqStr[head.shPayLoadLen / 2] = 0;
+       
         break;
 
     case dfJOB_DEL:
