@@ -174,13 +174,13 @@ void SubString(const WCHAR* str, size_t len, WCHAR* out)
 Parser::Parser()
 	:logFilename(L"LogError.txt")
 {
-	FILE* logfile;
+	/*FILE* logfile;
 	_wfopen_s(&logfile, logFilename, L"w, ccs=UTF-16LE");
 	if (logfile == nullptr)
 	{
 		__debugbreak();
 	}
-	fclose(logfile);
+	fclose(logfile);*/
 }
 
 Parser::~Parser()

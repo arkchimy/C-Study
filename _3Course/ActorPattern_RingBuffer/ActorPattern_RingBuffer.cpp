@@ -352,7 +352,10 @@ void CreateMsg()
     AcquireSRWLockShared(&list_srw);
     list_len = g_List.size();
     ReleaseSRWLockShared(&list_srw);
-    head.shType = rand() % dfJOB_QUIT;
+    if (list_len >= 500)
+        head.shType = dfJOB_DEL;
+    else
+        head.shType = rand() % dfJOB_QUIT;
 
     switch (head.shType)
     {
