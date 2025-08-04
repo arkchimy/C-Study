@@ -17,4 +17,6 @@ int main()
         msg >> temp;
         std::cout << temp << "\n";
     }
+
+
 }

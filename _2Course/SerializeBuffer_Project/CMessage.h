@@ -2,6 +2,9 @@
 #include <Windows.h>
 #include <iostream>
 
+template <typename T>
+concept Fundamental = std::is_fundamental_v<T>;
+
 struct CMessage
 {
     CMessage()
@@ -30,14 +33,14 @@ struct CMessage
         }
         return HeapAlloc(s_CMessageHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, sizeof(CMessage));
     }
-    template <typename T>
+    template <Fundamental T>
     CMessage &operator<<(const T &data)
     {
         memcpy(_rear, &data, sizeof(data));
         _rear += sizeof(data);
         return *this;
     }
-    template <typename T>
+    template <Fundamental T>
     CMessage &operator>>(T &data)
     {
         memcpy(&data, _front, sizeof(data));
