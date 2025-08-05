@@ -14,7 +14,7 @@ VOID CALLBACK APCProc(ULONG_PTR dwParam)
 {
     printf("APC called! : %ld \n", dwParam);
 }
-unsigned __stdcall WorkerThread(void *arg)
+unsigned WorkerThread(void *arg)
 {
     static LONG num = 1;
     DWORD current = GetCurrentThreadId();
