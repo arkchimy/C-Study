@@ -1,8 +1,13 @@
+ï»¿#pragma once
+
+#define WIN32_LEAN_AND_MEAN             // ê±°ì˜ ì‚¬ìš©ë˜ì§€ ì•ŠëŠ” ë‚´ìš©ì„ Windows í—¤ë”ì—ì„œ ì œì™¸í•©ë‹ˆë‹¤.
 #pragma once
+
+
 #include <Windows.h>
-#include <iostream>
 #include <exception>
-#include "../../error_log.h" 
+#include <iostream>
+#include "../../../error_log.h"
 
 class MessageException : public std::exception
 {
@@ -62,7 +67,7 @@ struct CMessage
             _end = _begin + _size;
 
             if (_begin == nullptr)
-                __debugbreak(); // TODO: Á¾·áÀıÂ÷·Î °¡¾ßÇÒ µí.
+                __debugbreak(); // TODO: ì¢…ë£Œì ˆì°¨ë¡œ ê°€ì•¼í•  ë“¯.
 
             _rear = _begin;
             _front = _begin;
@@ -88,7 +93,7 @@ struct CMessage
         HANDLE current_Heap;
         BOOL bHeapDeleteRetval;
         volatile LONG64 useCnt;
-        current_Heap = s_BufferHeap; // s_Buffer°¡ µ¤¾î¾µ¼ö ÀÖ±â¶§¹®¿¡ Áö¿ªÀ¸·Î º¹»ç.
+        current_Heap = s_BufferHeap; // s_Bufferê°€ ë®ì–´ì“¸ìˆ˜ ìˆê¸°ë•Œë¬¸ì— ì§€ì—­ìœ¼ë¡œ ë³µì‚¬.
         useCnt = _InterlockedDecrement64(&s_UseCnt);
 
         if (useCnt == 0)
@@ -106,7 +111,6 @@ struct CMessage
     CMessage(CMessage &&) = delete;
     CMessage &operator=(CMessage &&) = delete;
 
-
     template <Fundamental T>
     CMessage &operator<<(const T &data)
     {
@@ -118,9 +122,8 @@ struct CMessage
                 ReSize();
             else
                 throw MessageException(MessageException::NotEnoughSpace, "Buffer is fulled\n");
-            
         }
-            
+
         memcpy(r, &data, sizeof(data));
         _rear = r + sizeof(data);
 
@@ -128,7 +131,7 @@ struct CMessage
     }
 
     template <Fundamental T>
-    CMessage &operator>>( T &data)
+    CMessage &operator>>(T &data)
     {
         char *f = _front;
         if (f > _rear)
@@ -149,7 +152,7 @@ struct CMessage
         _rear += size;
         return _rear - r;
     }
-    DWORD GetData(char* desc, DWORD size)
+    DWORD GetData(char *desc, DWORD size)
     {
         char *f = _front;
         if (f + size > _rear)
@@ -158,8 +161,8 @@ struct CMessage
         _front += size;
         return _front - f;
     }
-    void ReSize() {} // ¹Ì±¸Çö
-    void Peek(char* out, DWORD size)
+    void ReSize() {} // ë¯¸êµ¬í˜„
+    void Peek(char *out, DWORD size)
     {
         char *f = _front;
         if (f + size > _rear)
