@@ -7,6 +7,7 @@
 #include <Windows.h>
 #include <exception>
 #include <iostream>
+#include "../../../error_log.h"
 
 using SerializeBufferSize = DWORD;
 class MessageException : public std::exception
@@ -17,30 +18,30 @@ class MessageException : public std::exception
         HasNotData,
         NotEnoughSpace
     };
-
+    
     MessageException(ErrorType type, const std::string &msg)
-        : type_(type), msg_(msg) {}
+        : _type(type), _msg(msg) {}
 
     virtual const char *what() const noexcept override
     {
-        return msg_.c_str();
+        return _msg.c_str();
     }
 
-    ErrorType type() const noexcept { return type_; }
+    ErrorType type() const noexcept { return _type; }
 
   private:
-    ErrorType type_;
-    std::string msg_;
+    ErrorType _type;
+    std::string _msg;
 };
 
 template <typename T>
 concept Fundamental = std::is_fundamental_v<T>;
 struct CMessage
 {
-    enum class en_BufferSize
+    enum en_BufferSize : DWORD
     {
-        bufferSize = 1000,
-        MaxSize = 2000,
+        bufferSize = 100,
+        MaxSize = 200,
     };
     CMessage();
     ~CMessage();
@@ -51,12 +52,15 @@ struct CMessage
     CMessage &operator=(CMessage &&) = delete;
 
     template <Fundamental T>
-    CMessage &operator<<(const T &data)
+    CMessage &operator << (const T data)
     {
         if (_end < _rear + sizeof(data))
         {
-            if (_size == (DWORD)en_BufferSize::bufferSize)
+            if (_size == en_BufferSize::bufferSize)
+            {
                 ReSize();
+                HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin,_size );
+            }
             else
                 throw MessageException(MessageException::NotEnoughSpace, "Buffer is fulled\n");
         }
@@ -80,7 +84,7 @@ struct CMessage
     DWORD PutData(const char *src, SerializeBufferSize size);
     DWORD GetData(char *desc, SerializeBufferSize size);
 
-    void ReSize();
+    BOOL ReSize();
     void Peek(char *out, SerializeBufferSize size);
 
     SerializeBufferSize _size;

@@ -15,10 +15,8 @@
 
 HANDLE hIOCPPort, hAcceptThread;
 
-
-void RecvProcezer(clsSession *session, DWORD transferred);
-void SendProcezer(clsSession *session, DWORD transferred);
-
+void RecvProcedure(clsSession *session, DWORD transferred);
+void SendProcedure(clsSession *session, DWORD transferred);
 
 unsigned AcceptThread(void *arg)
 {
@@ -32,7 +30,7 @@ unsigned AcceptThread(void *arg)
         client_sock = accept(listen_sock, (sockaddr *)&addr, &addrlen);
         if (client_sock == INVALID_SOCKET)
         {
-            ERROR_FILE_LOG(L"Accept Error ");
+            ERROR_FILE_LOG(L"SocketError.txt", L"Accept Error ");
             continue;
         }
         clsSession *session = new clsSession(client_sock);
@@ -55,23 +53,23 @@ unsigned WorkerThread(void *arg)
         GetQueuedCompletionStatus(hIOCPPort, &transferred, &key, &overlapped, INFINITE);
         if (overlapped == nullptr)
         {
-            ERROR_FILE_LOG(L"GetQueuedCompletionStatus Overlapped is nullptr\n");
+            ERROR_FILE_LOG(L"SocketError.txt", L"GetQueuedCompletionStatus Overlapped is nullptr\n");
             continue;
         }
         session = reinterpret_cast<clsSession *>(key);
 
         AcquireSRWLockExclusive(&session->srw_session);
-        //TODO : JumpTable 생성 되는 지?
-        switch (reinterpret_cast<stOverlapped*>(overlapped)->_mode)
+        // TODO : JumpTable 생성 되는 지?
+        switch (reinterpret_cast<stOverlapped *>(overlapped)->_mode)
         {
         case Job_Type::Recv:
-            RecvProcezer(session, transferred);
+            RecvProcedure(session, transferred);
             break;
         case Job_Type::Send:
-            SendProcezer(session, transferred);
+            SendProcedure(session, transferred);
             break;
         case Job_Type::MAX:
-            ERROR_FILE_LOG(L"UnDefine Error Overlapped_mode");
+            ERROR_FILE_LOG(L"SocketError.txt", L"UnDefine Error Overlapped_mode");
         }
         ReleaseSRWLockExclusive(&session->srw_session);
 
@@ -81,7 +79,6 @@ unsigned WorkerThread(void *arg)
             closesocket(session->_ioCount);
             delete session;
         }
-        
     }
 
     return 0;
@@ -107,13 +104,13 @@ int main()
     hAcceptThread = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &EchoServer.listen_sock, 0, nullptr);
 }
 
-void RecvProcezer(clsSession *session, DWORD transferred)
+void RecvProcedure(clsSession *session, DWORD transferred)
 {
     session->recvBuffer->MoveRear(transferred);
-    if ()
+    
 }
 
-void SendProcezer(clsSession *session, DWORD transferred)
+void SendProcedure(clsSession *session, DWORD transferred)
 {
     DWORD useSize;
     DWORD directDQSize;
@@ -128,7 +125,6 @@ void SendProcezer(clsSession *session, DWORD transferred)
 
     if (useSize == 0)
         return;
-
 
     if (directDQSize > useSize)
     {
@@ -156,9 +152,9 @@ void SendProcezer(clsSession *session, DWORD transferred)
         if (GetLastError() != ERROR_IO_PENDING)
         {
 
-            ERROR_FILE_LOG(L"WSASend Error \n");
+            ERROR_FILE_LOG(L"SocketError.txt",
+                           L"WSASend Error \n");
             _InterlockedDecrement(&session->_ioCount);
         }
     }
-    
 }
