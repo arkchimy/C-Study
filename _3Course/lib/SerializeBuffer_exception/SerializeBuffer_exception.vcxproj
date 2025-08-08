@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{38a6b2ed-7158-4d23-a6e4-3d6c1e6b97ec}</ProjectGuid>
-    <RootNamespace>SerializeBufferMT</RootNamespace>
+    <ProjectGuid>{1d36ff30-e26e-4f5c-b13c-db648ce9e8b8}</ProjectGuid>
+    <RootNamespace>SerializeBufferexception</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -141,7 +141,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="SerializeBuffer_MT.h" />
+    <ClInclude Include="SerializeBuffer_exception.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
@@ -151,7 +151,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="SerializeBuffer_MT.cpp" />
+    <ClCompile Include="SerializeBuffer_exception.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

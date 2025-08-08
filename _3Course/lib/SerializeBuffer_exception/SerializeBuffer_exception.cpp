@@ -2,8 +2,8 @@
 //
 #include "pch.h"
 
-#include "SerializeBuffer_MT.h"
 #include "../../../error_log.h"
+#include "SerializeBuffer_exception.h"
 
 CMessage::CMessage()
 {
