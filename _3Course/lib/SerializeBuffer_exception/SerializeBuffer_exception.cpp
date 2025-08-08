@@ -18,7 +18,7 @@ CMessage::CMessage()
         s_BufferHeap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
         if (s_BufferHeap == nullptr)
         {
-            ERROR_FILE_LOG("HeapCreate Error\n");
+            ERROR_FILE_LOG("SerializeError.txt", L"HeapCreate Error\n");
             return;
         }
         else
@@ -38,13 +38,13 @@ CMessage::CMessage()
         switch (exceptRetval)
         {
         case STATUS_NO_MEMORY:
-            ERROR_FILE_LOG("s_BufferHeap Create Failed STATUS_NO_MEMORY \n");
+            ERROR_FILE_LOG("SerializeError.txt", L"s_BufferHeap Create Failed STATUS_NO_MEMORY \n");
             break;
         case STATUS_ACCESS_VIOLATION:
-            ERROR_FILE_LOG("s_BufferHeap Create Failed STATUS_ACCESS_VIOLATION \n");
+            ERROR_FILE_LOG("SerializeError.txt", L"s_BufferHeap Create Failed STATUS_ACCESS_VIOLATION \n");
             break;
         default:
-            ERROR_FILE_LOG("Not define Error \n");
+            ERROR_FILE_LOG("SerializeError.txt", L"Not define Error \n");
         }
     }
 }
@@ -62,7 +62,7 @@ CMessage::~CMessage()
         bHeapDeleteRetval = HeapDestroy(current_Heap);
         if (bHeapDeleteRetval == 0)
         {
-            ERROR_FILE_LOG("s_BufferHeap Delete Failed \n");
+            ERROR_FILE_LOG("SerializeError.txt",L"s_BufferHeap Delete Failed ");
             return;
         }
     }
@@ -120,15 +120,15 @@ void CMessage::ReSize()
         switch (exceptRetval)
         {
         case STATUS_NO_MEMORY:
-            ERROR_FILE_LOG("s_BufferHeap Create Failed STATUS_NO_MEMORY \n");
+            ERROR_FILE_LOG("SerializeError.txt", L"s_BufferHeap Create Failed STATUS_NO_MEMORY \n");
             break;
 
         case STATUS_ACCESS_VIOLATION:
-            ERROR_FILE_LOG("s_BufferHeap Create Failed STATUS_ACCESS_VIOLATION \n");
+            ERROR_FILE_LOG("SerializeError.txt", L"s_BufferHeap Create Failed STATUS_ACCESS_VIOLATION \n");
             break;
 
         default:
-            ERROR_FILE_LOG("Not define Error \n");
+            ERROR_FILE_LOG("SerializeError.txt", L"Not define Error \n");
         }
     }
 }
