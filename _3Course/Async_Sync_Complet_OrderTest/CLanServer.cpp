@@ -1,11 +1,6 @@
 #include "CLanServer.h"
 #include "../../error_log.h"
 
-#include <ws2def.h>
-#include <Windows.h>
-
-#include <WS2tcpip.h>
-#include <WinSock2.h>
 
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
@@ -33,7 +28,13 @@ BOOL CLanServer::OnServer(const wchar_t *addr, short port)
 
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_sock == INVALID_SOCKET)
-        ERROR_FILE_LOG(L"listen_sock Create Socket Error");
+    {
+
+        ERROR_FILE_LOG(L"Socket_Error.txt",
+                       L"listen_sock Create Socket Error");
+        return false;
+    }
+    return true;
 }
 
 CLanServer::~CLanServer()

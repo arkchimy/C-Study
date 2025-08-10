@@ -133,8 +133,10 @@
     <ClCompile Include="st_WSAData.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Async_Sync_Complet_OrderTest.h" />
     <ClInclude Include="CLanServer.h" />
     <ClInclude Include="clsSession.h" />
+    <ClInclude Include="stProtocol.h" />
     <ClInclude Include="st_WSAData.h" />
   </ItemGroup>
   <ItemGroup>

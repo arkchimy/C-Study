@@ -1,10 +1,4 @@
-﻿// MT_CRingBuffer_lib.cpp : 정적 라이브러리를 위한 함수를 정의합니다.
-//
-
-#include "framework.h"
-#include "pch.h"
-
-#include <memory>
+﻿#include "MT_CRingBuffer_lib.h"
 
 CRingBuffer::CRingBuffer()
 {
@@ -28,7 +22,7 @@ CRingBuffer::~CRingBuffer()
     _aligned_free(_begin);
 }
 
-ringBufferSize CRingBuffer::GetUseSize(void)
+ringBufferSize CRingBuffer::GetUseSize()
 {
     char *f = _frontPtr;
     char *r = _rearPtr;
@@ -37,7 +31,7 @@ ringBufferSize CRingBuffer::GetUseSize(void)
                   : _end - f + r - _begin;
 }
 
-ringBufferSize CRingBuffer::GetFreeSize(void)
+ringBufferSize CRingBuffer::GetFreeSize()
 {
     // 가득 채우면 안되므로 -1
     char *f = _frontPtr;
@@ -47,24 +41,13 @@ ringBufferSize CRingBuffer::GetFreeSize(void)
                   : f - r - 1;
 }
 
-bool CRingBuffer::ReSize()
-{
-    char *f = _frontPtr, *r = _rearPtr;
 
-    // TODO : 이게 멀쓰에서 안전한가?
-    /* if (f <= r)
-     {
-         _end += _end - _begin;
 
-     }*/
-
-    return false;
-}
-
-bool CRingBuffer::Enqueue(const char *chpSrc, ringBufferSize iSize)
+bool CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
 {
     ringBufferSize directEnQSize, freeSize;
     char *f = _frontPtr, *r = _rearPtr;
+    const char *chpSrc = reinterpret_cast<const char *>(pSrc);
 
     if (f == _begin && r == _end)
     {
@@ -80,9 +63,7 @@ bool CRingBuffer::Enqueue(const char *chpSrc, ringBufferSize iSize)
 
     if (freeSize <= iSize)
     {
-        bool bChk = ReSize();
-        if (bChk == false)
-            return false;
+        return false;
     }
 
     if (iSize <= directEnQSize)
@@ -99,9 +80,11 @@ bool CRingBuffer::Enqueue(const char *chpSrc, ringBufferSize iSize)
     return true;
 }
 
-bool CRingBuffer::Dequeue(char *chpDest, ringBufferSize iSize)
+bool CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize)
 {
     char *f, *r;
+    char *chpDest = reinterpret_cast<char *>(pDest);
+
     ringBufferSize DirectDeqSize;
     ringBufferSize useSize;
     f = _frontPtr;
@@ -131,8 +114,9 @@ bool CRingBuffer::Dequeue(char *chpDest, ringBufferSize iSize)
     return true;
 }
 
-ringBufferSize CRingBuffer::Peek(char *chpDest, ringBufferSize iSize)
+ringBufferSize CRingBuffer::Peek(void *pDest, ringBufferSize iSize)
 {
+    char *chpDest = reinterpret_cast<char*>(pDest);
     char *f = _frontPtr, *r = _rearPtr;
     ringBufferSize useSize, DirectDeqSize;
 
@@ -156,13 +140,13 @@ ringBufferSize CRingBuffer::Peek(char *chpDest, ringBufferSize iSize)
     return iSize;
 }
 
-void CRingBuffer::ClearBuffer(void)
+void CRingBuffer::ClearBuffer()
 {
     _rearPtr = _begin;
     _frontPtr = _begin;
 }
 
-ringBufferSize CRingBuffer::DirectEnqueueSize(void)
+ringBufferSize CRingBuffer::DirectEnqueueSize()
 {
     char *f = _frontPtr, *r = _rearPtr;
 
@@ -175,7 +159,7 @@ ringBufferSize CRingBuffer::DirectEnqueueSize(void)
                   : f - r - 1;
 }
 
-ringBufferSize CRingBuffer::DirectDequeueSize(void)
+ringBufferSize CRingBuffer::DirectDequeueSize()
 {
     char *f = _frontPtr, *r = _rearPtr;
 

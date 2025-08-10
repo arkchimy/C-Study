@@ -38,5 +38,11 @@
     <ClInclude Include="clsSession.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="stProtocol.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Async_Sync_Complet_OrderTest.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
