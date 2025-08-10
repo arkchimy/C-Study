@@ -134,10 +134,10 @@ void RecvProcedure(clsSession *const session, DWORD transferred)
 {
     stEchoHeader header;
     ringBufferSize useSize, freeSize;
-    ringBufferSize DeQsize, payLoadDeQsize;
+    ringBufferSize DeQsize, EnQsize;
     ringBufferSize directDeQsize;
     int wsaRecv_retval;
-
+    char buffer[100];
     session->recvBuffer->MoveRear(transferred);
     while (1)
     {
@@ -155,12 +155,20 @@ void RecvProcedure(clsSession *const session, DWORD transferred)
             // SendBuffer에 빈 공간이 부족하다면
             if (freeSize < sizeof(header) + header.len)
                 break;
-            DeQsize = session->recvBuffer->Dequeue(session->sendBuffer->_rearPtr, header.len + sizeof(stEchoHeader));
-            session->sendBuffer->MoveRear(DeQsize);
+
+            ZeroMemory(buffer, sizeof(buffer));
+            DeQsize = session->recvBuffer->Dequeue(buffer, header.len + sizeof(stEchoHeader));
+            EnQsize = session->sendBuffer->Enqueue(buffer, header.len + sizeof(stEchoHeader));
+        
 
             if (DeQsize != header.len + sizeof(stEchoHeader))
             {
                 ERROR_FILE_LOG(L"Critical_Error.txt", L"DeQueueSize_Dif_retvalue");
+                __debugbreak();
+            }
+            if (EnQsize != header.len + sizeof(stEchoHeader))
+            {
+                ERROR_FILE_LOG(L"Critical_Error.txt", L"EnQueueSize_Dif_retvalue");
                 __debugbreak();
             }
         }
@@ -173,26 +181,7 @@ void RecvProcedure(clsSession *const session, DWORD transferred)
 
 void SendProcedure(clsSession *const session, DWORD transferred)
 {
-    DWORD useSize;
-
     session->sendBuffer->MoveFront(transferred);
-    useSize = session->sendBuffer->GetUseSize();
-
-    //if (useSize == 0)
-    //{
-    //    // flag 를 종료 Post를 통해 useSize의 오진단을 막는 시도.
-    // 
-    //    if (InterlockedCompareExchange(&session->_flag, 0, 1) == 1)
-    //    {
-    //        ZeroMemory(&session->_PostOverlapped, sizeof(stOverlapped));
-    //        session->_PostOverlapped._mode = Job_Type::PostSend;
-
-    //        _InterlockedIncrement(&session->_ioCount);
-    //        PostQueuedCompletionStatus(hIOCPPort, 0, (ULONG_PTR)session, &session->_PostOverlapped);
-    //    }
-    //    return;
-    //}
-
     SendPacket(session);
 }
 
@@ -215,15 +204,24 @@ void SendPacket(clsSession *const session)
 
     useSize = session->sendBuffer->GetUseSize();
 
-    //if (useSize == 0)
-    //    return;
+    if (useSize == 0)
+    {
+        if (InterlockedCompareExchange(&session->_flag, 0, 1) == 1)
+        {
+            ZeroMemory(&session->_PostOverlapped, sizeof(stOverlapped));
+            session->_PostOverlapped._mode = Job_Type::PostSend;
+
+            _InterlockedIncrement(&session->_ioCount);
+            PostQueuedCompletionStatus(hIOCPPort, 0, (ULONG_PTR)session, &session->_PostOverlapped);
+        }
+        return;
+    }
     directDQSize = session->sendBuffer->DirectDequeueSize();
 
     ZeroMemory(wsaBuf, sizeof(wsaBuf));
     ZeroMemory(&session->_sendOverlapped, sizeof(stOverlapped));
     session->_sendOverlapped._mode = Job_Type::Send;
 
- 
     wsaBuf[0].buf = session->sendBuffer->_frontPtr;
     wsaBuf[0].len = directDQSize;
 

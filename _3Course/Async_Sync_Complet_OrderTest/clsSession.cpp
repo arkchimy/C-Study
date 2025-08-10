@@ -6,7 +6,7 @@ clsSession::clsSession(SOCKET sock)
     : _sock(sock)
 {
 
-    sendBuffer = new CRingBuffer(1000);
+    sendBuffer = new CRingBuffer();
     recvBuffer = new CRingBuffer();
     _blive = 1;
     InitializeSRWLock(&srw_session);
