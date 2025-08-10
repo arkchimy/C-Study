@@ -6,12 +6,9 @@ clsSession::clsSession(SOCKET sock)
     : _sock(sock)
 {
 
-
-    _sendOverlapped._mode = Job_Type::Send;
-    _recvOverlapped._mode = Job_Type::Recv;
-    sendBuffer = new CRingBuffer();
+    sendBuffer = new CRingBuffer(1000);
     recvBuffer = new CRingBuffer();
-    blive = 1;
+    _blive = 1;
     InitializeSRWLock(&srw_session);
 
 }

@@ -30,9 +30,7 @@ BOOL CLanServer::OnServer(const wchar_t *addr, short port)
 
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     bind_retval = bind(listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
-    if (bind_retval == 0)
-        ERROR_FILE_LOG(L"Socket_Error.txt", L"Bind Sucess");
-    else
+    if (bind_retval != 0)
         ERROR_FILE_LOG(L"Socket_Error.txt", L"Bind Failed");
 
     if (listen_sock == INVALID_SOCKET)
