@@ -16,8 +16,8 @@ class CRingBuffer
     ringBufferSize GetUseSize();
     ringBufferSize GetFreeSize();
 
-    bool Enqueue(const void* chpData, ringBufferSize iSize);
-    bool Dequeue(void *chpDest, ringBufferSize iSize);
+    ringBufferSize Enqueue(const void *chpData, ringBufferSize iSize);
+    ringBufferSize Dequeue(void *chpDest, ringBufferSize iSize);
 
     ringBufferSize Peek(void *chpDest, ringBufferSize iSize);
     void ClearBuffer();

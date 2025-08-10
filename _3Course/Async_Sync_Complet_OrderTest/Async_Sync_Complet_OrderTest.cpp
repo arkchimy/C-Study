@@ -1,6 +1,5 @@
 ﻿#include "Async_Sync_Complet_OrderTest.h"
 
-
 HANDLE hIOCPPort, hAcceptThread;
 
 void RecvProcedure(clsSession *session, DWORD transferred);
@@ -11,8 +10,15 @@ unsigned AcceptThread(void *arg)
     SOCKET client_sock;
     SOCKADDR_IN addr;
     SOCKET listen_sock = *reinterpret_cast<SOCKET *>(arg);
+    DWORD listen_retval;
+
     int addrlen = sizeof(addr);
 
+    listen_retval = listen(listen_sock, SOMAXCONN_HINT(65535));
+    if (listen_retval == 0)
+        printf("Listen Sucess\n");
+    else
+        ERROR_FILE_LOG(L"Socket_Error.txt", L"Listen_Error");
     while (1)
     {
         client_sock = accept(listen_sock, (sockaddr *)&addr, &addrlen);
@@ -24,6 +30,25 @@ unsigned AcceptThread(void *arg)
         clsSession *session = new clsSession(client_sock);
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCPPort, (ull)session, 0);
+        WSABUF wsabuf;
+        DWORD flag = 0;
+        DWORD wsarecv_retval;
+
+        wsabuf.buf = session->recvBuffer->_rearPtr;
+        wsabuf.len = session->recvBuffer->GetFreeSize();
+
+        _InterlockedIncrement(&session->_ioCount);
+        wsarecv_retval = WSARecv(client_sock, &wsabuf, 1, nullptr, &flag, &session->_recvOverlapped, nullptr);
+        if (wsarecv_retval < 0)
+        {
+            if (WSA_IO_PENDING != GetLastError())
+            {
+                _InterlockedDecrement(&session->_ioCount);
+                ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Recv Error");
+                closesocket(client_sock);
+                delete session;
+            }
+        }
     }
     return 0;
 }
@@ -75,8 +100,8 @@ unsigned WorkerThread(void *arg)
 int main()
 {
     CLanServer EchoServer;
-
     st_WSAData wsa;
+    HANDLE hWorkerThread[3];
 
     {
         Parser parser;
@@ -90,15 +115,21 @@ int main()
     }
     hIOCPPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
     hAcceptThread = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &EchoServer.listen_sock, 0, nullptr);
+
+    for (int i = 0; i < 3; i++)
+        hWorkerThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
+    while (1)
+    {
+    }
 }
 
 void RecvProcedure(clsSession *session, DWORD transferred)
 {
     stEchoHeader header;
-    ringBufferSize useSize,freeSize;
+    ringBufferSize useSize, freeSize;
     ringBufferSize DeQsize, payLoadDeQsize;
     ringBufferSize directDeQsize;
-    DWORD wsaRecv_retval ,flag = 0;
+    DWORD wsaRecv_retval, flag = 0;
 
     session->recvBuffer->MoveRear(transferred);
     while (1)
@@ -106,6 +137,9 @@ void RecvProcedure(clsSession *session, DWORD transferred)
         useSize = session->recvBuffer->GetUseSize();
         freeSize = session->sendBuffer->GetFreeSize(); // SendBuffer에 바로넣기 위함.
         // Peek 의 반환값은 useSize가 더 적다면 useSize를 보낸다.
+        if (useSize < sizeof(header))
+            break;
+
         if (session->recvBuffer->Peek(&header, sizeof(header)) == sizeof(header))
         {
             // payLoad만큼 왔다면
@@ -121,7 +155,6 @@ void RecvProcedure(clsSession *session, DWORD transferred)
                 __debugbreak();
             }
         }
-
     }
     directDeQsize = session->recvBuffer->DirectDequeueSize();
 
@@ -161,10 +194,7 @@ void RecvProcedure(clsSession *session, DWORD transferred)
                 ERROR_FILE_LOG(L"Socket_Error.txt", L"WSARecv_Error");
             }
         }
-
     }
-   
-    
 }
 
 void SendProcedure(clsSession *session, DWORD transferred)
@@ -174,7 +204,7 @@ void SendProcedure(clsSession *session, DWORD transferred)
     WSABUF wsaBuf[2];
     DWORD bufCnt = 2;
     DWORD send_retval;
-
+    
     session->sendBuffer->MoveFront(transferred);
 
     useSize = session->sendBuffer->GetUseSize();
@@ -208,7 +238,6 @@ void SendProcedure(clsSession *session, DWORD transferred)
     {
         if (GetLastError() != ERROR_IO_PENDING)
         {
-
             ERROR_FILE_LOG(L"Socket_Error.txt",
                            L"WSASend Error \n");
             _InterlockedDecrement(&session->_ioCount);

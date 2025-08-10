@@ -43,9 +43,11 @@ ringBufferSize CRingBuffer::GetFreeSize()
 
 
 
-bool CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
+ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
 {
     ringBufferSize directEnQSize, freeSize;
+    ringBufferSize local_size = iSize;
+
     char *f = _frontPtr, *r = _rearPtr;
     const char *chpSrc = reinterpret_cast<const char *>(pSrc);
 
@@ -61,57 +63,59 @@ bool CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
     freeSize = f <= r ? (_end - r) + (f - _begin) - 1
                       : f - r - 1;
 
-    if (freeSize <= iSize)
+    if (freeSize < local_size)
     {
         return false;
     }
 
-    if (iSize <= directEnQSize)
+    if (local_size <= directEnQSize)
     {
-        memcpy(r, chpSrc, iSize);
+        memcpy(r, chpSrc, local_size);
     }
     else
     {
         memcpy(r, chpSrc, directEnQSize);
-        memcpy(_begin, chpSrc + directEnQSize, iSize - directEnQSize);
+        memcpy(_begin, chpSrc + directEnQSize, local_size - directEnQSize);
     }
-    MoveRear(iSize);
+    MoveRear(local_size);
 
-    return true;
+    return local_size;
 }
 
-bool CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize)
+ringBufferSize CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize)
 {
     char *f, *r;
     char *chpDest = reinterpret_cast<char *>(pDest);
 
     ringBufferSize DirectDeqSize;
     ringBufferSize useSize;
+    ringBufferSize local_size = iSize;
+
     f = _frontPtr;
     r = _rearPtr;
 
     useSize = f <= r ? r - f
                      : _end - f + r - _begin;
 
-    if (useSize < iSize)
+    if (useSize < local_size)
         return false;
 
     // TODO : 비순차적 문제는 없을까? Store라 괜찮음
 
     DirectDeqSize = f <= r ? r - f : _end - f;
 
-    if (iSize <= DirectDeqSize)
+    if (local_size <= DirectDeqSize)
     {
-        memcpy(chpDest, f, iSize);
+        memcpy(chpDest, f, local_size);
     }
     else
     {
         memcpy(chpDest, f, DirectDeqSize);
-        memcpy(chpDest + DirectDeqSize, _begin, iSize - DirectDeqSize);
+        memcpy(chpDest + DirectDeqSize, _begin, local_size - DirectDeqSize);
     }
-    MoveFront(iSize);
+    MoveFront(local_size);
 
-    return true;
+    return local_size;
 }
 
 ringBufferSize CRingBuffer::Peek(void *pDest, ringBufferSize iSize)
