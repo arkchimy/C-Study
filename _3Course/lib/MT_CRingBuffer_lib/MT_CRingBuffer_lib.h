@@ -14,7 +14,9 @@ class CRingBuffer
     ~CRingBuffer();
 
     ringBufferSize GetUseSize();
+    ringBufferSize GetUseSize(const char *f, const char *r);
     ringBufferSize GetFreeSize();
+    ringBufferSize GetFreeSize(const char *f, const char *r);
 
     ringBufferSize Enqueue(const void *chpData, ringBufferSize iSize);
     ringBufferSize Dequeue(void *chpDest, ringBufferSize iSize);
@@ -23,7 +25,10 @@ class CRingBuffer
     void ClearBuffer();
 
     ringBufferSize DirectEnqueueSize();
+    ringBufferSize DirectEnqueueSize(const char* f, const char* r);
+
     ringBufferSize DirectDequeueSize();
+    ringBufferSize DirectDequeueSize(const char *f, const char *r);
 
     void MoveRear(ringBufferSize iSize);
     void MoveFront(ringBufferSize iSize);

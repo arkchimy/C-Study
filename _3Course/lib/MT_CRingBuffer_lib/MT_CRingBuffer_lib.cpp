@@ -31,12 +31,24 @@ ringBufferSize CRingBuffer::GetUseSize()
                   : _end - f + r - _begin;
 }
 
+ringBufferSize CRingBuffer::GetUseSize(const char *f, const char *r)
+{
+    return f <= r ? r - f
+                  : _end - f + r - _begin;
+}
+
 ringBufferSize CRingBuffer::GetFreeSize()
 {
     // 가득 채우면 안되므로 -1
     char *f = _frontPtr;
     char *r = _rearPtr;
 
+    return f <= r ? (_end - r) + (f - _begin) - 1
+                  : f - r - 1;
+}
+
+ringBufferSize CRingBuffer::GetFreeSize(const char *f, const char *r)
+{
     return f <= r ? (_end - r) + (f - _begin) - 1
                   : f - r - 1;
 }
@@ -163,10 +175,26 @@ ringBufferSize CRingBuffer::DirectEnqueueSize()
                   : f - r - 1;
 }
 
+ringBufferSize CRingBuffer::DirectEnqueueSize(const char *f, const char *r)
+{
+    if (f == _begin && r == _end)
+    {
+        return _end - r - 1;
+    }
+
+    return f <= r ? _end - r
+                  : f - r - 1;
+}
+
 ringBufferSize CRingBuffer::DirectDequeueSize()
 {
     char *f = _frontPtr, *r = _rearPtr;
 
+    return f <= r ? r - f : _end - f;
+}
+
+ringBufferSize CRingBuffer::DirectDequeueSize(const char *f, const char *r)
+{
     return f <= r ? r - f : _end - f;
 }
 

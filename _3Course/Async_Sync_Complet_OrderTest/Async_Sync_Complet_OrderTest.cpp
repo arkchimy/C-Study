@@ -132,48 +132,7 @@ int main()
 
 void RecvProcedure(clsSession *const session, DWORD transferred)
 {
-    stEchoHeader header;
-    ringBufferSize useSize, freeSize;
-    ringBufferSize DeQsize, EnQsize;
-    ringBufferSize directDeQsize;
-    int wsaRecv_retval;
-    char buffer[100];
     session->recvBuffer->MoveRear(transferred);
-    while (1)
-    {
-        useSize = session->recvBuffer->GetUseSize();
-        freeSize = session->sendBuffer->GetFreeSize(); // SendBuffer에 바로넣기 위함.
-        // Peek 의 반환값은 useSize가 더 적다면 useSize를 보낸다.
-        if (useSize < sizeof(header))
-            break;
-
-        if (session->recvBuffer->Peek(&header, sizeof(header)) == sizeof(header))
-        {
-            // payLoad만큼 왔다면
-            if (useSize < sizeof(header) + header.len)
-                break;
-            // SendBuffer에 빈 공간이 부족하다면
-            if (freeSize < sizeof(header) + header.len)
-                break;
-
-            ZeroMemory(buffer, sizeof(buffer));
-            DeQsize = session->recvBuffer->Dequeue(buffer, header.len + sizeof(stEchoHeader));
-            EnQsize = session->sendBuffer->Enqueue(buffer, header.len + sizeof(stEchoHeader));
-        
-
-            if (DeQsize != header.len + sizeof(stEchoHeader))
-            {
-                ERROR_FILE_LOG(L"Critical_Error.txt", L"DeQueueSize_Dif_retvalue");
-                __debugbreak();
-            }
-            if (EnQsize != header.len + sizeof(stEchoHeader))
-            {
-                ERROR_FILE_LOG(L"Critical_Error.txt", L"EnQueueSize_Dif_retvalue");
-                __debugbreak();
-            }
-        }
-    }
-
     if (InterlockedCompareExchange(&session->_flag, 1, 0) == 0)
         SendPacket(session);
     RecvPacket(session);
@@ -181,7 +140,7 @@ void RecvProcedure(clsSession *const session, DWORD transferred)
 
 void SendProcedure(clsSession *const session, DWORD transferred)
 {
-    session->sendBuffer->MoveFront(transferred);
+    session->recvBuffer->MoveFront(transferred);
     SendPacket(session);
 }
 
@@ -195,47 +154,45 @@ void PostProcedure(clsSession *const session)
 
 void SendPacket(clsSession *const session)
 {
-    DWORD useSize, directDQSize;
-
-    DWORD bufCnt = 2;
+    ringBufferSize useSize, directDQSize;
+    DWORD bufCnt;
     int send_retval;
 
     WSABUF wsaBuf[2];
 
-    useSize = session->sendBuffer->GetUseSize();
+    char *f = session->recvBuffer->_frontPtr, *r = session->recvBuffer->_rearPtr;
 
-    if (useSize == 0)
-    {
-        if (InterlockedCompareExchange(&session->_flag, 0, 1) == 1)
-        {
-            ZeroMemory(&session->_PostOverlapped, sizeof(stOverlapped));
-            session->_PostOverlapped._mode = Job_Type::PostSend;
-
-            _InterlockedIncrement(&session->_ioCount);
-            PostQueuedCompletionStatus(hIOCPPort, 0, (ULONG_PTR)session, &session->_PostOverlapped);
-        }
-        return;
-    }
-    directDQSize = session->sendBuffer->DirectDequeueSize();
+    directDQSize = session->recvBuffer->DirectDequeueSize(f, r);
+    useSize = session->recvBuffer->GetUseSize(f, r);
 
     ZeroMemory(wsaBuf, sizeof(wsaBuf));
-    ZeroMemory(&session->_sendOverlapped, sizeof(stOverlapped));
+    ZeroMemory(&session->_sendOverlapped, sizeof(OVERLAPPED));
     session->_sendOverlapped._mode = Job_Type::Send;
 
-    wsaBuf[0].buf = session->sendBuffer->_frontPtr;
-    wsaBuf[0].len = directDQSize;
+    if (useSize <= directDQSize)
+    {
+        wsaBuf[0].buf = session->recvBuffer->_frontPtr;
+        wsaBuf[0].len = useSize;
 
-    wsaBuf[1].buf = session->sendBuffer->_begin;
-    wsaBuf[1].len = useSize - directDQSize;
+        bufCnt = 1;
+    }
+    else
+    {
+        wsaBuf[0].buf = session->recvBuffer->_frontPtr;
+        wsaBuf[0].len = directDQSize;
 
-    bufCnt = 2;
-    
+        wsaBuf[1].buf = session->recvBuffer->_begin;
+        wsaBuf[1].len = useSize - directDQSize;
+
+        bufCnt = 2;
+    }
+
     _InterlockedIncrement(&session->_ioCount);
 
     send_retval = WSASend(session->_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->_sendOverlapped, nullptr);
-    if (send_retval == -1)
+    if (send_retval < 0)
     {
-        if (GetLastError() != ERROR_IO_PENDING)
+        if (GetLastError() != WSA_IO_PENDING)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt",
                            L"WSASend Error \n");
@@ -247,34 +204,42 @@ void SendPacket(clsSession *const session)
 void RecvPacket(clsSession *const session)
 {
 
-    ringBufferSize useSize, freeSize;
+    ringBufferSize freeSize;
     ringBufferSize directEnQsize;
 
     int wsaRecv_retval;
-    
+
     DWORD flag = 0;
-    DWORD bufCnt = 2;
+    DWORD bufCnt;
 
     WSABUF wsaBuf[2];
 
+    char *f = session->recvBuffer->_frontPtr, *r = session->recvBuffer->_rearPtr;
+
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
-        ZeroMemory(&session->_recvOverlapped, sizeof(stOverlapped));
+        ZeroMemory(&session->_recvOverlapped, sizeof(OVERLAPPED));
         session->_recvOverlapped._mode = Job_Type::Recv;
     }
 
-    freeSize = session->recvBuffer->GetFreeSize(); // SendBuffer에 바로넣기 위함.
-    directEnQsize = session->recvBuffer->DirectEnqueueSize();
+    directEnQsize = session->recvBuffer->DirectEnqueueSize(f, r);
+    freeSize = session->recvBuffer->GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
 
+    if (freeSize <= directEnQsize)
+    {
+        bufCnt = 1;
+        wsaBuf[0].buf = session->recvBuffer->_rearPtr;
+        wsaBuf[0].len = directEnQsize;
+    }
+    else
+    {
+        bufCnt = 2;
+        wsaBuf[0].buf = session->recvBuffer->_rearPtr;
+        wsaBuf[0].len = directEnQsize;
 
-    bufCnt = 2;
-    wsaBuf[0].buf = session->recvBuffer->_rearPtr;
-    wsaBuf[0].len = directEnQsize;
-
-    wsaBuf[1].buf = session->recvBuffer->_begin;
-    wsaBuf[1].len = freeSize - directEnQsize;
-    
-
+        wsaBuf[1].buf = session->recvBuffer->_begin;
+        wsaBuf[1].len = freeSize - directEnQsize;
+    }
     _InterlockedIncrement(&session->_ioCount);
     wsaRecv_retval = WSARecv(session->_sock, wsaBuf, bufCnt, nullptr, &flag, &session->_recvOverlapped, nullptr);
     if (wsaRecv_retval < 0)
