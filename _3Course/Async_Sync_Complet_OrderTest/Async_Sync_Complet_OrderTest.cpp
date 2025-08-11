@@ -4,10 +4,11 @@ HANDLE hIOCPPort, hAcceptThread;
 
 void RecvProcedure(clsSession *const session, DWORD transferred);
 void SendProcedure(clsSession *const session, DWORD transferred);
-void PostProcedure(clsSession *const session);
 
 void SendPacket(clsSession *const session);
 void RecvPacket(clsSession *const session);
+
+std::list<class clsSession *> sessions;
 
 unsigned AcceptThread(void *arg)
 {
@@ -32,6 +33,16 @@ unsigned AcceptThread(void *arg)
             continue;
         }
         clsSession *session = new clsSession(client_sock);
+        sessions.push_back(session);
+
+        for (std::list<clsSession*>::iterator iter = sessions.begin(); iter != sessions.end(); iter++)
+        {
+            if ((*iter)->_blive == false)
+            {
+                delete *iter;
+                iter = sessions.erase(iter);
+            }
+        }
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCPPort, (ull)session, 0);
         WSABUF wsabuf;
@@ -42,6 +53,7 @@ unsigned AcceptThread(void *arg)
         wsabuf.len = session->recvBuffer->GetFreeSize();
 
         _InterlockedIncrement(&session->_ioCount);
+
         wsarecv_retval = WSARecv(client_sock, &wsabuf, 1, nullptr, &flag, &session->_recvOverlapped, nullptr);
         if (wsarecv_retval < 0)
         {
@@ -83,9 +95,6 @@ unsigned WorkerThread(void *arg)
         case Job_Type::Send:
             SendProcedure(session, transferred);
             break;
-        case Job_Type::PostSend:
-            PostProcedure(session);
-            break;
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
         }
@@ -93,8 +102,8 @@ unsigned WorkerThread(void *arg)
         local_ioCount = InterlockedDecrement(&session->_ioCount);
         if (local_ioCount == 0)
         {
-            closesocket(session->_ioCount);
-            delete session;
+            InterlockedExchange(&session->_blive, false);
+ 
         }
     }
 
@@ -135,7 +144,8 @@ void RecvProcedure(clsSession *const session, DWORD transferred)
     session->recvBuffer->MoveRear(transferred);
     if (InterlockedCompareExchange(&session->_flag, 1, 0) == 0)
         SendPacket(session);
-    RecvPacket(session);
+    if (session->_blive == true)
+        RecvPacket(session);
 }
 
 void SendProcedure(clsSession *const session, DWORD transferred)
@@ -144,16 +154,10 @@ void SendProcedure(clsSession *const session, DWORD transferred)
     SendPacket(session);
 }
 
-void PostProcedure(clsSession *const session)
-{
-    if (InterlockedCompareExchange(&session->_flag, 1, 0) == 0)
-    {
-        SendPacket(session);
-    }
-}
 
 void SendPacket(clsSession *const session)
 {
+    BOOL cancle_retval;
     ringBufferSize useSize, directDQSize;
     DWORD bufCnt;
     int send_retval;
@@ -197,13 +201,23 @@ void SendPacket(clsSession *const session)
             ERROR_FILE_LOG(L"Socket_Error.txt",
                            L"WSASend Error \n");
             _InterlockedDecrement(&session->_ioCount);
+            
+            cancle_retval = CancelIoEx((HANDLE)session->_sock, &session->_recvOverlapped);
+            if (cancle_retval == 0)
+            {
+                if (WSAGetLastError() != ERROR_NOT_FOUND)
+                    ERROR_FILE_LOG(L"Socket_Error.txt",
+                                   L"CancelIoEx Error \n");
+            }
+            else
+                _InterlockedDecrement(&session->_ioCount);
         }
     }
 }
 
 void RecvPacket(clsSession *const session)
 {
-
+    BOOL cancle_retval;
     ringBufferSize freeSize;
     ringBufferSize directEnQsize;
 
@@ -252,6 +266,16 @@ void RecvPacket(clsSession *const session)
         default:
             _InterlockedDecrement(&session->_ioCount);
             ERROR_FILE_LOG(L"Socket_Error.txt", L"WSARecv_Error");
+
+            cancle_retval = CancelIoEx((HANDLE)session->_sock, &session->_recvOverlapped);
+            if (cancle_retval == 0)
+            {
+                if (WSAGetLastError() != ERROR_NOT_FOUND)
+                    ERROR_FILE_LOG(L"Socket_Error.txt",
+                                   L"CancelIoEx Error \n");
+            }
+            else
+                _InterlockedDecrement(&session->_ioCount);
         }
     }
 }

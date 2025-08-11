@@ -9,11 +9,15 @@ clsSession::clsSession(SOCKET sock)
     sendBuffer = new CRingBuffer();
     recvBuffer = new CRingBuffer();
     _blive = 1;
-    InitializeSRWLock(&srw_session);
 
 }
 
 clsSession::~clsSession()
 {
     
+}
+
+void clsSession::Release()
+{
+    _blive = 0;
 }

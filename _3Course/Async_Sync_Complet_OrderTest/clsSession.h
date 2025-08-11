@@ -26,6 +26,8 @@ class clsSession
   public:
     clsSession(SOCKET sock);
     ~clsSession();
+    
+    void Release();
 
     SOCKET _sock = 0;
 
@@ -33,10 +35,8 @@ class clsSession
     stOverlapped _sendOverlapped = stOverlapped(Job_Type::Send);
     stOverlapped _PostOverlapped = stOverlapped(Job_Type::PostSend);
 
-    class CRingBuffer *sendBuffer;
+    class CRingBuffer *sendBuffer; // Echo에서는 미 사용
     class CRingBuffer *recvBuffer;
-
-    SRWLOCK srw_session;
 
    
     ull _ioCount = 0;
