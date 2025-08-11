@@ -61,8 +61,8 @@ unsigned AcceptThread(void *arg)
             {
                 _InterlockedDecrement(&session->_ioCount);
                 ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Recv Error");
-                closesocket(client_sock);
-                delete session;
+
+                session->_blive = false;
             }
         }
     }
