@@ -139,7 +139,7 @@ int main()
 
         EchoServer.OnServer(addr, port);
     }
-    hIOCPPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
+    hIOCPPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 13);
     hAcceptThread = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &EchoServer.listen_sock, 0, nullptr);
 
     for (int i = 0; i < iWorkerCnt; i++)
@@ -167,7 +167,6 @@ void SendProcedure(clsSession *const session, DWORD transferred)
 
 void SendPacket(clsSession *const session)
 {
-    BOOL cancle_retval;
     ringBufferSize useSize, directDQSize;
     DWORD bufCnt;
     int send_retval;
@@ -218,7 +217,6 @@ void SendPacket(clsSession *const session)
 
 void RecvPacket(clsSession *const session)
 {
-    BOOL cancle_retval;
     ringBufferSize freeSize;
     ringBufferSize directEnQsize;
 

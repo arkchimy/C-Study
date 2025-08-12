@@ -1,17 +1,13 @@
 ﻿#include "MT_CRingBuffer_lib.h"
 
 CRingBuffer::CRingBuffer()
+    : CRingBuffer(18)
 {
-    _begin = (char *)_aligned_malloc(18, 4096);
-    _end = _begin + 18;
-    ClearBuffer();
+   
 }
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
-    /*  ringBufferSize realSize = iBufferSize % 4096;
-      realSize = realSize == 0 ? iBufferSize : iBufferSize + realSize;*/
-
     _begin = (char *)_aligned_malloc(iBufferSize, 4096);
     _end = _begin + iBufferSize;
     ClearBuffer();
@@ -176,7 +172,7 @@ ringBufferSize CRingBuffer::DirectEnqueueSize()
 
 ringBufferSize CRingBuffer::DirectEnqueueSize(const char *f, const char *r)
 {
-    if (f == _begin && r  == _end - 1)
+    if (f == _begin && r == _end - 1)
     {
         return _end - r - 1;
     }
