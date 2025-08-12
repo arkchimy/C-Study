@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.10.35013.160
+VisualStudioVersion = 17.14.36127.28 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Async_Sync_Complet_OrderTest", "Async_Sync_Complet_OrderTest.vcxproj", "{18CC3859-8E1A-4B13-81E4-D23C31540C34}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EchoServer", "EchoServer.vcxproj", "{07626A99-AABC-4FBA-AF04-D141FB902A7C}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MT_CRingBuffer_lib", "..\lib\MT_CRingBuffer_lib\MT_CRingBuffer_lib.vcxproj", "{C5117940-F3EF-4C6C-B22E-4D1F42F22D81}"
 EndProject
@@ -17,14 +17,14 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Debug|x64.ActiveCfg = Debug|x64
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Debug|x64.Build.0 = Debug|x64
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Debug|x86.ActiveCfg = Debug|Win32
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Debug|x86.Build.0 = Debug|Win32
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Release|x64.ActiveCfg = Release|x64
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Release|x64.Build.0 = Release|x64
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Release|x86.ActiveCfg = Release|Win32
-		{18CC3859-8E1A-4B13-81E4-D23C31540C34}.Release|x86.Build.0 = Release|Win32
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Debug|x64.ActiveCfg = Debug|x64
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Debug|x64.Build.0 = Debug|x64
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Debug|x86.ActiveCfg = Debug|Win32
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Debug|x86.Build.0 = Debug|Win32
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Release|x64.ActiveCfg = Release|x64
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Release|x64.Build.0 = Release|x64
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Release|x86.ActiveCfg = Release|Win32
+		{07626A99-AABC-4FBA-AF04-D141FB902A7C}.Release|x86.Build.0 = Release|Win32
 		{C5117940-F3EF-4C6C-B22E-4D1F42F22D81}.Debug|x64.ActiveCfg = Debug|x64
 		{C5117940-F3EF-4C6C-B22E-4D1F42F22D81}.Debug|x64.Build.0 = Debug|x64
 		{C5117940-F3EF-4C6C-B22E-4D1F42F22D81}.Debug|x86.ActiveCfg = Debug|Win32
@@ -46,6 +46,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {40D16295-752F-4736-9C00-A958A3232EB8}
+		SolutionGuid = {B883B55C-89DD-4F06-A30B-673E850D898B}
 	EndGlobalSection
 EndGlobal

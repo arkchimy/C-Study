@@ -15,10 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Async_Sync_Complet_OrderTest.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="st_WSAData.cpp">
+    <ClCompile Include="EchoServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CLanServer.cpp">
@@ -27,27 +24,25 @@
     <ClCompile Include="clsSession.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="st_WSAData.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="st_WSAData.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="CLanServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="clsSession.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="st_WSAData.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="stProtocol.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Async_Sync_Complet_OrderTest.h">
+    <ClInclude Include="EchoServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="Config.txt">
-      <Filter>리소스 파일</Filter>
-    </Text>
   </ItemGroup>
 </Project>
