@@ -14,7 +14,7 @@ clsSession::clsSession(SOCKET sock)
 
 clsSession::~clsSession()
 {
-    
+    closesocket(_sock);
 }
 
 void clsSession::Release()

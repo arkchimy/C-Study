@@ -19,6 +19,10 @@ BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 
 BOOL CLanServer::OnServer(const wchar_t *addr, short port)
 {
+    linger linger;
+    linger.l_onoff = 1;
+    linger.l_linger = 0;
+
     DWORD bind_retval;
 
     SOCKADDR_IN serverAddr;
@@ -29,6 +33,10 @@ BOOL CLanServer::OnServer(const wchar_t *addr, short port)
     InetPtonW(AF_INET, addr, &serverAddr.sin_addr);
 
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    setsockopt(listen_sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
+ 
+
     bind_retval = bind(listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
     if (bind_retval != 0)
         ERROR_FILE_LOG(L"Socket_Error.txt", L"Bind Failed");

@@ -17,9 +17,14 @@ unsigned AcceptThread(void *arg)
     SOCKET listen_sock = *reinterpret_cast<SOCKET *>(arg);
     DWORD listen_retval;
 
+    WSABUF wsabuf;
+    DWORD flag;
+    int wsarecv_retval;
     int addrlen = sizeof(addr);
 
     listen_retval = listen(listen_sock, SOMAXCONN_HINT(65535));
+    flag = 0;
+
     if (listen_retval == 0)
         printf("Listen Sucess\n");
     else
@@ -45,10 +50,7 @@ unsigned AcceptThread(void *arg)
         }
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCPPort, (ull)session, 0);
-        WSABUF wsabuf;
-        DWORD flag = 0;
-        int wsarecv_retval;
-
+       
         wsabuf.buf = session->recvBuffer->_rearPtr;
         wsabuf.len = session->recvBuffer->GetFreeSize();
 
@@ -79,10 +81,13 @@ unsigned WorkerThread(void *arg)
     ull local_ioCount;
     while (1)
     {
-        transferred = 0;
-        key = 0;
-        overlapped = nullptr;
-        session = nullptr;
+        //지역변수 초기화
+        {
+            transferred = 0;
+            key = 0;
+            overlapped = nullptr;
+            session = nullptr;
+        }
 
         GetQueuedCompletionStatus(hIOCPPort, &transferred, &key, &overlapped, INFINITE);
         if (overlapped == nullptr)
@@ -168,12 +173,14 @@ void SendPacket(clsSession *const session)
 
     char *f = session->recvBuffer->_frontPtr, *r = session->recvBuffer->_rearPtr;
 
+
+    {
+        ZeroMemory(wsaBuf, sizeof(wsaBuf));
+        ZeroMemory(&session->_sendOverlapped, sizeof(OVERLAPPED));
+    }
     directDQSize = session->recvBuffer->DirectDequeueSize(f, r);
     useSize = session->recvBuffer->GetUseSize(f, r);
 
-    ZeroMemory(wsaBuf, sizeof(wsaBuf));
-    ZeroMemory(&session->_sendOverlapped, sizeof(OVERLAPPED));
-    session->_sendOverlapped._mode = Job_Type::Send;
 
     if (useSize <= directDQSize)
     {
@@ -200,19 +207,17 @@ void SendPacket(clsSession *const session)
     {
         if (GetLastError() != WSA_IO_PENDING)
         {
-            ERROR_FILE_LOG(L"Socket_Error.txt",
-                           L"WSASend Error \n");
+            ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error");
             _InterlockedDecrement(&session->_ioCount);
             
-            cancle_retval = CancelIoEx((HANDLE)session->_sock, &session->_recvOverlapped);
+   /*         cancle_retval = CancelIoEx((HANDLE)session->_sock, &session->_recvOverlapped);
             if (cancle_retval == 0)
             {
                 if (WSAGetLastError() != ERROR_NOT_FOUND)
-                    ERROR_FILE_LOG(L"Socket_Error.txt",
-                                   L"CancelIoEx Error \n");
+                    ERROR_FILE_LOG(L"Socket_Error.txt", L"CancelIoEx Error ");
             }
             else
-                _InterlockedDecrement(&session->_ioCount);
+                _InterlockedDecrement(&session->_ioCount);*/
         }
     }
 }
@@ -235,7 +240,6 @@ void RecvPacket(clsSession *const session)
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session->_recvOverlapped, sizeof(OVERLAPPED));
-        session->_recvOverlapped._mode = Job_Type::Recv;
     }
 
     directEnQsize = session->recvBuffer->DirectEnqueueSize(f, r);
@@ -249,12 +253,13 @@ void RecvPacket(clsSession *const session)
     }
     else
     {
-        bufCnt = 2;
         wsaBuf[0].buf = session->recvBuffer->_rearPtr;
         wsaBuf[0].len = directEnQsize;
 
         wsaBuf[1].buf = session->recvBuffer->_begin;
         wsaBuf[1].len = freeSize - directEnQsize;
+
+        bufCnt = 2;
     }
     _InterlockedIncrement(&session->_ioCount);
     wsaRecv_retval = WSARecv(session->_sock, wsaBuf, bufCnt, nullptr, &flag, &session->_recvOverlapped, nullptr);
@@ -269,15 +274,14 @@ void RecvPacket(clsSession *const session)
             _InterlockedDecrement(&session->_ioCount);
             ERROR_FILE_LOG(L"Socket_Error.txt", L"WSARecv_Error");
 
-            cancle_retval = CancelIoEx((HANDLE)session->_sock, &session->_recvOverlapped);
+     /*       cancle_retval = CancelIoEx((HANDLE)session->_sock, &session->_recvOverlapped);
             if (cancle_retval == 0)
             {
                 if (WSAGetLastError() != ERROR_NOT_FOUND)
-                    ERROR_FILE_LOG(L"Socket_Error.txt",
-                                   L"CancelIoEx Error \n");
+                    ERROR_FILE_LOG(L"Socket_Error.txt", L"CancelIoEx Error");
             }
             else
-                _InterlockedDecrement(&session->_ioCount);
-        }
+                _InterlockedDecrement(&session->_ioCount);*/
+        }   
     }
 }
