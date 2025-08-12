@@ -43,8 +43,7 @@ ringBufferSize CRingBuffer::GetFreeSize()
     char *f = _frontPtr;
     char *r = _rearPtr;
 
-    return f <= r ? (_end - r) + (f - _begin) - 1
-                  : f - r - 1;
+    return GetFreeSize(f, r);
 }
 
 ringBufferSize CRingBuffer::GetFreeSize(const char *f, const char *r)
@@ -177,7 +176,7 @@ ringBufferSize CRingBuffer::DirectEnqueueSize()
 
 ringBufferSize CRingBuffer::DirectEnqueueSize(const char *f, const char *r)
 {
-    if (f == _begin && r == _end)
+    if (f == _begin && r  == _end - 1)
     {
         return _end - r - 1;
     }
@@ -205,9 +204,7 @@ void CRingBuffer::MoveRear(ringBufferSize iSize)
 
     if (_end < pChk)
     {
-        char *distance = reinterpret_cast<char *>(pChk - _end);
-
-        _rearPtr = _begin + long(distance);
+        _rearPtr = _begin + long long(distance);
     }
     else
     {
@@ -218,11 +215,12 @@ void CRingBuffer::MoveRear(ringBufferSize iSize)
 void CRingBuffer::MoveFront(ringBufferSize iSize)
 {
     char *pChk = _frontPtr + iSize;
+    char *distance = reinterpret_cast<char *>(pChk - _end);
+
     if (_end < pChk)
     {
-        char *distance = reinterpret_cast<char *>(pChk - _end);
-
-        _frontPtr = _begin + long(distance);
+    
+        _frontPtr = _begin + long long(distance);
     }
     else
     {
