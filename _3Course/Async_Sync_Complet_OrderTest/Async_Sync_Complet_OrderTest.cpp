@@ -79,6 +79,11 @@ unsigned WorkerThread(void *arg)
     ull local_ioCount;
     while (1)
     {
+        transferred = 0;
+        key = 0;
+        overlapped = nullptr;
+        session = nullptr;
+
         GetQueuedCompletionStatus(hIOCPPort, &transferred, &key, &overlapped, INFINITE);
         if (overlapped == nullptr)
         {
@@ -98,13 +103,10 @@ unsigned WorkerThread(void *arg)
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
         }
-
         local_ioCount = InterlockedDecrement(&session->_ioCount);
+
         if (local_ioCount == 0)
-        {
             InterlockedExchange(&session->_blive, false);
- 
-        }
     }
 
     return 0;

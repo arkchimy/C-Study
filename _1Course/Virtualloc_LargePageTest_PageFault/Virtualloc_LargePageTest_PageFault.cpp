@@ -53,6 +53,11 @@ struct A
                 NULL                      // ReturnLength: 필요 없으면 NULL
                 ))
             ;
+        //AdjustTokenPrivileges(GetCurrentProcess(), FALSE, SE_PRIVILEGE_ENABLED,)
+        LUID PrivilegeRequired;
+        BOOL bRes = FALSE;
+
+        bRes = LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &PrivilegeRequired);
 
         size_t sizeds = GetLargePageMinimum();
         if (g_mode == 1)
