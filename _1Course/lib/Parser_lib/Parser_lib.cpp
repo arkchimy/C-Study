@@ -421,6 +421,11 @@ bool Parser::GetValue(const WCHAR* tag, int& out)
 	return true;
 }
 
+bool Parser::GetValue(const WCHAR *tag, bool &out)
+{
+    return false;
+}
+
 bool Parser::GetValue(const WCHAR* tag, WCHAR* out, size_t bufferSize)
 {
 	const WCHAR* left;

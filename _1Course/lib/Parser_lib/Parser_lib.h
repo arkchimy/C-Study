@@ -33,6 +33,7 @@ class Parser
     bool GetValue(const WCHAR *tag, unsigned short &out);
     bool GetValue(const WCHAR *tag, short &out);
     bool GetValue(const WCHAR *tag, int &out);
+    bool GetValue(const WCHAR *tag, bool &out);
     bool GetValue(const WCHAR *tag, WCHAR *out, size_t bufferSize);
 
   private:
