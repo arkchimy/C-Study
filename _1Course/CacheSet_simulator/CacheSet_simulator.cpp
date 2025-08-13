@@ -88,6 +88,7 @@ class CacheManager
         GetLogicalProcessorInformation(infos, &len);
 
         DWORD cnt = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION); // 반복문
+
         for (int i = 0; i < cnt; i++)
         {
             if (infos[i].Cache.Level == 1 && infos[i].Cache.Size != 0)
@@ -112,7 +113,7 @@ class CacheManager
 
                 cacheTagMask = pow(2, cacheIndexBit + cacheOffsetBit) - 1;
                 cacheTagMask = ~cacheTagMask;
-                return;
+                //return;
             }
         }
     }
