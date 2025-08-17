@@ -15,13 +15,19 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="EchoServer.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
+    <ClInclude Include="CNetwork_lib.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="clsSession.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="Config.txt">
-      <Filter>리소스 파일</Filter>
-    </Text>
+    <ClCompile Include="CNetwork_lib.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="clsSession.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

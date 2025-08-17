@@ -1,88 +1,98 @@
-﻿#pragma once
+﻿//#include "pch.h"
+#include "CNetwork_lib.h"
+#include "../../../error_log.h"
+#include "clsSession.h"
 
-#include <WS2tcpip.h>
-#include <WinSock2.h>
-#include <Windows.h>
+#include <list>
+#include <thread>
 
-#include "../../error_log.h"
-
-#pragma comment(lib, "winmm")
-#pragma comment(lib, "ws2_32")
-
-
-#include "../lib/CNetwork_lib/CNetwork_lib.h"
-#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
-
-struct stEchoHeader
+st_WSAData::st_WSAData()
 {
-    short len;
-};
+    WSAData wsa;
+    DWORD wsaStartRetval;
 
-int main()
-{
-    st_WSAData wsa;
-
-    CLanServer EchoServer;
-    wchar_t bindAddr[16];
-    short bindPort;
-
-  
-    int iWorkerCnt;
-
-    int bZeroCopy;
-    int WorkerThreadCnt;
-    int reduceThreadCount;
-    int NoDelay;
-    int maxSessions;
-    LINGER linger;
-
-
-
+    wsaStartRetval = WSAStartup(MAKEWORD(2, 2), &wsa);
+    if (wsaStartRetval != 0)
     {
-        Parser parser;
-
-        if (parser.LoadFile(L"Config.txt") == false)
-            ERROR_FILE_LOG(L"ParserError.txt", L"LoadFile");
-        parser.GetValue(L"ServerAddr", bindAddr, 16);
-        parser.GetValue(L"ServerPort", bindPort);
-        parser.GetValue(L"iWorkerCnt", iWorkerCnt);
-
-        parser.GetValue(L"LingerOn", linger.l_onoff);
-        parser.GetValue(L"ZeroCopy", bZeroCopy);
-        parser.GetValue(L"WorkerThreadCnt", WorkerThreadCnt);
-        parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
-        parser.GetValue(L"NoDelay", NoDelay);
-        parser.GetValue(L"MaxSessions", maxSessions);
-        EchoServer.Start(bindAddr, bindPort, iWorkerCnt, reduceThreadCount, NoDelay, maxSessions);
-
+        ERROR_FILE_LOG(L"WSAData_Error.txt", L"WSAStartup retval is not Zero ");
+        __debugbreak();
     }
-
-    while (1)
-    {
-        
-    }
-
-    return 0;
 }
-    /*
 
-#include "EchoServer.h"
+st_WSAData::~st_WSAData()
+{
+    WSACleanup();
+}
 
-HANDLE hIOCPPort, hAcceptThread;
+BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
+{
+    ADDRINFOW *pAddrInfo;
+    SOCKADDR_IN *pSockAddr;
+    if (GetAddrInfo(szDomain, L"0", NULL, &pAddrInfo) != 0)
+    {
+        return FALSE;
+    }
+    pSockAddr = (SOCKADDR_IN *)pAddrInfo->ai_addrlen;
+    *pAddr = pSockAddr->sin_addr;
+    FreeAddrInfo(pAddrInfo);
+    return TRUE;
+}
+BOOL GetLogicalProcess(DWORD &out)
+{
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION *infos = nullptr;
+    DWORD len;
+    DWORD cnt;
+    DWORD temp = 0;
 
-void RecvProcedure(clsSession *const session, DWORD transferred);
-void SendProcedure(clsSession *const session, DWORD transferred);
+    len = 0;
 
-void SendPacket(clsSession *const session);
-void RecvPacket(clsSession *const session);
+    GetLogicalProcessorInformation(infos, &len);
+
+    infos = new SYSTEM_LOGICAL_PROCESSOR_INFORMATION[len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION)];
+
+    if (infos == nullptr)
+        return false;
+
+    GetLogicalProcessorInformation(infos, &len);
+
+    cnt = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION); // 반복문
+
+    for (int i = 0; i < cnt; i++)
+    {
+        if (infos[i].Relationship == RelationProcessorCore)
+        {
+            DWORD mask = infos[i].ProcessorMask;
+            // 논리 프로세서의 수는 set된 비트의 개수
+            while (mask)
+            {
+                temp += (mask & 1);
+                mask >>= 1;
+            }
+        }
+    }
+    printf("LogicalProcess Cnt : %d \n", temp);
+
+    delete[] infos;
+    out = temp;
+    return true;
+}
 
 std::list<class clsSession *> sessions;
 
 unsigned AcceptThread(void *arg)
 {
+
+    /* arg 에 대해서
+     * arg[0] 에는 클라이언트에게 연결시킬 hIOCP의 HANDLE을 넣기.
+     * arg[1] 에는 listen_sock의 주소를 넣기
+     */
     SOCKET client_sock;
     SOCKADDR_IN addr;
-    SOCKET listen_sock = *reinterpret_cast<SOCKET *>(arg);
+
+    size_t *arrArg = (size_t *)arg;
+    HANDLE hIOCP = (HANDLE)*arrArg;
+    SOCKET listen_sock = SOCKET(arrArg[1]);
+
     DWORD listen_retval;
 
     WSABUF wsabuf;
@@ -117,7 +127,7 @@ unsigned AcceptThread(void *arg)
             }
         }
 
-        CreateIoCompletionPort((HANDLE)client_sock, hIOCPPort, (ull)session, 0);
+        CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
 
         wsabuf.buf = session->recvBuffer->_rearPtr;
         wsabuf.len = session->recvBuffer->GetFreeSize();
@@ -141,7 +151,16 @@ unsigned AcceptThread(void *arg)
 
 unsigned WorkerThread(void *arg)
 {
+    /*
+     * arg[0] 에는 hIOCP의 가짜핸들을
+     * arg[1] 에는 Server의 인스턴스
+     */
+    size_t *arrArg = reinterpret_cast<size_t *>(arg);
     DWORD transferred;
+
+    HANDLE hIOCP = (HANDLE)*arrArg;
+    CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[1]);
+
     ull key;
     OVERLAPPED *overlapped;
     clsSession *session;
@@ -157,7 +176,7 @@ unsigned WorkerThread(void *arg)
             // session = nullptr;
         }
 
-        GetQueuedCompletionStatus(hIOCPPort, &transferred, &key, &overlapped, INFINITE);
+        GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
         if (overlapped == nullptr)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt", L"GetQueuedCompletionStatus Overlapped is nullptr");
@@ -168,10 +187,10 @@ unsigned WorkerThread(void *arg)
         switch (reinterpret_cast<stOverlapped *>(overlapped)->_mode)
         {
         case Job_Type::Recv:
-            RecvProcedure(session, transferred);
+            server->RecvComplete(session, transferred);
             break;
         case Job_Type::Send:
-            SendProcedure(session, transferred);
+            server->SendComplete(session, transferred);
             break;
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
@@ -188,36 +207,75 @@ unsigned WorkerThread(void *arg)
 
     return 0;
 }
-int main()
+BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
 {
-    CLanServer EchoServer;
-    st_WSAData wsa;
-    int iWorkerCnt;
+    linger linger;
+    linger.l_onoff = 1;
+    linger.l_linger = 0;
 
-    HANDLE hWorkerThread[24];
+    DWORD lProcessCnt;
+    DWORD bind_retval;
 
+    SOCKADDR_IN serverAddr;
+    ZeroMemory(&serverAddr, sizeof(serverAddr));
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(port);
+    InetPtonW(AF_INET, bindAddress, &serverAddr.sin_addr);
+
+    m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    setsockopt(m_listen_sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
+    setsockopt(m_listen_sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&noDelay, sizeof(noDelay));
+
+    bind_retval = bind(m_listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
+    if (bind_retval != 0)
+        ERROR_FILE_LOG(L"Socket_Error.txt", L"Bind Failed");
+
+    if (m_listen_sock == INVALID_SOCKET)
     {
-        Parser parser;
-        wchar_t addr[16];
-        short port;
-        parser.LoadFile(L"Config.txt");
-        parser.GetValue(L"ServerAddr", addr, 16);
-        parser.GetValue(L"ServerPort", port);
-        parser.GetValue(L"iWorkerCnt", iWorkerCnt);
 
-        EchoServer.OnServer(addr, port);
+        ERROR_FILE_LOG(L"Socket_Error.txt",
+                       L"listen_sock Create Socket Error");
+        return false;
     }
-    hIOCPPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 13);
-    hAcceptThread = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &EchoServer.listen_sock, 0, nullptr);
 
-    for (int i = 0; i < iWorkerCnt; i++)
-        hWorkerThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
-    while (1)
-    {
-    }
+    if (GetLogicalProcess(lProcessCnt) == false)
+        ERROR_FILE_LOG(L"GetLogicalProcessError.txt", L"GetLogicalProcess_Error");
+    
+
+    m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
+
+    m_hThread = new HANDLE[WorkerCreateCnt];
+
+
+    HANDLE WorkerArg[] = {m_hIOCP, this};
+    HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock};
+
+    m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
+    for (DWORD i = 0; i < WorkerCreateCnt; i++)
+        m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
+    Sleep(10000);
+    return true;
 }
 
-void RecvProcedure(clsSession *const session, DWORD transferred)
+void CLanServer::Stop()
+{
+    
+}
+
+int CLanServer::GetSessionCount()
+{
+
+    return 0;
+}
+
+bool CLanServer::Disconnect(clsSession *const session)
+{
+    return false;
+}
+
+void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 {
     session->recvBuffer->MoveRear(transferred);
     if (InterlockedCompareExchange(&session->_flag, 1, 0) == 0)
@@ -225,7 +283,7 @@ void RecvProcedure(clsSession *const session, DWORD transferred)
     RecvPacket(session);
 }
 
-void SendProcedure(clsSession *const session, DWORD transferred)
+void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
     if (18 < transferred)
         __debugbreak();
@@ -233,7 +291,7 @@ void SendProcedure(clsSession *const session, DWORD transferred)
     SendPacket(session);
 }
 
-void SendPacket(clsSession *const session)
+void CLanServer::SendPacket(clsSession *const session)
 {
     ringBufferSize useSize, directDQSize;
     DWORD bufCnt;
@@ -283,7 +341,7 @@ void SendPacket(clsSession *const session)
     }
 }
 
-void RecvPacket(clsSession *const session)
+void CLanServer::RecvPacket(clsSession *const session)
 {
     ringBufferSize freeSize;
     ringBufferSize directEnQsize;
@@ -339,18 +397,19 @@ void RecvPacket(clsSession *const session)
         }
     }
 }
-*/
-
-// TODO: 서버가 closesocket 하기를 원할 때
-/*
-*             cancle_retval = CancelIoEx((HANDLE)session->_sock, &session->_recvOverlapped);
-            if (cancle_retval == 0)
-            {
-                if (WSAGetLastError() != ERROR_NOT_FOUND)
-                    ERROR_FILE_LOG(L"Socket_Error.txt",
-                                   L"CancelIoEx Error \n");
-            }
-            else
-                _InterlockedDecrement(&session->_ioCount);
-*/
-
+int CLanServer::getAcceptTPS()
+{
+    return 0;
+}
+int CLanServer::getRecvMessageTPS()
+{
+    return 0;
+}
+int CLanServer::getSendMessageTPS()
+{
+    return 0;
+}
+CLanServer::~CLanServer()
+{
+    closesocket(m_listen_sock);
+}

@@ -7,10 +7,3 @@
 
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "ws2_32")
-class st_WSAData
-{
-  public:
-    st_WSAData();
-    ~st_WSAData();
-};
-

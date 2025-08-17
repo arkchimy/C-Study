@@ -6,6 +6,7 @@
 
 
 #include "../../_1Course/lib/Parser_lib/Parser_lib.h"
+#include "../../_3Course/lib/MT_CRingBuffer_lib/MT_CRingBuffer_lib.h"
 #include "../../error_log.h"
 
 #pragma comment(lib, "winmm")
@@ -19,9 +20,13 @@ struct stSession
     OVERLAPPED recvOverlapped;
     OVERLAPPED sendOverlapped;
 
+    CRingBuffer sendBuffer;
+    CRingBuffer recvBuffer;
 };
 BOOL GetLogicalProcess(DWORD &out);
 using POVERLAPPED = LPOVERLAPPED;
+
+
 
 unsigned WorkerThread(void *arg) 
 {
@@ -44,7 +49,7 @@ unsigned WorkerThread(void *arg)
         
         if (overlapped == &session->recvOverlapped)
         {
-            //RecvProc   
+            RecvPost();
         }
         else if (overlapped == &session->sendOverlapped)
         {
@@ -65,7 +70,7 @@ int main()
     int disconnect;
     int bZeroCopy;
     int WorkerThreadCnt;
-    int DecreamentConcurrent;
+    int reduceThreadCount;
     DWORD Logical_Cnt = 0;
     HANDLE hPort;
     HANDLE *hWorkerThread;
@@ -82,14 +87,14 @@ int main()
         parser.GetValue(L"LingerOn", linger.l_onoff);
         parser.GetValue(L"ZeroCopy", bZeroCopy);
         parser.GetValue(L"WorkerThreadCnt", WorkerThreadCnt);
-        parser.GetValue(L"DecreamentConcurrent", DecreamentConcurrent);
+        parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
     }
     //TODO : CriticalError 에 대한 처리 
     if (GetLogicalProcess(Logical_Cnt) == false)
         ERROR_FILE_LOG(L"Critical_Error.txt", L"GetLogicalProcess");
 
-    hPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, Logical_Cnt - DecreamentConcurrent);
-    printf("Logical_Cnt - DecreamentConcurrent : \t %d - %d = %d \n", Logical_Cnt, DecreamentConcurrent, Logical_Cnt - DecreamentConcurrent);
+    hPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, Logical_Cnt - reduceThreadCount);
+    printf("Logical_Cnt - DecreamentConcurrent : \t %d - %d = %d \n", Logical_Cnt, reduceThreadCount, Logical_Cnt - reduceThreadCount);
 
     hWorkerThread = new HANDLE[WorkerThreadCnt];
 

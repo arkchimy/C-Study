@@ -15,13 +15,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="EchoServer.cpp">
+    <ClCompile Include="EchoClient_IOCP.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="Config.txt">
-      <Filter>리소스 파일</Filter>
-    </Text>
   </ItemGroup>
 </Project>
