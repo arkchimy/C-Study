@@ -91,7 +91,11 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+<<<<<<< HEAD
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
+=======
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+>>>>>>> origin/main
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -119,7 +123,11 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+<<<<<<< HEAD
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
+=======
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+>>>>>>> origin/main
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
