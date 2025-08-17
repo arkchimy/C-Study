@@ -16,7 +16,7 @@ class st_WSAData
     st_WSAData();
     ~st_WSAData();
 };
-
+using ull = unsigned long long;
 class CLanServer
 {
   public:
