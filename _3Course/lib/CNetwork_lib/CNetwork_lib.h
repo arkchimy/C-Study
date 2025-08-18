@@ -30,6 +30,7 @@ class CLanServer
 
     void RecvComplete(class clsSession *const session, DWORD transferred);
     void SendComplete(class clsSession *const session, DWORD transferred);
+    void PostComplete(class clsSession* const session, DWORD transferred);
     void SendPacket(class clsSession *const session);
     void RecvPacket(class clsSession *const session);
 

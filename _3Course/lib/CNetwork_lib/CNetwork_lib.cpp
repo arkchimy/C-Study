@@ -192,6 +192,8 @@ unsigned WorkerThread(void *arg)
         case Job_Type::Send:
             server->SendComplete(session, transferred);
             break;
+        case Job_Type::PostSend:
+            server->PostComplete(session, transferred);
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
         }
@@ -291,6 +293,22 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
     SendPacket(session);
 }
 
+void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
+{
+    char *f = session->recvBuffer->_frontPtr, *r = session->recvBuffer->_rearPtr;
+    
+    ringBufferSize usesize, directDeQsize;
+    usesize = session->recvBuffer->GetUseSize();
+    if (usesize == 0)
+    {
+        return;
+    }
+    if (_InterlockedCompareExchange(&session->_flag, 1, 0) == 0)
+    {
+        SendPacket(session);
+    }
+}
+
 void CLanServer::SendPacket(clsSession *const session)
 {
     ringBufferSize useSize, directDQSize;
@@ -306,8 +324,19 @@ void CLanServer::SendPacket(clsSession *const session)
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session->_sendOverlapped, sizeof(OVERLAPPED));
     }
-    directDQSize = session->recvBuffer->DirectDequeueSize(f, r);
     useSize = session->recvBuffer->GetUseSize(f, r);
+
+    if (useSize == 0)
+    {
+        //flag를 끄고 Recv를 받은 후에 완료통지를 왔다면 
+        if (_InterlockedCompareExchange(&session->_flag, 0, 1) == 1)
+        {
+            InterlockedIncrement(&session->_ioCount);
+            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->_PostOverlapped);
+        }
+        return;
+    }
+    directDQSize = session->recvBuffer->DirectDequeueSize(f, r);
 
     if (useSize <= directDQSize)
     {
