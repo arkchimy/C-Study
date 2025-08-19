@@ -12,6 +12,9 @@ clsSession::clsSession(SOCKET sock)
 
 clsSession::~clsSession()
 {
+    delete sendBuffer;
+    delete recvBuffer;
+
     closesocket(_sock);
 }
 
