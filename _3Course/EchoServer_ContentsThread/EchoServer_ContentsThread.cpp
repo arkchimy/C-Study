@@ -1,11 +1,13 @@
 ﻿#include "stdafx.h"
 #include "CTestServer.h"
 
+static CTestServer EchoServer;
+
 int main()
-{
+    {
     st_WSAData wsa;
 
-    CTestServer EchoServer;
+
 
     wchar_t bindAddr[16];
     short bindPort;

@@ -7,6 +7,7 @@
 #pragma comment(lib, "ws2_32")
 
 #include <map>
+#include "clsSession.h"
 #include    "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 
@@ -20,7 +21,6 @@ using ull = unsigned long long;
 class CLanServer
 {
   public:
-
     ~CLanServer();
     // 오픈 IP / 포트 / 워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
     BOOL Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
@@ -73,4 +73,6 @@ class CLanServer
     HANDLE m_hAccept;
 
     std::map<ull, class clsSession *> sessions;
+    //TODO : 나중에 LOCK 없앨 때 지워야함.
+    CRITICAL_SECTION cs_sessionMap;
 };

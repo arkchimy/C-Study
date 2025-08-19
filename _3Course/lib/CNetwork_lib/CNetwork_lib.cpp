@@ -1,6 +1,6 @@
 ﻿// #include "pch.h"
 #include "CNetwork_lib.h"
-#include "clsSession.h"
+
 #include "stHeader.h"
 
 #include <list>
@@ -121,6 +121,7 @@ unsigned AcceptThread(void *arg)
 
         clsSession *session = new clsSession(client_sock);
 
+        EnterCriticalSection(&server->cs_sessionMap);
         server->sessions[session_id] = session;
         session->m_id = session_id++;
         
@@ -134,6 +135,8 @@ unsigned AcceptThread(void *arg)
                 iter = server->sessions.erase(iter);
             }
         }
+        LeaveCriticalSection(&server->cs_sessionMap);
+
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
         server->RecvPacket(session);
@@ -337,7 +340,7 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
     if (18 < transferred)
         __debugbreak();
     session->m_recvBuffer->MoveFront(transferred);
-    SendPacket(session);
+    InterlockedCompareExchange(&session->m_flag, 0, 1);
 }
 
 void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
@@ -365,25 +368,25 @@ void CLanServer::SendPacket(clsSession *const session)
     WSABUF wsaBuf[2];
     DWORD LastError;
 
-    char *f = session->m_recvBuffer->_frontPtr, *r = session->m_recvBuffer->_rearPtr;
+    char *f = session->m_sendBuffer->_frontPtr, *r = session->m_sendBuffer->_rearPtr;
 
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
     }
-    useSize = session->m_recvBuffer->GetUseSize(f, r);
+    useSize = session->m_sendBuffer->GetUseSize(f, r);
 
     if (useSize == 0)
     {
-        // flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-        if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
-        {
-            InterlockedIncrement(&session->m_ioCount);
-            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
-        }
+        //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
+        //if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
+        //{
+        //    InterlockedIncrement(&session->m_ioCount);
+        //    PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
+        //}
         return;
     }
-    directDQSize = session->m_recvBuffer->DirectDequeueSize(f, r);
+    directDQSize = session->m_sendBuffer->DirectDequeueSize(f, r);
 
     if (useSize <= directDQSize)
     {
@@ -397,7 +400,7 @@ void CLanServer::SendPacket(clsSession *const session)
         wsaBuf[0].buf = f;
         wsaBuf[0].len = directDQSize;
 
-        wsaBuf[1].buf = session->m_recvBuffer->_begin;
+        wsaBuf[1].buf = session->m_sendBuffer->_begin;
         wsaBuf[1].len = useSize - directDQSize;
 
         bufCnt = 2;
