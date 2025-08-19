@@ -1,10 +1,7 @@
 ﻿#include "MT_CRingBuffer_lib.h"
 
 CRingBuffer::CRingBuffer()
-    : CRingBuffer(18)
-{
-   
-}
+    : CRingBuffer(18){}
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
@@ -20,11 +17,7 @@ CRingBuffer::~CRingBuffer()
 
 ringBufferSize CRingBuffer::GetUseSize()
 {
-    char *f = _frontPtr;
-    char *r = _rearPtr;
-
-    return f <= r ? r - f
-                  : _end - f + r - _begin;
+    return GetUseSize(_frontPtr, _rearPtr);
 }
 
 ringBufferSize CRingBuffer::GetUseSize(const char *f, const char *r)
@@ -35,11 +28,7 @@ ringBufferSize CRingBuffer::GetUseSize(const char *f, const char *r)
 
 ringBufferSize CRingBuffer::GetFreeSize()
 {
-    // 가득 채우면 안되므로 -1
-    char *f = _frontPtr;
-    char *r = _rearPtr;
-
-    return GetFreeSize(f, r);
+    return GetFreeSize(_frontPtr, _rearPtr);
 }
 
 ringBufferSize CRingBuffer::GetFreeSize(const char *f, const char *r)
@@ -127,8 +116,11 @@ ringBufferSize CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize)
 
 ringBufferSize CRingBuffer::Peek(void *pDest, ringBufferSize iSize)
 {
-    char *chpDest = reinterpret_cast<char*>(pDest);
-    char *f = _frontPtr, *r = _rearPtr;
+    return Peek(pDest , iSize,_frontPtr, _rearPtr);
+}
+ringBufferSize CRingBuffer::Peek(void *pDest, ringBufferSize iSize, char *f, char *r)
+{
+    char *chpDest = reinterpret_cast<char *>(pDest);
     ringBufferSize useSize, DirectDeqSize;
 
     useSize = f <= r ? r - f
@@ -150,7 +142,6 @@ ringBufferSize CRingBuffer::Peek(void *pDest, ringBufferSize iSize)
     }
     return iSize;
 }
-
 void CRingBuffer::ClearBuffer()
 {
     _rearPtr = _begin;

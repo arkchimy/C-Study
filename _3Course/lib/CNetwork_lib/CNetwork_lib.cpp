@@ -1,10 +1,11 @@
-﻿//#include "pch.h"
+﻿// #include "pch.h"
 #include "CNetwork_lib.h"
-#include "../../../error_log.h"
 #include "clsSession.h"
+#include "stHeader.h"
 
 #include <list>
 #include <thread>
+#include "../../../error_log.h"
 
 st_WSAData::st_WSAData()
 {
@@ -57,11 +58,11 @@ BOOL GetLogicalProcess(DWORD &out)
 
     cnt = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION); // 반복문
 
-    for (int i = 0; i < cnt; i++)
+    for (DWORD i = 0; i < cnt; i++)
     {
         if (infos[i].Relationship == RelationProcessorCore)
         {
-            DWORD mask = infos[i].ProcessorMask;
+            ULONG_PTR mask = infos[i].ProcessorMask;
             // 논리 프로세서의 수는 set된 비트의 개수
             while (mask)
             {
@@ -76,8 +77,6 @@ BOOL GetLogicalProcess(DWORD &out)
     out = temp;
     return true;
 }
-
-std::list<class clsSession *> sessions;
 
 unsigned AcceptThread(void *arg)
 {
@@ -97,6 +96,10 @@ unsigned AcceptThread(void *arg)
 
     WSABUF wsabuf;
     DWORD flag;
+    ull session_id = 1;
+
+    CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[2]);
+
     int wsarecv_retval;
     int addrlen = sizeof(addr);
 
@@ -115,36 +118,41 @@ unsigned AcceptThread(void *arg)
             ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Error ");
             continue;
         }
-        clsSession *session = new clsSession(client_sock);
-        sessions.push_back(session);
 
-        for (std::list<clsSession *>::iterator iter = sessions.begin(); iter != sessions.end(); iter++)
+        clsSession *session = new clsSession(client_sock);
+
+        server->sessions[session_id] = session;
+        session->m_id = session_id++;
+        
+
+        for (std::map<ull,clsSession *>::iterator iter = server->sessions.begin(); iter != server->sessions.end(); iter++)
         {
-            if ((*iter)->_blive == false)
+            clsSession *element = iter->second;
+            if (element->m_blive == false)
             {
-                delete *iter;
-                iter = sessions.erase(iter);
+                delete element;
+                iter = server->sessions.erase(iter);
             }
         }
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
+        server->RecvPacket(session);
 
-        wsabuf.buf = session->recvBuffer->_rearPtr;
-        wsabuf.len = session->recvBuffer->GetFreeSize();
+        //wsabuf.buf = session->m_recvBuffer->_rearPtr;
+        //wsabuf.len = session->m_recvBuffer->GetFreeSize();
 
-        _InterlockedIncrement(&session->_ioCount);
-
-        wsarecv_retval = WSARecv(client_sock, &wsabuf, 1, nullptr, &flag, &session->_recvOverlapped, nullptr);
+        //_InterlockedIncrement(&session->m_ioCount); 
+  /*      wsarecv_retval = WSARecv(client_sock, &wsabuf, 1, nullptr, &flag, &session->m_recvOverlapped, nullptr);
         if (wsarecv_retval < 0)
         {
             if (WSA_IO_PENDING != GetLastError())
             {
-                _InterlockedDecrement(&session->_ioCount);
+                _InterlockedDecrement(&session->m_ioCount);
                 ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Recv Error");
 
-                session->_blive = false;
+                session->m_blive = false;
             }
-        }
+        }*/
     }
     return 0;
 }
@@ -194,14 +202,15 @@ unsigned WorkerThread(void *arg)
             break;
         case Job_Type::PostSend:
             server->PostComplete(session, transferred);
+            break;
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
         }
-        local_ioCount = InterlockedDecrement(&session->_ioCount);
+        local_ioCount = InterlockedDecrement(&session->m_ioCount);
 
         if (local_ioCount == 0)
         {
-            if (InterlockedCompareExchange(&session->_blive, false, true) == false)
+            if (InterlockedCompareExchange(&session->m_blive, false, true) == false)
                 ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
             // InterlockedExchange(&session->_blive, false);
         }
@@ -244,18 +253,16 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateC
 
     if (GetLogicalProcess(lProcessCnt) == false)
         ERROR_FILE_LOG(L"GetLogicalProcessError.txt", L"GetLogicalProcess_Error");
-    
 
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 
     m_hThread = new HANDLE[WorkerCreateCnt];
 
-
     HANDLE WorkerArg[] = {m_hIOCP, this};
-    HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock};
+    HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock,this};
 
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
-    for (DWORD i = 0; i < WorkerCreateCnt; i++)
+    for (int i = 0; i < WorkerCreateCnt; i++)
         m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
     Sleep(10000);
     return true;
@@ -263,7 +270,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateC
 
 void CLanServer::Stop()
 {
-    
 }
 
 int CLanServer::GetSessionCount()
@@ -279,31 +285,72 @@ bool CLanServer::Disconnect(clsSession *const session)
 
 void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 {
-    session->recvBuffer->MoveRear(transferred);
-    if (InterlockedCompareExchange(&session->_flag, 1, 0) == 0)
-        SendPacket(session);
+    session->m_recvBuffer->MoveRear(transferred);
+
+    stHeader header;
+    ringBufferSize useSize;
+    float qPersentage;
+
+    // Header의 크기만큼을 확인.
+    while (session->m_recvBuffer->Peek(&header, sizeof(stHeader)) == sizeof(stHeader))
+    {
+        useSize = session->m_recvBuffer->GetUseSize();
+        if (useSize < header._len + sizeof(stHeader))
+        {
+            break;
+        }
+        session->m_recvBuffer->MoveFront(sizeof(stHeader));
+        // 메세지 생성
+        CMessage *msg = CreateCMessage(session, header);
+        qPersentage = OnRecv(session->m_id, msg);
+
+        if (qPersentage >= 75.f)
+            break;
+    }
     RecvPacket(session);
 }
 
+CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &header)
+{
+    CMessage *msg = new CMessage();
+    // ringBufferSize directDeQsize;
+
+    // directDeQsize = session->m_recvBuffer->DirectDequeueSize(f, r);
+    *msg << session->m_id;
+
+    switch (header._len)
+    {
+    default:
+    {
+        short len;
+        char payload[8];
+        session->m_recvBuffer->Dequeue(&len, sizeof(len));
+        session->m_recvBuffer->Dequeue(&payload, sizeof(payload));
+        *msg << len;
+        msg->PutData(payload, sizeof(payload));
+    }
+    }
+    return msg;
+}
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
     if (18 < transferred)
         __debugbreak();
-    session->recvBuffer->MoveFront(transferred);
+    session->m_recvBuffer->MoveFront(transferred);
     SendPacket(session);
 }
 
 void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
 {
-    char *f = session->recvBuffer->_frontPtr, *r = session->recvBuffer->_rearPtr;
-    
-    ringBufferSize usesize, directDeQsize;
-    usesize = session->recvBuffer->GetUseSize();
+    char *f = session->m_recvBuffer->_frontPtr, *r = session->m_recvBuffer->_rearPtr;
+
+    ringBufferSize usesize;
+    usesize = session->m_recvBuffer->GetUseSize();
     if (usesize == 0)
     {
         return;
     }
-    if (_InterlockedCompareExchange(&session->_flag, 1, 0) == 0)
+    if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
     {
         SendPacket(session);
     }
@@ -318,25 +365,25 @@ void CLanServer::SendPacket(clsSession *const session)
     WSABUF wsaBuf[2];
     DWORD LastError;
 
-    char *f = session->recvBuffer->_frontPtr, *r = session->recvBuffer->_rearPtr;
+    char *f = session->m_recvBuffer->_frontPtr, *r = session->m_recvBuffer->_rearPtr;
 
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
-        ZeroMemory(&session->_sendOverlapped, sizeof(OVERLAPPED));
+        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
     }
-    useSize = session->recvBuffer->GetUseSize(f, r);
+    useSize = session->m_recvBuffer->GetUseSize(f, r);
 
     if (useSize == 0)
     {
-        //flag를 끄고 Recv를 받은 후에 완료통지를 왔다면 
-        if (_InterlockedCompareExchange(&session->_flag, 0, 1) == 1)
+        // flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
+        if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
         {
-            InterlockedIncrement(&session->_ioCount);
-            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->_PostOverlapped);
+            InterlockedIncrement(&session->m_ioCount);
+            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
         }
         return;
     }
-    directDQSize = session->recvBuffer->DirectDequeueSize(f, r);
+    directDQSize = session->m_recvBuffer->DirectDequeueSize(f, r);
 
     if (useSize <= directDQSize)
     {
@@ -350,22 +397,22 @@ void CLanServer::SendPacket(clsSession *const session)
         wsaBuf[0].buf = f;
         wsaBuf[0].len = directDQSize;
 
-        wsaBuf[1].buf = session->recvBuffer->_begin;
+        wsaBuf[1].buf = session->m_recvBuffer->_begin;
         wsaBuf[1].len = useSize - directDQSize;
 
         bufCnt = 2;
     }
 
-    _InterlockedIncrement(&session->_ioCount);
+    _InterlockedIncrement(&session->m_ioCount);
 
-    send_retval = WSASend(session->_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->_sendOverlapped, nullptr);
+    send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
     if (send_retval < 0)
     {
         LastError = GetLastError();
         if (LastError != WSA_IO_PENDING)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");
-            _InterlockedDecrement(&session->_ioCount);
+            _InterlockedDecrement(&session->m_ioCount);
         }
     }
 }
@@ -382,15 +429,15 @@ void CLanServer::RecvPacket(clsSession *const session)
 
     WSABUF wsaBuf[2];
 
-    char *f = session->recvBuffer->_frontPtr, *r = session->recvBuffer->_rearPtr;
+    char *f = session->m_recvBuffer->_frontPtr, *r = session->m_recvBuffer->_rearPtr;
 
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
-        ZeroMemory(&session->_recvOverlapped, sizeof(OVERLAPPED));
+        ZeroMemory(&session->m_recvOverlapped, sizeof(OVERLAPPED));
     }
 
-    directEnQsize = session->recvBuffer->DirectEnqueueSize(f, r);
-    freeSize = session->recvBuffer->GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
+    directEnQsize = session->m_recvBuffer->DirectEnqueueSize(f, r);
+    freeSize = session->m_recvBuffer->GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
 
     if (freeSize <= directEnQsize)
     {
@@ -404,15 +451,15 @@ void CLanServer::RecvPacket(clsSession *const session)
         wsaBuf[0].buf = r;
         wsaBuf[0].len = directEnQsize;
 
-        wsaBuf[1].buf = session->recvBuffer->_begin;
+        wsaBuf[1].buf = session->m_recvBuffer->_begin;
         wsaBuf[1].len = freeSize - directEnQsize;
 
         bufCnt = 2;
     }
 
-    _InterlockedIncrement(&session->_ioCount);
+    _InterlockedIncrement(&session->m_ioCount);
 
-    wsaRecv_retval = WSARecv(session->_sock, wsaBuf, bufCnt, nullptr, &flag, &session->_recvOverlapped, nullptr);
+    wsaRecv_retval = WSARecv(session->m_sock, wsaBuf, bufCnt, nullptr, &flag, &session->m_recvOverlapped, nullptr);
     if (wsaRecv_retval < 0)
     {
         LastError = GetLastError();
@@ -421,11 +468,12 @@ void CLanServer::RecvPacket(clsSession *const session)
         case WSA_IO_PENDING:
             break;
         default:
-            _InterlockedDecrement(&session->_ioCount);
+            _InterlockedDecrement(&session->m_ioCount);
             ERROR_FILE_LOG(L"Socket_Error.txt", L"WSARecv_Error");
         }
     }
 }
+
 int CLanServer::getAcceptTPS()
 {
     return 0;

@@ -30,16 +30,17 @@ class clsSession
 
     void Release();
 
-    SOCKET _sock = 0;
+    SOCKET m_sock = 0;
 
-    stOverlapped _recvOverlapped = stOverlapped(Job_Type::Recv);
-    stOverlapped _sendOverlapped = stOverlapped(Job_Type::Send);
-    stOverlapped _PostOverlapped = stOverlapped(Job_Type::PostSend);
+    stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
+    stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
+    stOverlapped m_postOverlapped = stOverlapped(Job_Type::PostSend);
 
-    CRingBuffer *sendBuffer; // Echo에서는 미 사용
-    CRingBuffer *recvBuffer;
+    CRingBuffer *m_sendBuffer; // Echo에서는 미 사용
+    CRingBuffer *m_recvBuffer;
 
-    ull _ioCount = 0;
-    ull _blive = 0;
-    ull _flag = 0;
+    ull m_ioCount = 0;
+    ull m_blive = 0;
+    ull m_flag = 0;
+    ull m_id = 0;
 };

@@ -7,7 +7,7 @@
 #pragma comment(lib, "ws2_32")
 
 #include <map>
-
+#include    "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 
 class st_WSAData
@@ -29,11 +29,14 @@ class CLanServer
     bool Disconnect(class clsSession *const session);
 
     void RecvComplete(class clsSession *const session, DWORD transferred);
+    struct CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
+
     void SendComplete(class clsSession *const session, DWORD transferred);
     void PostComplete(class clsSession* const session, DWORD transferred);
     void SendPacket(class clsSession *const session);
     void RecvPacket(class clsSession *const session);
 
+    virtual double OnRecv(ull SessionID, struct CMessage *msg) = 0;
 
     /* 
             virtual bool OnConnectionRequest(IP, Port) = 0; //
@@ -49,8 +52,7 @@ class CLanServer
         < Release 후 호출
             
 
-            virtual void OnRecv(SessionID, CPacket *) = 0;
-        < 패킷 수신 완료 후
+           
 
         //	virtual void OnSend(SessionID, int sendsize) = 0;           < 패킷 송신 완료 후
 

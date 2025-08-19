@@ -22,6 +22,8 @@ class CRingBuffer
     ringBufferSize Dequeue(void *chpDest, ringBufferSize iSize);
 
     ringBufferSize Peek(void *chpDest, ringBufferSize iSize);
+    ringBufferSize Peek(void *pDest, ringBufferSize iSize, char *f, char *r);
+
     void ClearBuffer();
 
     ringBufferSize DirectEnqueueSize();

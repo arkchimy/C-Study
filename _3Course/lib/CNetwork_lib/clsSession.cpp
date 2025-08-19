@@ -2,23 +2,23 @@
 #include "clsSession.h"
 
 clsSession::clsSession(SOCKET sock)
-    : _sock(sock)
+    : m_sock(sock)
 {
 
-    sendBuffer = new CRingBuffer();
-    recvBuffer = new CRingBuffer();
-    _blive = 1;
+    m_sendBuffer = new CRingBuffer();
+    m_recvBuffer = new CRingBuffer();
+    m_blive = 1;
 }
 
 clsSession::~clsSession()
 {
-    delete sendBuffer;
-    delete recvBuffer;
+    delete m_sendBuffer;
+    delete m_recvBuffer;
 
-    closesocket(_sock);
+    closesocket(m_sock);
 }
 
 void clsSession::Release()
 {
-    _blive = 0;
+    m_blive = 0;
 }

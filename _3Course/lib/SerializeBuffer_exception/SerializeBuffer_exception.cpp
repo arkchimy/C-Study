@@ -1,9 +1,8 @@
 ﻿// SerializeBuffer_MT.cpp : 정적 라이브러리를 위한 함수를 정의합니다.
 //
 #include "pch.h"
-
-#include "../../../error_log.h"
-#include "SerializeBuffer_exception.h"
+#include <strsafe.h>
+#define ERROR_BUFFER_SIZE 100
 
 CMessage::CMessage()
 {
@@ -21,7 +20,6 @@ CMessage::CMessage()
             ERROR_FILE_LOG(L"SerializeError.txt", L"HeapCreate Error\n");
             return;
         }
-     
     }
 
     __try
@@ -71,10 +69,9 @@ CMessage::~CMessage()
     }
 }
 
-DWORD CMessage::PutData(const char *src, SerializeBufferSize size)
+SSIZE_T CMessage::PutData(const char *src, SerializeBufferSize size)
 {
     char *r = _rear;
-
     if (r + size > _end)
         throw MessageException(MessageException::NotEnoughSpace, "Buffer OverFlow\n");
     memcpy(r, src, size);
@@ -82,7 +79,7 @@ DWORD CMessage::PutData(const char *src, SerializeBufferSize size)
     return _rear - r;
 }
 
-DWORD CMessage::GetData(char *desc, SerializeBufferSize size)
+SSIZE_T CMessage::GetData(char *desc, SerializeBufferSize size)
 {
     char *f = _front;
     if (f + size > _rear)
