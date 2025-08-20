@@ -3,9 +3,9 @@
 
 #include "stHeader.h"
 
+#include "../../../error_log.h"
 #include <list>
 #include <thread>
-#include "../../../error_log.h"
 
 st_WSAData::st_WSAData()
 {
@@ -124,9 +124,8 @@ unsigned AcceptThread(void *arg)
         EnterCriticalSection(&server->cs_sessionMap);
         server->sessions[session_id] = session;
         session->m_id = session_id++;
-        
 
-        for (std::map<ull,clsSession *>::iterator iter = server->sessions.begin(); iter != server->sessions.end(); iter++)
+        for (std::map<ull, clsSession *>::iterator iter = server->sessions.begin(); iter != server->sessions.end(); iter++)
         {
             clsSession *element = iter->second;
             if (element->m_blive == false)
@@ -137,25 +136,24 @@ unsigned AcceptThread(void *arg)
         }
         LeaveCriticalSection(&server->cs_sessionMap);
 
-
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
         server->RecvPacket(session);
 
-        //wsabuf.buf = session->m_recvBuffer->_rearPtr;
-        //wsabuf.len = session->m_recvBuffer->GetFreeSize();
+        // wsabuf.buf = session->m_recvBuffer->_rearPtr;
+        // wsabuf.len = session->m_recvBuffer->GetFreeSize();
 
-        //_InterlockedIncrement(&session->m_ioCount); 
-  /*      wsarecv_retval = WSARecv(client_sock, &wsabuf, 1, nullptr, &flag, &session->m_recvOverlapped, nullptr);
-        if (wsarecv_retval < 0)
-        {
-            if (WSA_IO_PENDING != GetLastError())
-            {
-                _InterlockedDecrement(&session->m_ioCount);
-                ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Recv Error");
+        //_InterlockedIncrement(&session->m_ioCount);
+        /*      wsarecv_retval = WSARecv(client_sock, &wsabuf, 1, nullptr, &flag, &session->m_recvOverlapped, nullptr);
+              if (wsarecv_retval < 0)
+              {
+                  if (WSA_IO_PENDING != GetLastError())
+                  {
+                      _InterlockedDecrement(&session->m_ioCount);
+                      ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Recv Error");
 
-                session->m_blive = false;
-            }
-        }*/
+                      session->m_blive = false;
+                  }
+              }*/
     }
     return 0;
 }
@@ -262,7 +260,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateC
     m_hThread = new HANDLE[WorkerCreateCnt];
 
     HANDLE WorkerArg[] = {m_hIOCP, this};
-    HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock,this};
+    HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock, this};
 
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
     for (int i = 0; i < WorkerCreateCnt; i++)
@@ -325,11 +323,11 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     {
     default:
     {
-        short len;
+        // short len;
         char payload[8];
-        session->m_recvBuffer->Dequeue(&len, sizeof(len));
-        session->m_recvBuffer->Dequeue(&payload, sizeof(payload));
-        *msg << len;
+        // session->m_recvBuffer->Dequeue(&len, sizeof(len));
+        session->m_recvBuffer->Dequeue(payload, sizeof(payload));
+        //*msg << len;
         msg->PutData(payload, sizeof(payload));
     }
     }
@@ -337,10 +335,8 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
 }
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
-    if (18 < transferred)
-        __debugbreak();
-    session->m_recvBuffer->MoveFront(transferred);
-    InterlockedCompareExchange(&session->m_flag, 0, 1);
+    session->m_sendBuffer->MoveFront(transferred);
+    SendPacket(session);
 }
 
 void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
@@ -368,22 +364,21 @@ void CLanServer::SendPacket(clsSession *const session)
     WSABUF wsaBuf[2];
     DWORD LastError;
 
+    if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 1)
+        return;
     char *f = session->m_sendBuffer->_frontPtr, *r = session->m_sendBuffer->_rearPtr;
 
-    {
-        ZeroMemory(wsaBuf, sizeof(wsaBuf));
-        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-    }
     useSize = session->m_sendBuffer->GetUseSize(f, r);
 
     if (useSize == 0)
     {
         //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-        //if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
+        // if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
         //{
-        //    InterlockedIncrement(&session->m_ioCount);
-        //    PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
-        //}
+        //     InterlockedIncrement(&session->m_ioCount);
+        //     PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
+        // }
+        _InterlockedCompareExchange(&session->m_flag, 0, 1);
         return;
     }
     directDQSize = session->m_sendBuffer->DirectDequeueSize(f, r);
@@ -408,6 +403,10 @@ void CLanServer::SendPacket(clsSession *const session)
 
     _InterlockedIncrement(&session->m_ioCount);
 
+    {
+        ZeroMemory(wsaBuf, sizeof(wsaBuf));
+        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+    }
     send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
     if (send_retval < 0)
     {

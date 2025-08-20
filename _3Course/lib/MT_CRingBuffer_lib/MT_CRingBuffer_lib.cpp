@@ -1,7 +1,7 @@
 ﻿#include "MT_CRingBuffer_lib.h"
 
 CRingBuffer::CRingBuffer()
-    : CRingBuffer(18){}
+    : CRingBuffer(4096) {}
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {

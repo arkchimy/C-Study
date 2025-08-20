@@ -96,5 +96,4 @@ struct CMessage
     char *_rear = nullptr;
 
     inline static LONG64 s_UseCnt = 0;
-    inline static HANDLE s_BufferHeap = 0;
 };
