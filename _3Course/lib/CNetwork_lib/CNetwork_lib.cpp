@@ -347,6 +347,7 @@ void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
     usesize = session->m_recvBuffer->GetUseSize();
     if (usesize == 0)
     {
+        _InterlockedCompareExchange(&session->m_flag, 0, 1);
         return;
     }
     if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
@@ -363,23 +364,27 @@ void CLanServer::SendPacket(clsSession *const session)
 
     WSABUF wsaBuf[2];
     DWORD LastError;
+    char *f, *r;
 
-    if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 1)
-        return;
-    char *f = session->m_sendBuffer->_frontPtr, *r = session->m_sendBuffer->_rearPtr;
+    f = session->m_sendBuffer->_frontPtr;
+    r = session->m_sendBuffer->_rearPtr;
 
     useSize = session->m_sendBuffer->GetUseSize(f, r);
 
     if (useSize == 0)
     {
         //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-        // if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
-        //{
-        //     InterlockedIncrement(&session->m_ioCount);
-        //     PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
-        // }
-        _InterlockedCompareExchange(&session->m_flag, 0, 1);
+   /*      if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
+        {*/
+             InterlockedIncrement(&session->m_ioCount);
+             PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
+         //}
+ 
         return;
+    }
+    {
+        ZeroMemory(wsaBuf, sizeof(wsaBuf));
+        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
     }
     directDQSize = session->m_sendBuffer->DirectDequeueSize(f, r);
 
@@ -402,11 +407,6 @@ void CLanServer::SendPacket(clsSession *const session)
     }
 
     _InterlockedIncrement(&session->m_ioCount);
-
-    {
-        ZeroMemory(wsaBuf, sizeof(wsaBuf));
-        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-    }
     send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
     if (send_retval < 0)
     {

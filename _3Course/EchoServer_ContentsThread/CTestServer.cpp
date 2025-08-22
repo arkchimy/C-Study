@@ -14,10 +14,18 @@ void EchoProcedure(CMessage *const message, CTestServer *const server)
     // TODO : disconnect에 대비해서 풀을 만들어야함.
   
     EnterCriticalSection(&server->cs_sessionMap);
-    session = server->sessions[session_id];
-    if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
+
+    auto iter = server->sessions.find(session_id);
+    if (iter == server->sessions.end())
+    {
+        LeaveCriticalSection(&server->cs_sessionMap);
+        return;
+    }
+    session = iter->second;
+    if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
     {
         session->m_sendBuffer->Enqueue(&len, sizeof(len));
+
         if (session->m_sendBuffer->Enqueue(payload, 8) != 8)
         {
             session->m_blive = false;
