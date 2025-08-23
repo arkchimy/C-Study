@@ -213,7 +213,8 @@ unsigned WorkerThread(void *arg)
         {
             if (InterlockedCompareExchange(&session->m_blive, false, true) == false)
                 ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
-            // InterlockedExchange(&session->_blive, false);
+            // InterlockedExchange(&session->_blive, false)[=p411111111111111111111111111111111
+            //  m;
         }
     }
 
@@ -292,10 +293,14 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     ringBufferSize useSize;
     float qPersentage;
 
+    char *f, *r;
+    f = session->m_recvBuffer->_frontPtr;
+    r = session->m_recvBuffer->_rearPtr;
+
     // Header의 크기만큼을 확인.
-    while (session->m_recvBuffer->Peek(&header, sizeof(stHeader)) == sizeof(stHeader))
+    while (session->m_recvBuffer->Peek(&header, sizeof(stHeader),f,r) == sizeof(stHeader))
     {
-        useSize = session->m_recvBuffer->GetUseSize();
+        useSize = session->m_recvBuffer->GetUseSize(f, r);
         if (useSize < header._len + sizeof(stHeader))
         {
             break;
@@ -329,6 +334,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
         session->m_recvBuffer->Dequeue(payload, sizeof(payload));
         //*msg << len;
         msg->PutData(payload, sizeof(payload));
+        msg->_begin = msg->_begin; 
     }
     }
     return msg;
@@ -341,19 +347,27 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 
 void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
 {
-    char *f = session->m_recvBuffer->_frontPtr, *r = session->m_recvBuffer->_rearPtr;
-
+    char *f, *r;
     ringBufferSize usesize;
-    usesize = session->m_recvBuffer->GetUseSize();
-    if (usesize == 0)
+
+    f = session->m_sendBuffer->_frontPtr;
+    r = session->m_sendBuffer->_rearPtr;
+
+    usesize = session->m_sendBuffer->GetUseSize(f, r);
+    if (usesize != 0)
     {
-        _InterlockedCompareExchange(&session->m_flag, 0, 1);
+        if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
+        {
+            if (_InterlockedCompareExchange(&session->m_Postflag, 0, 1) == 0)
+                __debugbreak();
+            SendPacket(session);
+        }
+        else
+            SendPostMessage(session->m_id);
         return;
     }
-    if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
-    {
-        SendPacket(session);
-    }
+    if (_InterlockedCompareExchange(&session->m_Postflag, 0, 1) == 0)
+        __debugbreak();
 }
 
 void CLanServer::SendPacket(clsSession *const session)
@@ -371,17 +385,13 @@ void CLanServer::SendPacket(clsSession *const session)
 
     useSize = session->m_sendBuffer->GetUseSize(f, r);
 
-    if (useSize == 0)
-    {
-        //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-   /*      if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
-        {*/
-             InterlockedIncrement(&session->m_ioCount);
-             PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
-         //}
- 
-        return;
-    }
+    //if (useSize == 0)
+    //{
+    //    //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
+    //    _InterlockedCompareExchange(&session->m_flag, 0, 1);
+    //    return;
+    //}
+
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));

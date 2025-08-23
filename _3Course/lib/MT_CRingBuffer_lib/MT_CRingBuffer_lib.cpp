@@ -37,27 +37,23 @@ ringBufferSize CRingBuffer::GetFreeSize(const char *f, const char *r)
                   : f - r - 1;
 }
 
-
-
 ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
+{
+    return Enqueue(pSrc,  iSize,_frontPtr,_rearPtr);
+}
+
+ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize, char *f, char *r)
 {
     ringBufferSize directEnQSize, freeSize;
     ringBufferSize local_size = iSize;
 
-    char *f = _frontPtr, *r = _rearPtr;
-    const char *chpSrc = reinterpret_cast<const char *>(pSrc);
+    const char *chpSrc;
 
-    if (f == _begin && r == _end)
-    {
-        directEnQSize = _end - r - 1;
-    }
-    else
-    {
-        directEnQSize = f <= r ? _end - r
-                               : f - r - 1;
-    }
-    freeSize = f <= r ? (_end - r) + (f - _begin) - 1
-                      : f - r - 1;
+    chpSrc = reinterpret_cast<const char *>(pSrc);
+
+
+    directEnQSize = DirectDequeueSize(f, r);
+    freeSize = GetFreeSize(f, r);
 
     if (freeSize < local_size)
     {
@@ -80,25 +76,28 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
 
 ringBufferSize CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize)
 {
-    char *f, *r;
+    return Dequeue(pDest, iSize,_frontPtr,_rearPtr);
+}
+
+ringBufferSize CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize, char *f, char *r)
+{
+
     char *chpDest = reinterpret_cast<char *>(pDest);
 
     ringBufferSize DirectDeqSize;
     ringBufferSize useSize;
-    ringBufferSize local_size = iSize;
+    ringBufferSize local_size;
 
-    f = _frontPtr;
-    r = _rearPtr;
 
-    useSize = f <= r ? r - f
-                     : _end - f + r - _begin;
+    local_size = iSize;
+    useSize = GetUseSize(f, r);
 
     if (useSize < local_size)
         return false;
 
     // TODO : 비순차적 문제는 없을까? Store라 괜찮음
 
-    DirectDeqSize = f <= r ? r - f : _end - f;
+    DirectDeqSize = DirectDequeueSize(f, r);
 
     if (local_size <= DirectDeqSize)
     {
@@ -116,20 +115,18 @@ ringBufferSize CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize)
 
 ringBufferSize CRingBuffer::Peek(void *pDest, ringBufferSize iSize)
 {
-    return Peek(pDest , iSize,_frontPtr, _rearPtr);
+    return Peek(pDest, iSize, _frontPtr, _rearPtr);
 }
 ringBufferSize CRingBuffer::Peek(void *pDest, ringBufferSize iSize, char *f, char *r)
 {
     char *chpDest = reinterpret_cast<char *>(pDest);
     ringBufferSize useSize, DirectDeqSize;
 
-    useSize = f <= r ? r - f
-                     : _end - f + r - _begin;
 
+    useSize = GetUseSize(f, r);
     if (iSize > useSize)
         return useSize;
-
-    DirectDeqSize = f <= r ? r - f : _end - f;
+    DirectDeqSize = DirectDequeueSize(f, r);
 
     if (iSize <= DirectDeqSize)
     {
@@ -150,22 +147,14 @@ void CRingBuffer::ClearBuffer()
 
 ringBufferSize CRingBuffer::DirectEnqueueSize()
 {
-    char *f = _frontPtr, *r = _rearPtr;
-
-    if (f == _begin && r == _end)
-    {
-        return _end - r - 1;
-    }
-
-    return f <= r ? _end - r
-                  : f - r - 1;
+    return DirectEnqueueSize(_frontPtr, _rearPtr);
 }
 
 ringBufferSize CRingBuffer::DirectEnqueueSize(const char *f, const char *r)
 {
     if (f == _begin && r == _end - 1)
     {
-        return _end - r - 1;
+        return 0;
     }
 
     return f <= r ? _end - r
@@ -174,9 +163,7 @@ ringBufferSize CRingBuffer::DirectEnqueueSize(const char *f, const char *r)
 
 ringBufferSize CRingBuffer::DirectDequeueSize()
 {
-    char *f = _frontPtr, *r = _rearPtr;
-
-    return f <= r ? r - f : _end - f;
+    return DirectDequeueSize(_frontPtr, _rearPtr);
 }
 
 ringBufferSize CRingBuffer::DirectDequeueSize(const char *f, const char *r)
@@ -186,31 +173,35 @@ ringBufferSize CRingBuffer::DirectDequeueSize(const char *f, const char *r)
 
 void CRingBuffer::MoveRear(ringBufferSize iSize)
 {
-    char *pChk = _rearPtr + iSize;
-    char *distance = reinterpret_cast<char *>(pChk - _end);
 
+    char *pChk;
+    char *distance;
+    char *r; //= _rearPtr
+
+    r = _rearPtr;
+    pChk = r + iSize;
+    distance = reinterpret_cast<char *>(pChk - _end);
     if (_end < pChk)
     {
-        _rearPtr = _begin + long long(distance);
+        pChk = _begin + long long(distance);
     }
-    else
-    {
-        _rearPtr = pChk;
-    }
+    InterlockedCompareExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk, (unsigned long long)r);
 }
 
 void CRingBuffer::MoveFront(ringBufferSize iSize)
 {
-    char *pChk = _frontPtr + iSize;
-    char *distance = reinterpret_cast<char *>(pChk - _end);
+    char *f;
+    char *pChk;
+    char *distance;
+
+    f = _frontPtr;
+    pChk = f + iSize;
+    distance = reinterpret_cast<char *>(pChk - _end);
 
     if (_end < pChk)
     {
-    
-        _frontPtr = _begin + long long(distance);
+        pChk = _begin + long long(distance);
     }
-    else
-    {
-        _frontPtr = pChk;
-    }
+    if (InterlockedCompareExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk, (unsigned long long)f) != (unsigned long long)f)
+        __debugbreak();
 }

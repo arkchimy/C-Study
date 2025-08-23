@@ -18,8 +18,11 @@ class CRingBuffer
     ringBufferSize GetFreeSize();
     ringBufferSize GetFreeSize(const char *f, const char *r);
 
-    ringBufferSize Enqueue(const void *chpData, ringBufferSize iSize);
+    ringBufferSize Enqueue(const void *pSrc, ringBufferSize iSize);
+    ringBufferSize Enqueue(const void *pSrc, ringBufferSize iSize, char *f, char *r);
+
     ringBufferSize Dequeue(void *chpDest, ringBufferSize iSize);
+    ringBufferSize Dequeue(void *pDest, ringBufferSize iSize, char* f ,char* r);
 
     ringBufferSize Peek(void *chpDest, ringBufferSize iSize);
     ringBufferSize Peek(void *pDest, ringBufferSize iSize, char *f, char *r);

@@ -42,5 +42,6 @@ class clsSession
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0;
+    ull m_Postflag = 0;
     ull m_id = 0;
 };

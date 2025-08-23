@@ -28,7 +28,6 @@ int main()
             ERROR_FILE_LOG(L"ParserError.txt", L"LoadFile");
         parser.GetValue(L"ServerAddr", bindAddr, 16);
         parser.GetValue(L"ServerPort", bindPort);
-        parser.GetValue(L"iWorkerCnt", iWorkerCnt);
 
         parser.GetValue(L"LingerOn", linger.l_onoff);
         parser.GetValue(L"ZeroCopy", bZeroCopy);
@@ -36,7 +35,7 @@ int main()
         parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
         parser.GetValue(L"NoDelay", NoDelay);
         parser.GetValue(L"MaxSessions", maxSessions);
-        EchoServer.Start(bindAddr, bindPort, iWorkerCnt, reduceThreadCount, NoDelay, maxSessions);
+        EchoServer.Start(bindAddr, bindPort, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
     }
 
     while (1)
