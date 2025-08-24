@@ -97,7 +97,10 @@ void CTestServer::SendPostMessage(ull SessionID)
     InterlockedIncrement(&session->m_ioCount);
     EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
     if (EnQSucess == false)
+    {
         InterlockedDecrement(&session->m_ioCount);
+        ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
+    }
 
 }
 
@@ -126,6 +129,7 @@ void CTestServer::EchoProcedure(CMessage *const message)
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // TODO : cs_sessionMap Lock 제거
 
+    EnterCriticalSection(&cs_sessionMap);
     auto iter = sessions.find(session_id);
     if (iter == sessions.end())
     {
@@ -134,6 +138,7 @@ void CTestServer::EchoProcedure(CMessage *const message)
         return;
     }
     session = iter->second;
+    LeaveCriticalSection(&cs_sessionMap);
 
     if (session->m_sendBuffer->Enqueue(&len, sizeof(len)) != sizeof(len))
     {

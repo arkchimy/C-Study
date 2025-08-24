@@ -220,11 +220,12 @@ unsigned WorkerThread(void *arg)
 
     return 0;
 }
-BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
+BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions, int ZeroByteTest)
 {
     linger linger;
     linger.l_onoff = 1;
     linger.l_linger = 0;
+    m_ZeroByteTest = ZeroByteTest;
 
     DWORD lProcessCnt;
     DWORD bind_retval;
@@ -307,7 +308,10 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 
         EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_recvOverlapped);
         if (EnQSucess == false)
+        {
             InterlockedDecrement(&session->m_ioCount);
+            ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
+        }
 
         return;
     }
@@ -330,7 +334,10 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
        
             EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_recvOverlapped);
             if (EnQSucess == false)
+            {
                 InterlockedDecrement(&session->m_ioCount);
+                ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
+            }
 
             return;
         }
@@ -369,27 +376,14 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 
 void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
 {
-    char *f, *r;
-    ringBufferSize usesize;
-
-    f = session->m_sendBuffer->_frontPtr;
-    r = session->m_sendBuffer->_rearPtr;
-
-    usesize = session->m_sendBuffer->GetUseSize(f, r);
-    if (usesize != 0)
+    if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
     {
-        if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
-        {
-            SendPacket(session);
-        }
-        else
-        {
-            SendPostMessage(session->m_id);
-            return;
-        }
+        _InterlockedCompareExchange(&session->m_Postflag, 0, 1);
+        SendPacket(session);
+        return;
     }
-    if (_InterlockedCompareExchange(&session->m_Postflag, 0, 1) == 0)
-        __debugbreak();
+    SendPostMessage(session->m_id);
+
 }
 
 void CLanServer::SendPacket(clsSession *const session)
@@ -409,9 +403,12 @@ void CLanServer::SendPacket(clsSession *const session)
 
     if (useSize == 0)
     {
-        //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-        _InterlockedCompareExchange(&session->m_flag, 0, 1);
-        return;
+        if (!m_ZeroByteTest)
+        {
+            //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
+            _InterlockedCompareExchange(&session->m_flag, 0, 1);
+            return;
+        }
     }
 
     {

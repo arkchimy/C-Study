@@ -22,6 +22,7 @@ int main()
     int reduceThreadCount;
     int NoDelay;
     int maxSessions;
+    int ZeroByteTest;
     LINGER linger;
 
     {
@@ -34,11 +35,12 @@ int main()
 
         parser.GetValue(L"LingerOn", linger.l_onoff);
         parser.GetValue(L"ZeroCopy", bZeroCopy);
+        parser.GetValue(L"ZeroByteTest", ZeroByteTest);
         parser.GetValue(L"WorkerThreadCnt", WorkerThreadCnt);
         parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
         parser.GetValue(L"NoDelay", NoDelay);
         parser.GetValue(L"MaxSessions", maxSessions);
-        EchoServer.Start(bindAddr, bindPort, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+        EchoServer.Start(bindAddr, bindPort, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions, ZeroByteTest);
     }
 
     while (1)

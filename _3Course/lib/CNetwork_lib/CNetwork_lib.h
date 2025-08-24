@@ -23,7 +23,7 @@ class CLanServer
   public:
     ~CLanServer();
     // 오픈 IP / 포트 / 워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
-    BOOL Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
+    BOOL Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest);
     void Stop();
     int GetSessionCount();
     bool Disconnect(class clsSession *const session);
@@ -75,6 +75,7 @@ class CLanServer
     HANDLE m_hAccept;
     HANDLE m_ContentsEvent;
     HANDLE m_ServerOffEvent;
+    int m_ZeroByteTest;
 
     std::map<ull, class clsSession *> sessions;
     //TODO : 나중에 LOCK 없앨 때 지워야함.
