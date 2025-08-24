@@ -62,7 +62,10 @@ struct CMessage
                 HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin,_size );
             }
             else
+            {
+                HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin, _size);
                 throw MessageException(MessageException::NotEnoughSpace, "Buffer is fulled\n");
+            }
         }
 
         memcpy(_rear, &data, sizeof(data));
@@ -75,7 +78,10 @@ struct CMessage
     CMessage &operator>>(T &data)
     {
         if (_front > _rear)
+        {
+            HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin, _size);
             throw MessageException(MessageException::HasNotData, "false Packet \n");
+        }
 
         memcpy(&data, _front, sizeof(data));
         _front = _front + sizeof(data);

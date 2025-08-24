@@ -86,7 +86,9 @@ SSIZE_T CMessage::GetData(char *desc, SerializeBufferSize size)
 {
     char *f = _front;
     if (f + size > _rear)
+    {
         throw MessageException(MessageException::HasNotData, "buffer has not Data\n");
+    }
     memcpy(desc, f, size);
     _front += size;
     return _front - f;

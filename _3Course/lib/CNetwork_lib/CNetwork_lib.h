@@ -73,6 +73,8 @@ class CLanServer
     HANDLE m_hIOCP;
     HANDLE *m_hThread;
     HANDLE m_hAccept;
+    HANDLE m_ContentsEvent;
+    HANDLE m_ServerOffEvent;
 
     std::map<ull, class clsSession *> sessions;
     //TODO : 나중에 LOCK 없앨 때 지워야함.

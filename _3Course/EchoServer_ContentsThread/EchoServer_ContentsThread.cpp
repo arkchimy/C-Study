@@ -1,13 +1,16 @@
 ﻿#include "stdafx.h"
+#include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
 #include "CTestServer.h"
 
+
 static CTestServer EchoServer;
+CDump cump;
 
 int main()
-    {
+{
+    CDump::SetHandlerDump();
+
     st_WSAData wsa;
-
-
 
     wchar_t bindAddr[16];
     short bindPort;
@@ -40,7 +43,7 @@ int main()
 
     while (1)
     {
-
+        
     }
 
     return 0;

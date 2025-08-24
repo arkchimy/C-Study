@@ -36,6 +36,7 @@ class CRingBuffer
     ringBufferSize DirectDequeueSize(const char *f, const char *r);
 
     void MoveRear(ringBufferSize iSize);
+    void MoveRear(ringBufferSize iSize, char *r);
     void MoveFront(ringBufferSize iSize);
 
   public:

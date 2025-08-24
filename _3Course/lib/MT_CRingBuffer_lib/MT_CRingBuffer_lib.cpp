@@ -1,7 +1,7 @@
 ﻿#include "MT_CRingBuffer_lib.h"
 
 CRingBuffer::CRingBuffer()
-    : CRingBuffer(4096) {}
+    : CRingBuffer(10001) {}
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
@@ -52,11 +52,12 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize, char
     chpSrc = reinterpret_cast<const char *>(pSrc);
 
 
-    directEnQSize = DirectDequeueSize(f, r);
+    directEnQSize = DirectEnqueueSize(f, r);
     freeSize = GetFreeSize(f, r);
 
     if (freeSize < local_size)
     {
+        __debugbreak();
         return false;
     }
 
@@ -69,7 +70,7 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize, char
         memcpy(r, chpSrc, directEnQSize);
         memcpy(_begin, chpSrc + directEnQSize, local_size - directEnQSize);
     }
-    MoveRear(local_size);
+    MoveRear(local_size,r);
 
     return local_size;
 }
@@ -95,10 +96,7 @@ ringBufferSize CRingBuffer::Dequeue(void *pDest, ringBufferSize iSize, char *f, 
     if (useSize < local_size)
         return false;
 
-    // TODO : 비순차적 문제는 없을까? Store라 괜찮음
-
     DirectDeqSize = DirectDequeueSize(f, r);
-
     if (local_size <= DirectDeqSize)
     {
         memcpy(chpDest, f, local_size);
@@ -173,19 +171,21 @@ ringBufferSize CRingBuffer::DirectDequeueSize(const char *f, const char *r)
 
 void CRingBuffer::MoveRear(ringBufferSize iSize)
 {
+    MoveRear(iSize, _rearPtr);
+}
 
+void CRingBuffer::MoveRear(ringBufferSize iSize, char *r)
+{
     char *pChk;
     char *distance;
-    char *r; //= _rearPtr
 
-    r = _rearPtr;
     pChk = r + iSize;
     distance = reinterpret_cast<char *>(pChk - _end);
     if (_end < pChk)
     {
         pChk = _begin + long long(distance);
     }
-    InterlockedCompareExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk, (unsigned long long)r);
+    InterlockedExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk);
 }
 
 void CRingBuffer::MoveFront(ringBufferSize iSize)
@@ -202,6 +202,5 @@ void CRingBuffer::MoveFront(ringBufferSize iSize)
     {
         pChk = _begin + long long(distance);
     }
-    if (InterlockedCompareExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk, (unsigned long long)f) != (unsigned long long)f)
-        __debugbreak();
+    InterlockedExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk);
 }
