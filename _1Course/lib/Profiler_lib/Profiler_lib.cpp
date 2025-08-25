@@ -190,6 +190,7 @@ PROFILE_Manager::PROFILE_Manager()
     myStrcat(ProfileName, L".txt");
 
     QueryPerformanceFrequency(&Freq);
+
 }
 
 void PROFILE_Manager::createProfile()

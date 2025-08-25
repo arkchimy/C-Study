@@ -1,11 +1,14 @@
 ﻿#include "MT_CRingBuffer_lib.h"
+#include "clsRingBufferManager.h"
 
 CRingBuffer::CRingBuffer()
-    : CRingBuffer(10001) {}
+    : CRingBuffer(s_BufferSize) {}
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
-    _begin = (char *)_aligned_malloc(iBufferSize, 4096);
+
+    //_begin = (char *)_aligned_malloc(iBufferSize, 4096);
+    _begin = clsRingBufferManager::GetInstance()->Alloc(iBufferSize);
     _end = _begin + iBufferSize;
     ClearBuffer();
 }

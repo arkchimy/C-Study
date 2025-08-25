@@ -1,11 +1,11 @@
 ﻿#include "stdafx.h"
-#include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
 #include "../../_1Course/lib/Profiler_lib/Profiler_lib.h"
+#include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+
 
 #include "CTestServer.h"
 #include <conio.h>
 
-static CTestServer EchoServer;
 CDump cump;
 
 int main()
@@ -26,6 +26,7 @@ int main()
     int maxSessions;
     int ZeroByteTest;
     LINGER linger;
+    int iRingBufferSize;
 
     {
         Parser parser;
@@ -42,28 +43,36 @@ int main()
         parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
         parser.GetValue(L"NoDelay", NoDelay);
         parser.GetValue(L"MaxSessions", maxSessions);
-        EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions, ZeroByteTest);
+
+        parser.GetValue(L"RingBufferSize", iRingBufferSize);
+        CRingBuffer::s_BufferSize = iRingBufferSize;
     }
-  
 
-    while (1)
     {
-        if (_kbhit())
+        CTestServer EchoServer;
+        EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions, ZeroByteTest);
+
+        while (1)
         {
-            char ch = _getch();
-
-            if (ch == VK_ESCAPE)
+            if (_kbhit())
             {
-                SetEvent(EchoServer.m_ServerOffEvent);
+                char ch = _getch();
 
+                if (ch == VK_ESCAPE)
+                {
+                    SetEvent(EchoServer.m_ServerOffEvent);
+                }
+                else if (ch == 'a' || ch == 'A')
+                    PROFILE_Manager::Instance.createProfile();
+                else if (ch == 'd' || ch == 'D')
+                {
+
+                    PROFILE_Manager::Instance.resetInfo();
+                }
             }
-            else if (ch == 'a' || ch == 'A')
-                PROFILE_Manager::Instance.createProfile();
-            else if (ch == 'd' || ch == 'D')
-                PROFILE_Manager::Instance.resetInfo();
         }
     }
 
-    //WaitForMultipleObjects();
+    // WaitForMultipleObjects();
     return 0;
 }

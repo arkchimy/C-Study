@@ -4,34 +4,34 @@
 #include <windows.h>
 
 #ifdef PROFILE
-#define PRO_BEGIN(TagName)                                                     \
-    {                                                                          \
-        PROFILE_INFO *info = nullptr;                                          \
-        for (size_t i = 0; i < PROFILE_SIZE; i++)                              \
-        {                                                                      \
-            if (PROFILE_Manager::Instance.infoPool[i]._tag == TagName)         \
-            {                                                                  \
-                info = &(PROFILE_Manager::Instance.infoPool[i]);               \
-                break;                                                         \
-            }                                                                  \
-        }                                                                      \
-        if (info == nullptr)                                                   \
-        {                                                                      \
-            for (size_t i = 0; i < PROFILE_SIZE; i++)                          \
-            {                                                                  \
-                if (PROFILE_Manager::Instance.infoPool[i].lFlag == false)      \
-                {                                                              \
-                    PROFILE_Manager::Instance.infoPool[i].lFlag = true;        \
-                    info = &(PROFILE_Manager::Instance.infoPool[i]);           \
-                    break;                                                     \
-                }                                                              \
-            }                                                                  \
-        }                                                                      \
-        if (info == nullptr)                                                   \
-            __debugbreak();                                                    \
-        info->iCall++;                                                         \
-        info->_tag = TagName;                                                  \
-        QueryPerformanceCounter(&info->lStartTime);                            \
+#define PRO_BEGIN(TagName)                                                \
+    {                                                                     \
+        PROFILE_INFO *info = nullptr;                                     \
+        for (size_t i = 0; i < PROFILE_SIZE; i++)                         \
+        {                                                                 \
+            if (PROFILE_Manager::Instance.infoPool[i]._tag == TagName)    \
+            {                                                             \
+                info = &(PROFILE_Manager::Instance.infoPool[i]);          \
+                break;                                                    \
+            }                                                             \
+        }                                                                 \
+        if (info == nullptr)                                              \
+        {                                                                 \
+            for (size_t i = 0; i < PROFILE_SIZE; i++)                     \
+            {                                                             \
+                if (PROFILE_Manager::Instance.infoPool[i].lFlag == false) \
+                {                                                         \
+                    PROFILE_Manager::Instance.infoPool[i].lFlag = true;   \
+                    info = &(PROFILE_Manager::Instance.infoPool[i]);      \
+                    break;                                                \
+                }                                                         \
+            }                                                             \
+        }                                                                 \
+        if (info == nullptr)                                              \
+            __debugbreak();                                               \
+        info->iCall++;                                                    \
+        info->_tag = TagName;                                             \
+        QueryPerformanceCounter(&info->lStartTime);                       \
     }
 #define PRO_END(TagName)                                                       \
     {                                                                          \
@@ -47,7 +47,7 @@
             }                                                                  \
         }                                                                      \
         if (info == nullptr)                                                   \
-            __debugbreak();                                                    \
+            return;                                                            \
         long long current_time = current.QuadPart - info->lStartTime.QuadPart; \
         info->iTotalTime += current_time;                                      \
         if (info->iMax[1] <= current_time)                                     \
@@ -102,8 +102,8 @@ struct PROFILE_FUNC
     __int64 iTotalTime = 0; // 전체 사용시간 카운터 Time.	(출력시
                             // 호출회수로 나누어 평균 구함)
     __int64 iMin[2] = {
-        INT_MAX, INT_MAX}; // 최소 사용시간 카운터 Time.	(초단위로
-                           // 계산하여 저장 / [0] 가장최소 [1] 다음 최소 [2])
+        INT_MAX, INT_MAX};    // 최소 사용시간 카운터 Time.	(초단위로
+                              // 계산하여 저장 / [0] 가장최소 [1] 다음 최소 [2])
     __int64 iMax[2] = {0, 0}; // 최대 사용시간 카운터 Time.	(초단위로
                               // 계산하여 저장 / [0] 가장최대 [1] 다음 최대 [2])
 
@@ -123,7 +123,7 @@ class PROFILE_INFO
         iMax[1] = 0;
         aver = 0;
     }
-    ~PROFILE_INFO(){};
+    ~PROFILE_INFO() {};
     void writeInfo();
     void resetinfo();
     void StartLogic(const wchar_t *TagName);
@@ -138,8 +138,8 @@ class PROFILE_INFO
     __int64 iTotalTime = 0; // 전체 사용시간 카운터 Time.	(출력시
                             // 호출회수로 나누어 평균 구함)
     __int64 iMin[2] = {
-        INT_MAX, INT_MAX}; // 최소 사용시간 카운터 Time.	(초단위로
-                           // 계산하여 저장 / [0] 가장최소 [1] 다음 최소 [2])
+        INT_MAX, INT_MAX};    // 최소 사용시간 카운터 Time.	(초단위로
+                              // 계산하여 저장 / [0] 가장최소 [1] 다음 최소 [2])
     __int64 iMax[2] = {0, 0}; // 최대 사용시간 카운터 Time.	(초단위로
                               // 계산하여 저장 / [0] 가장최대 [1] 다음 최대 [2])
 

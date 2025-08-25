@@ -131,10 +131,10 @@ void CTestServer::EchoProcedure(CMessage *const message)
     session = iter->second;
     LeaveCriticalSection(&cs_sessionMap);
 
-    if (session->m_sendBuffer->Enqueue(messageData, sizeof(messageData)) != sizeof(messageData))
+    if (session->m_sendBuffer.Enqueue(messageData, sizeof(messageData)) != sizeof(messageData))
     {
         session->m_blive = false;
-        ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer->Enqueue another");
+        ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer.Enqueue another");
         __debugbreak();
         return;
     }

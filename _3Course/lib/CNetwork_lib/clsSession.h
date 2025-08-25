@@ -36,8 +36,8 @@ class clsSession
     stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
     stOverlapped m_postOverlapped = stOverlapped(Job_Type::PostSend);
 
-    CRingBuffer *m_sendBuffer; // Echo에서는 미 사용
-    CRingBuffer *m_recvBuffer;
+    CRingBuffer m_sendBuffer; // Echo에서는 미 사용
+    CRingBuffer m_recvBuffer;
 
     ull m_ioCount = 0;
     ull m_blive = 0;
@@ -45,3 +45,4 @@ class clsSession
     ull m_Postflag = 0;
     ull m_id = 0;
 };
+

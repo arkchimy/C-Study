@@ -13,7 +13,7 @@ class CTestServer : public CLanServer
 
     CRITICAL_SECTION cs_ContentQ;
 
-    CRingBuffer m_ContentsQ = CRingBuffer(10000);
+    CRingBuffer m_ContentsQ;
 
     HANDLE hContentsThread;
 };

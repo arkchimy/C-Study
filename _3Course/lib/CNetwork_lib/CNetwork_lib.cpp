@@ -121,6 +121,11 @@ unsigned AcceptThread(void *arg)
         }
 
         clsSession *session = new clsSession(client_sock);
+        if (session == nullptr)
+        {
+            closesocket(client_sock);
+            continue;
+        }
 
         EnterCriticalSection(&server->cs_sessionMap);
 
@@ -285,7 +290,7 @@ bool CLanServer::Disconnect(clsSession *const session)
 
 void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 {
-    session->m_recvBuffer->MoveRear(transferred);
+    session->m_recvBuffer.MoveRear(transferred);
 
     stHeader header;
     ringBufferSize useSize;
@@ -294,8 +299,8 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     BOOL EnQSucess;
 
     char *f, *r;
-    f = session->m_recvBuffer->_frontPtr;
-    r = session->m_recvBuffer->_rearPtr;
+    f = session->m_recvBuffer._frontPtr;
+    r = session->m_recvBuffer._rearPtr;
 
     // ContentsQ의 상황이 어떤지를 체크.
     qPersentage = OnRecv(session->m_id, nullptr);
@@ -313,18 +318,18 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         return;
     }
     // Header의 크기만큼을 확인.
-    while (session->m_recvBuffer->Peek(&header, sizeof(stHeader),f,r) == sizeof(stHeader))
+    while (session->m_recvBuffer.Peek(&header, sizeof(stHeader),f,r) == sizeof(stHeader))
     {
-        useSize = session->m_recvBuffer->GetUseSize(f, r);
+        useSize = session->m_recvBuffer.GetUseSize(f, r);
         if (useSize < header._len + sizeof(stHeader))
         {
             break;
         }
-        session->m_recvBuffer->MoveFront(sizeof(stHeader));
+        session->m_recvBuffer.MoveFront(sizeof(stHeader));
         // 메세지 생성
         CMessage *msg = CreateCMessage(session, header);
         qPersentage = OnRecv(session->m_id, msg);
-        f = session->m_recvBuffer->_frontPtr;
+        f = session->m_recvBuffer._frontPtr;
         if (qPersentage >= 75.f)
         {
             InterlockedIncrement((unsigned long long *)&session->m_ioCount);
@@ -347,7 +352,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     CMessage *msg = new CMessage();
     // ringBufferSize directDeQsize;
 
-    // directDeQsize = session->m_recvBuffer->DirectDequeueSize(f, r);
+    // directDeQsize = session->m_recvBuffer.DirectDequeueSize(f, r);
     *msg << session->m_id;
 
     switch (header._len)
@@ -356,8 +361,8 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     {
         // short len;
         char payload[8];
-        // session->m_recvBuffer->Dequeue(&len, sizeof(len));
-        session->m_recvBuffer->Dequeue(payload, sizeof(payload));
+        // session->m_recvBuffer.Dequeue(&len, sizeof(len));
+        session->m_recvBuffer.Dequeue(payload, sizeof(payload));
         //*msg << len;
         msg->PutData(payload, sizeof(payload));
         msg->_begin = msg->_begin; 
@@ -367,7 +372,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
 }
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
-    session->m_sendBuffer->MoveFront(transferred);
+    session->m_sendBuffer.MoveFront(transferred);
     SendPacket(session);
 }
 
@@ -393,10 +398,10 @@ void CLanServer::SendPacket(clsSession *const session)
     DWORD LastError;
     char *f, *r;
 
-    f = session->m_sendBuffer->_frontPtr;
-    r = session->m_sendBuffer->_rearPtr;
+    f = session->m_sendBuffer._frontPtr;
+    r = session->m_sendBuffer._rearPtr;
 
-    useSize = session->m_sendBuffer->GetUseSize(f, r);
+    useSize = session->m_sendBuffer.GetUseSize(f, r);
 
     if (useSize == 0)
     {
@@ -412,7 +417,7 @@ void CLanServer::SendPacket(clsSession *const session)
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
     }
-    directDQSize = session->m_sendBuffer->DirectDequeueSize(f, r);
+    directDQSize = session->m_sendBuffer.DirectDequeueSize(f, r);
 
     if (useSize <= directDQSize)
     {
@@ -426,7 +431,7 @@ void CLanServer::SendPacket(clsSession *const session)
         wsaBuf[0].buf = f;
         wsaBuf[0].len = directDQSize;
 
-        wsaBuf[1].buf = session->m_sendBuffer->_begin;
+        wsaBuf[1].buf = session->m_sendBuffer._begin;
         wsaBuf[1].len = useSize - directDQSize;
 
         bufCnt = 2;
@@ -467,15 +472,15 @@ void CLanServer::RecvPacket(clsSession *const session)
 
     WSABUF wsaBuf[2];
 
-    char *f = session->m_recvBuffer->_frontPtr, *r = session->m_recvBuffer->_rearPtr;
+    char *f = session->m_recvBuffer._frontPtr, *r = session->m_recvBuffer._rearPtr;
 
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session->m_recvOverlapped, sizeof(OVERLAPPED));
     }
 
-    directEnQsize = session->m_recvBuffer->DirectEnqueueSize(f, r);
-    freeSize = session->m_recvBuffer->GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
+    directEnQsize = session->m_recvBuffer.DirectEnqueueSize(f, r);
+    freeSize = session->m_recvBuffer.GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
 
     if (freeSize <= directEnQsize)
     {
@@ -489,7 +494,7 @@ void CLanServer::RecvPacket(clsSession *const session)
         wsaBuf[0].buf = r;
         wsaBuf[0].len = directEnQsize;
 
-        wsaBuf[1].buf = session->m_recvBuffer->_begin;
+        wsaBuf[1].buf = session->m_recvBuffer._begin;
         wsaBuf[1].len = freeSize - directEnQsize;
 
         bufCnt = 2;
