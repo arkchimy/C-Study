@@ -23,7 +23,7 @@ class CLanServer
   public:
     ~CLanServer();
     // 오픈 IP / 포트 / 워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
-    BOOL Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest);
+    BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest);
     void Stop();
     int GetSessionCount();
     bool Disconnect(class clsSession *const session);
@@ -52,11 +52,6 @@ class CLanServer
 
             virtual void OnRelease(SessionID) = 0;
         < Release 후 호출
-            
-
-           
-
-        //	virtual void OnSend(SessionID, int sendsize) = 0;           < 패킷 송신 완료 후
 
         //	virtual void OnWorkerThreadBegin() = 0;                    < 워커스레드 GQCS 바로 하단에서 호출
         //	virtual void OnWorkerThreadEnd() = 0;                      < 워커스레드 1루프 종료 후
@@ -76,7 +71,7 @@ class CLanServer
     HANDLE m_ContentsEvent;
     HANDLE m_ServerOffEvent;
     int m_ZeroByteTest;
-
+    bool bZeroCopy =false;
     std::map<ull, class clsSession *> sessions;
     //TODO : 나중에 LOCK 없앨 때 지워야함.
     CRITICAL_SECTION cs_sessionMap;

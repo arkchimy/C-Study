@@ -2,6 +2,7 @@
 #include "CNetwork_lib.h"
 
 #include "stHeader.h"
+#include "../../../_1Course/lib/Profiler_lib/Profiler_lib.h"
 
 #include "../../../error_log.h"
 #include <list>
@@ -122,6 +123,7 @@ unsigned AcceptThread(void *arg)
         clsSession *session = new clsSession(client_sock);
 
         EnterCriticalSection(&server->cs_sessionMap);
+
         server->sessions[session_id] = session;
         session->m_id = session_id++;
 
@@ -134,28 +136,11 @@ unsigned AcceptThread(void *arg)
                 iter = server->sessions.erase(iter);
             }
         }
+
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
         server->RecvPacket(session);
 
         LeaveCriticalSection(&server->cs_sessionMap);
-
-
-
-        // wsabuf.buf = session->m_recvBuffer->_rearPtr;
-        // wsabuf.len = session->m_recvBuffer->GetFreeSize();
-
-        //_InterlockedIncrement(&session->m_ioCount);
-        /*      wsarecv_retval = WSARecv(client_sock, &wsabuf, 1, nullptr, &flag, &session->m_recvOverlapped, nullptr);
-              if (wsarecv_retval < 0)
-              {
-                  if (WSA_IO_PENDING != GetLastError())
-                  {
-                      _InterlockedDecrement(&session->m_ioCount);
-                      ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Recv Error");
-
-                      session->m_blive = false;
-                  }
-              }*/
     }
     return 0;
 }
@@ -220,9 +205,10 @@ unsigned WorkerThread(void *arg)
 
     return 0;
 }
-BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions, int ZeroByteTest)
+BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy,int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions, int ZeroByteTest)
 {
     linger linger;
+    int buflen;
     linger.l_onoff = 1;
     linger.l_linger = 0;
     m_ZeroByteTest = ZeroByteTest;
@@ -238,6 +224,16 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateC
     InetPtonW(AF_INET, bindAddress, &serverAddr.sin_addr);
 
     m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (ZeroCopy)
+    {
+        bZeroCopy = true;
+        buflen = 0;
+        setsockopt(m_listen_sock, SOL_SOCKET, SO_SNDBUF, (const char *)&buflen, sizeof(buflen));
+        getsockopt(m_listen_sock, SOL_SOCKET, SO_SNDBUF, (char *)&buflen, &buflen);
+        printf("getsockopt SendBuffer Len : %d \n", buflen);
+
+    }
 
     setsockopt(m_listen_sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
     setsockopt(m_listen_sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&noDelay, sizeof(noDelay));
@@ -263,11 +259,12 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int WorkerCreateC
 
     HANDLE WorkerArg[] = {m_hIOCP, this};
     HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock, this};
+    // TODO : 넘겨줄 매개변수를  지역변수로 ???  다른 방안 생각하기
 
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
     for (int i = 0; i < WorkerCreateCnt; i++)
         m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
-    Sleep(10000);
+    Sleep(1000);
     return true;
 }
 
@@ -436,7 +433,17 @@ void CLanServer::SendPacket(clsSession *const session)
     }
 
     _InterlockedIncrement(&session->m_ioCount);
-    send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+
+    if (bZeroCopy)
+    {
+        Profile profile(L"ZeroCopy WSASend");
+        send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+    }
+    else
+    {
+        Profile profile(L"WSASend");
+        send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+    }
     if (send_retval < 0)
     {
         LastError = GetLastError();

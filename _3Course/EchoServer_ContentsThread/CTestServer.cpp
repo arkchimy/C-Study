@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "CTestServer.h"
-
 #include <thread>
-
 
 unsigned ContentsThread(void *arg)
 {
@@ -13,33 +11,25 @@ unsigned ContentsThread(void *arg)
     HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
     DWORD hSignalIdx;
 
-    //bool 이 좋아보임.
+    // bool 이 좋아보임.
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
         if (hSignalIdx - WAIT_OBJECT_0 == 1)
-            return 0;
-
-        //EnterCriticalSection(&server->cs_ContentQ);
+            break;
 
         f = server->m_ContentsQ._frontPtr;
         r = server->m_ContentsQ._rearPtr;
 
-        while (server->m_ContentsQ.GetUseSize(f,r) >= 8)
+        while (server->m_ContentsQ.GetUseSize(f, r) >= 8)
         {
-            if (server->m_ContentsQ.Peek(&addr, sizeof(size_t), f, r) != sizeof(size_t))
-                __debugbreak();
-            message = (CMessage *)addr;
-
-            if (server->m_ContentsQ.Dequeue(&addr, sizeof(size_t),f,r) != sizeof(size_t))
+            if (server->m_ContentsQ.Dequeue(&addr, sizeof(size_t), f, r) != sizeof(size_t))
                 __debugbreak();
             message = (CMessage *)addr;
             // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
             server->EchoProcedure(message);
             f = server->m_ContentsQ._frontPtr;
         }
-        //LeaveCriticalSection(&server->cs_ContentQ);
-      
     }
 
     return 0;
@@ -54,14 +44,12 @@ CTestServer::CTestServer()
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
 
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
-
 }
 
 CTestServer::~CTestServer()
 {
     DeleteCriticalSection(&cs_ContentQ);
     DeleteCriticalSection(&cs_sessionMap);
-    
 }
 
 double CTestServer::OnRecv(ull sessionID, CMessage *msg)
@@ -101,7 +89,6 @@ void CTestServer::SendPostMessage(ull SessionID)
         InterlockedDecrement(&session->m_ioCount);
         ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
     }
-
 }
 
 void CTestServer::EchoProcedure(CMessage *const message)
@@ -110,10 +97,15 @@ void CTestServer::EchoProcedure(CMessage *const message)
     char payload[8];
     short len = 8;
     clsSession *session;
-    
+    char *payloadoffset;
+    char messageData[10];
+
+    memcpy(messageData, &len, sizeof(len));
+    payloadoffset = messageData + sizeof(len);
     try
     {
         *message >> session_id;
+        message->GetData(payloadoffset, len);
     }
     catch (MessageException::ErrorType err)
     {
@@ -123,9 +115,8 @@ void CTestServer::EchoProcedure(CMessage *const message)
             __debugbreak();
             break;
         }
-      
     }
-    message->GetData(payload, sizeof(payload));
+
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // TODO : cs_sessionMap Lock 제거
 
@@ -140,23 +131,16 @@ void CTestServer::EchoProcedure(CMessage *const message)
     session = iter->second;
     LeaveCriticalSection(&cs_sessionMap);
 
-    if (session->m_sendBuffer->Enqueue(&len, sizeof(len)) != sizeof(len))
+    if (session->m_sendBuffer->Enqueue(messageData, sizeof(messageData)) != sizeof(messageData))
     {
         session->m_blive = false;
         ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer->Enqueue another");
         __debugbreak();
         return;
     }
-    if (session->m_sendBuffer->Enqueue(payload, 8) != 8)
-    {
-        session->m_blive = false;
-        ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer->Enqueue another");
-        __debugbreak();
-        return;
-    }
+
     if (InterlockedCompareExchange(&session->m_Postflag, 1, 0) == 0)
         SendPostMessage(session_id);
-    
-    delete message;
 
+    delete message;
 }
