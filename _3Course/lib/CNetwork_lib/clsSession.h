@@ -21,10 +21,30 @@ struct stOverlapped : public OVERLAPPED
     stOverlapped(Job_Type mode) : _mode(mode) {}
     Job_Type _mode = Job_Type::MAX;
 };
+typedef struct stSessionId
+{
+    bool operator==(const stSessionId other)
+    {
+        return SeqNumberAndIdx == other.SeqNumberAndIdx;
+    }
+
+    union
+    {
+        struct
+        {
+            ull idx : 16;
+            ull seqNumber : 48;
+        };
+        ull SeqNumberAndIdx;
+    };
+
+} stSessionId;
+
 
 class clsSession
 {
   public:
+    clsSession() = default;
     clsSession(SOCKET sock);
     ~clsSession();
 
@@ -39,10 +59,11 @@ class clsSession
     CRingBuffer m_sendBuffer; // Echo에서는 미 사용
     CRingBuffer m_recvBuffer;
 
+
+    stSessionId m_SeqID;
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0;
     ull m_Postflag = 0;
-    ull m_id = 0;
 };
 

@@ -10,3 +10,4 @@
 #include    "../lib/SerializeBuffer_exception/SerializeBuffer_exception.h"
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "ws2_32")
+#include <vector>

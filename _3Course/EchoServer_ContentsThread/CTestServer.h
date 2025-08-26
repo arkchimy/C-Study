@@ -11,7 +11,7 @@ class CTestServer : public CLanServer
 
     void EchoProcedure(CMessage *const message);
 
-    CRITICAL_SECTION cs_ContentQ;
+    SRWLOCK srw_ContentQ;
 
     CRingBuffer m_ContentsQ;
 

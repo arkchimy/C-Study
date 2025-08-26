@@ -36,6 +36,8 @@ ringBufferSize CRingBuffer::GetFreeSize()
 
 ringBufferSize CRingBuffer::GetFreeSize(const char *f, const char *r)
 {
+    if (f == _begin)
+        return _end - r - 1;
     return f <= r ? (_end - r) + (f - _begin) - 1
                   : f - r - 1;
 }
@@ -153,9 +155,9 @@ ringBufferSize CRingBuffer::DirectEnqueueSize()
 
 ringBufferSize CRingBuffer::DirectEnqueueSize(const char *f, const char *r)
 {
-    if (f == _begin && r == _end - 1)
+    if (f == _begin)
     {
-        return 0;
+        return _end -r - 1;
     }
 
     return f <= r ? _end - r

@@ -1,8 +1,9 @@
 ﻿// #include "pch.h"
+
 #include "CNetwork_lib.h"
 
-#include "stHeader.h"
 #include "../../../_1Course/lib/Profiler_lib/Profiler_lib.h"
+#include "stHeader.h"
 
 #include "../../../error_log.h"
 #include <list>
@@ -97,12 +98,19 @@ unsigned AcceptThread(void *arg)
 
     WSABUF wsabuf;
     DWORD flag;
-    ull session_id = 1;
 
-    CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[2]);
+    ull session_id = 10;
+    ull idx;
+
+    clsSession *session;
+    CLanServer *server;
 
     int wsarecv_retval;
-    int addrlen = sizeof(addr);
+    int addrlen;
+    stSessionId stsessionID;
+
+    addrlen = sizeof(addr);
+    server = reinterpret_cast<CLanServer *>(arrArg[2]);
 
     listen_retval = listen(listen_sock, SOMAXCONN_HINT(65535));
     flag = 0;
@@ -120,32 +128,32 @@ unsigned AcceptThread(void *arg)
             continue;
         }
 
-        clsSession *session = new clsSession(client_sock);
-        if (session == nullptr)
         {
-            closesocket(client_sock);
-            continue;
-        }
+            stSRWLock srw = stSRWLock(server->srw_session_idleList);
 
-        EnterCriticalSection(&server->cs_sessionMap);
-
-        server->sessions[session_id] = session;
-        session->m_id = session_id++;
-
-        for (std::map<ull, clsSession *>::iterator iter = server->sessions.begin(); iter != server->sessions.end(); iter++)
-        {
-            clsSession *element = iter->second;
-            if (element->m_blive == false)
+            if (server->m_idleIdx.empty() == true)
             {
-                delete element;
-                iter = server->sessions.erase(iter);
+                // 비어있는 세션이 없을 경우.. 대기열을 만들어야할 듯
+                // 일단은 연결을 끊고 계속 Accept  받는 방식으로 하자.
+                closesocket(client_sock);
+                __debugbreak();
+                continue;
             }
+
+            idx = server->m_idleIdx.front();
+            server->m_idleIdx.pop_front();
         }
+        
+        stsessionID.idx = idx;
+        stsessionID.seqNumber = session_id++;
+
+        session = &server->sessions_vec[idx];
+        session->m_SeqID = stsessionID;
+        session->m_sock = client_sock;
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
         server->RecvPacket(session);
 
-        LeaveCriticalSection(&server->cs_sessionMap);
     }
     return 0;
 }
@@ -174,7 +182,7 @@ unsigned WorkerThread(void *arg)
             transferred = 0;
             key = 0;
             overlapped = nullptr;
-            // session = nullptr;
+            session = nullptr;
         }
 
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
@@ -210,18 +218,24 @@ unsigned WorkerThread(void *arg)
 
     return 0;
 }
-BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy,int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions, int ZeroByteTest)
+BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions, int ZeroByteTest)
 {
     linger linger;
     int buflen;
-    linger.l_onoff = 1;
-    linger.l_linger = 0;
-    m_ZeroByteTest = ZeroByteTest;
-
     DWORD lProcessCnt;
     DWORD bind_retval;
 
     SOCKADDR_IN serverAddr;
+
+    sessions_vec.resize(MaxSessions);
+
+    for (ull idx = 0; idx < MaxSessions; idx++)
+        m_idleIdx.push_back(idx);
+
+    linger.l_onoff = 1;
+    linger.l_linger = 0;
+    m_ZeroByteTest = ZeroByteTest;
+
     ZeroMemory(&serverAddr, sizeof(serverAddr));
 
     serverAddr.sin_family = AF_INET;
@@ -237,7 +251,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy,int 
         setsockopt(m_listen_sock, SOL_SOCKET, SO_SNDBUF, (const char *)&buflen, sizeof(buflen));
         getsockopt(m_listen_sock, SOL_SOCKET, SO_SNDBUF, (char *)&buflen, &buflen);
         printf("getsockopt SendBuffer Len : %d \n", buflen);
-
     }
 
     setsockopt(m_listen_sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
@@ -303,7 +316,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     r = session->m_recvBuffer._rearPtr;
 
     // ContentsQ의 상황이 어떤지를 체크.
-    qPersentage = OnRecv(session->m_id, nullptr);
+    qPersentage = OnRecv((ull)(session->m_SeqID.SeqNumberAndIdx), nullptr);
     if (qPersentage >= 75.f)
     {
         InterlockedIncrement((unsigned long long *)&session->m_ioCount);
@@ -318,7 +331,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         return;
     }
     // Header의 크기만큼을 확인.
-    while (session->m_recvBuffer.Peek(&header, sizeof(stHeader),f,r) == sizeof(stHeader))
+    while (session->m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
     {
         useSize = session->m_recvBuffer.GetUseSize(f, r);
         if (useSize < header._len + sizeof(stHeader))
@@ -328,12 +341,12 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         session->m_recvBuffer.MoveFront(sizeof(stHeader));
         // 메세지 생성
         CMessage *msg = CreateCMessage(session, header);
-        qPersentage = OnRecv(session->m_id, msg);
+        qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
         f = session->m_recvBuffer._frontPtr;
         if (qPersentage >= 75.f)
         {
             InterlockedIncrement((unsigned long long *)&session->m_ioCount);
-       
+
             EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_recvOverlapped);
             if (EnQSucess == false)
             {
@@ -353,7 +366,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     // ringBufferSize directDeQsize;
 
     // directDeQsize = session->m_recvBuffer.DirectDequeueSize(f, r);
-    *msg << session->m_id;
+    *msg << session->m_SeqID.SeqNumberAndIdx;
 
     switch (header._len)
     {
@@ -365,7 +378,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
         session->m_recvBuffer.Dequeue(payload, sizeof(payload));
         //*msg << len;
         msg->PutData(payload, sizeof(payload));
-        msg->_begin = msg->_begin; 
+        msg->_begin = msg->_begin;
     }
     }
     return msg;
@@ -384,8 +397,7 @@ void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
         SendPacket(session);
         return;
     }
-    SendPostMessage(session->m_id);
-
+    SendPostMessage(session->m_SeqID.SeqNumberAndIdx);
 }
 
 void CLanServer::SendPacket(clsSession *const session)

@@ -1,5 +1,8 @@
 #include "stdafx.h"
+
 #include "CTestServer.h"
+#include "../lib/CNetwork_lib/CNetwork_lib.h"
+
 #include <thread>
 
 unsigned ContentsThread(void *arg)
@@ -37,8 +40,8 @@ unsigned ContentsThread(void *arg)
 
 CTestServer::CTestServer()
 {
-    InitializeCriticalSection(&cs_ContentQ);
-    InitializeCriticalSection(&cs_sessionMap);
+    InitializeSRWLock(&srw_ContentQ);
+    InitializeSRWLock(&srw_session_idleList);
 
     m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
@@ -48,8 +51,7 @@ CTestServer::CTestServer()
 
 CTestServer::~CTestServer()
 {
-    DeleteCriticalSection(&cs_ContentQ);
-    DeleteCriticalSection(&cs_sessionMap);
+    
 }
 
 double CTestServer::OnRecv(ull sessionID, CMessage *msg)
@@ -62,15 +64,16 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
         return CurrentQ;
     }
 
-    EnterCriticalSection(&cs_ContentQ);
-    // 포인터를 넣고
-    CMessage **ppMsg;
-    ppMsg = &msg;
+    {
+        stSRWLock srw(srw_ContentQ);
+        // 포인터를 넣고
+        CMessage **ppMsg;
+        ppMsg = &msg;
 
-    if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
-        __debugbreak();
-    SetEvent(m_ContentsEvent);
-    LeaveCriticalSection(&cs_ContentQ);
+        if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
+            __debugbreak();
+        SetEvent(m_ContentsEvent);
+    }
 
     return double(m_ContentsQ.GetUseSize()) / 1000.f * 100.f;
 }
@@ -78,10 +81,21 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
 void CTestServer::SendPostMessage(ull SessionID)
 {
     clsSession *session;
+    stSessionId stsessionid;
+    stsessionid.SeqNumberAndIdx = SessionID;
+
     BOOL EnQSucess;
-
-    session = sessions[SessionID];
-
+    {
+        stSRWLock srw(srw_session_idleList);
+        
+        session = &sessions_vec[stsessionid.idx];
+        if (session->m_SeqID != stsessionid)
+        {
+            //TODO : discconect 를 켰다면 이상황이 맞음.
+            __debugbreak();
+            return;
+        }
+    }
     InterlockedIncrement(&session->m_ioCount);
     EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_postOverlapped);
     if (EnQSucess == false)
@@ -94,6 +108,9 @@ void CTestServer::SendPostMessage(ull SessionID)
 void CTestServer::EchoProcedure(CMessage *const message)
 {
     ull session_id;
+    stSessionId stSessionid;
+    stSessionid.SeqNumberAndIdx = 0;
+
     char payload[8];
     short len = 8;
     clsSession *session;
@@ -106,6 +123,7 @@ void CTestServer::EchoProcedure(CMessage *const message)
     {
         *message >> session_id;
         message->GetData(payloadoffset, len);
+        stSessionid.SeqNumberAndIdx = session_id;
     }
     catch (MessageException::ErrorType err)
     {
@@ -119,26 +137,26 @@ void CTestServer::EchoProcedure(CMessage *const message)
 
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // TODO : cs_sessionMap Lock 제거
-
-    EnterCriticalSection(&cs_sessionMap);
-    auto iter = sessions.find(session_id);
-    if (iter == sessions.end())
     {
-        LeaveCriticalSection(&cs_sessionMap);
-        __debugbreak();
-        return;
-    }
-    session = iter->second;
-    LeaveCriticalSection(&cs_sessionMap);
+        stSRWLock srw(srw_session_idleList);
+   
+        session = &sessions_vec[stSessionid.idx];
 
-    if (session->m_sendBuffer.Enqueue(messageData, sizeof(messageData)) != sizeof(messageData))
-    {
-        session->m_blive = false;
-        ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer.Enqueue another");
-        __debugbreak();
-        return;
-    }
 
+        if (session->m_SeqID.SeqNumberAndIdx != session_id)
+        {
+            //TODO : disConnect 시 debugbreak 타야함.
+            __debugbreak();
+            return;
+        }
+        if (session->m_sendBuffer.Enqueue(messageData, sizeof(messageData)) != sizeof(messageData))
+        {
+            session->m_blive = false;
+            ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer.Enqueue another");
+            __debugbreak();
+            return;
+        }
+    }
     if (InterlockedCompareExchange(&session->m_Postflag, 1, 0) == 0)
         SendPostMessage(session_id);
 
