@@ -10,6 +10,7 @@ clsSession::clsSession(SOCKET sock)
 clsSession::~clsSession()
 {
     closesocket(m_sock);
+    __debugbreak();
 }
 
 void clsSession::Release()

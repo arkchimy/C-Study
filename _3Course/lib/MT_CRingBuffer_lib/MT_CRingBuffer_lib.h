@@ -11,6 +11,8 @@ class CRingBuffer
   public:
     CRingBuffer();
     CRingBuffer(ringBufferSize iBufferSize);
+    CRingBuffer(ringBufferSize iBufferSize, bool ContentsQBuffer);
+
     ~CRingBuffer();
 
     ringBufferSize GetUseSize();
@@ -19,10 +21,8 @@ class CRingBuffer
     ringBufferSize GetFreeSize(const char *f, const char *r);
 
     ringBufferSize Enqueue(const void *pSrc, ringBufferSize iSize);
-    ringBufferSize Enqueue(const void *pSrc, ringBufferSize iSize, char *f, char *r);
-
     ringBufferSize Dequeue(void *chpDest, ringBufferSize iSize);
-    ringBufferSize Dequeue(void *pDest, ringBufferSize iSize, char* f ,char* r);
+
 
     ringBufferSize Peek(void *chpDest, ringBufferSize iSize);
     ringBufferSize Peek(void *pDest, ringBufferSize iSize, char *f, char *r);
@@ -36,8 +36,8 @@ class CRingBuffer
     ringBufferSize DirectDequeueSize(const char *f, const char *r);
 
     void MoveRear(ringBufferSize iSize);
-    void MoveRear(ringBufferSize iSize, char *r);
     void MoveFront(ringBufferSize iSize);
+
 
   public:
     char *_begin;

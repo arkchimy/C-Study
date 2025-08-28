@@ -24,16 +24,16 @@ using ull = unsigned long long;
 
 struct stSRWLock
 {
-    stSRWLock(SRWLOCK& srw)
+    stSRWLock(SRWLOCK* srw)
         : m_srw(srw)
     {
-        AcquireSRWLockExclusive(&m_srw);
+        AcquireSRWLockExclusive(m_srw);
     }
     ~stSRWLock()
     {
-        ReleaseSRWLockExclusive(&m_srw);
+        ReleaseSRWLockExclusive(m_srw);
     }
-    SRWLOCK m_srw;
+    SRWLOCK *m_srw;
 };
 
 
@@ -51,6 +51,8 @@ class CLanServer
     CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
 
     void SendComplete(class clsSession *const session, DWORD transferred);
+
+    void RecvPostComplete(class clsSession *const session, DWORD transferred);
     void PostComplete(class clsSession *const session, DWORD transferred);
 
     void SendPacket(class clsSession *const session);
@@ -58,6 +60,7 @@ class CLanServer
 
     virtual double OnRecv(ull SessionID, CMessage *msg) = 0;
     virtual void SendPostMessage(ull SessionID) = 0;
+    virtual void RecvPostMessage(clsSession *session) = 0;
 
     /*
             virtual bool OnConnectionRequest(IP, Port) = 0; //
@@ -91,6 +94,7 @@ class CLanServer
     HANDLE m_ServerOffEvent;
     int m_ZeroByteTest;
     bool bZeroCopy = false;
+
     std::map<ull, class clsSession *> sessions;
 
     std::vector<class clsSession> sessions_vec;

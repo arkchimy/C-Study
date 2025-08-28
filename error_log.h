@@ -12,7 +12,7 @@ void ERROR_FILE_LOG(const wchar_t *LogFilename, const wchar_t *str);
     {                                                                             \
         FILE *file = nullptr;                                                     \
         DWORD lastError = GetLastError();                                         \
-        const WCHAR *format = L"str : %s \t GetLastError : %d\n";                 \
+        const WCHAR *format = L" %s \t GetLastError : %d\n";                 \
         WCHAR errorBuffer[ERROR_BUFFER_SIZE];                                     \
         StringCchPrintfW(errorBuffer, ERROR_BUFFER_SIZE, format, str, lastError); \
         _wfopen_s(&file, LogFilename, L"a+,ccs=UTF-16LE");                        \

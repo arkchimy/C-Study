@@ -79,6 +79,7 @@ BOOL GetLogicalProcess(DWORD &out)
     out = temp;
     return true;
 }
+SRWLOCK srw_Log;
 
 unsigned AcceptThread(void *arg)
 {
@@ -108,12 +109,15 @@ unsigned AcceptThread(void *arg)
     int wsarecv_retval;
     int addrlen;
     stSessionId stsessionID;
+    wchar_t buffer[100];
 
     addrlen = sizeof(addr);
     server = reinterpret_cast<CLanServer *>(arrArg[2]);
 
     listen_retval = listen(listen_sock, SOMAXCONN_HINT(65535));
     flag = 0;
+
+    InitializeSRWLock(&srw_Log);
 
     if (listen_retval == 0)
         printf("Listen Sucess\n");
@@ -129,7 +133,7 @@ unsigned AcceptThread(void *arg)
         }
 
         {
-            stSRWLock srw = stSRWLock(server->srw_session_idleList);
+            stSRWLock srw = stSRWLock(&server->srw_session_idleList);
 
             if (server->m_idleIdx.empty() == true)
             {
@@ -143,17 +147,25 @@ unsigned AcceptThread(void *arg)
             idx = server->m_idleIdx.front();
             server->m_idleIdx.pop_front();
         }
-        
+
         stsessionID.idx = idx;
         stsessionID.seqNumber = session_id++;
 
         session = &server->sessions_vec[idx];
-        session->m_SeqID = stsessionID;
+        session->m_SeqID.SeqNumberAndIdx = stsessionID.SeqNumberAndIdx;
         session->m_sock = client_sock;
+        InterlockedExchange(&session->m_sock, client_sock);
+        InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+
+        StringCchPrintfW(buffer, 100, L"Socket %lld Accept  Addr : %lld", session->m_sock, (ull)session);
+
+        //AcquireSRWLockExclusive(&srw_Log);
+        //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
+        //ReleaseSRWLockExclusive(&srw_Log);
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
-        server->RecvPacket(session);
 
+        server->RecvPacket(session);
     }
     return 0;
 }
@@ -175,6 +187,7 @@ unsigned WorkerThread(void *arg)
     clsSession *session;
 
     ull local_ioCount;
+    wchar_t buffer[100];
     while (1)
     {
         // 지역변수 초기화
@@ -196,16 +209,34 @@ unsigned WorkerThread(void *arg)
         switch (reinterpret_cast<stOverlapped *>(overlapped)->_mode)
         {
         case Job_Type::Recv:
+
+            StringCchPrintfW(buffer, 100, L"Socket %lld RecvComplete", session->m_sock);
+            //AcquireSRWLockExclusive(&srw_Log);
+            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
+            //ReleaseSRWLockExclusive(&srw_Log);
+
             server->RecvComplete(session, transferred);
             break;
         case Job_Type::Send:
             server->SendComplete(session, transferred);
+            break;
+        case Job_Type::PostRecv:
+
+            InterlockedDecrement((unsigned long long *)&session->m_RcvPostCnt);
+
+            StringCchPrintfW(buffer, 100, L"Socket %lld RecvPostComplete", session->m_sock);
+            //AcquireSRWLockExclusive(&srw_Log);
+            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
+            //ReleaseSRWLockExclusive(&srw_Log);
+
+            server->RecvPostComplete(session, transferred);
             break;
         case Job_Type::PostSend:
             server->PostComplete(session, transferred);
             break;
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
+            __debugbreak();
         }
         local_ioCount = InterlockedDecrement(&session->m_ioCount);
 
@@ -307,9 +338,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 
     stHeader header;
     ringBufferSize useSize;
-    float qPersentage;
-
-    BOOL EnQSucess;
+    double qPersentage;
 
     char *f, *r;
     f = session->m_recvBuffer._frontPtr;
@@ -319,15 +348,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     qPersentage = OnRecv((ull)(session->m_SeqID.SeqNumberAndIdx), nullptr);
     if (qPersentage >= 75.f)
     {
-        InterlockedIncrement((unsigned long long *)&session->m_ioCount);
-
-        EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_recvOverlapped);
-        if (EnQSucess == false)
-        {
-            InterlockedDecrement(&session->m_ioCount);
-            ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
-        }
-
+        RecvPostMessage(session);
         return;
     }
     // Header의 크기만큼을 확인.
@@ -343,20 +364,19 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         CMessage *msg = CreateCMessage(session, header);
         qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
         f = session->m_recvBuffer._frontPtr;
-        if (qPersentage >= 75.f)
+        if (qPersentage >= 75.0)
         {
-            InterlockedIncrement((unsigned long long *)&session->m_ioCount);
-
-            EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_recvOverlapped);
-            if (EnQSucess == false)
-            {
-                InterlockedDecrement(&session->m_ioCount);
-                ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
-            }
-
+            RecvPostMessage(session);
             return;
         }
     }
+    useSize = session->m_recvBuffer.GetUseSize();
+    if (useSize >= 10)
+    {
+        RecvPostMessage(session);
+        return;
+    }
+
     RecvPacket(session);
 }
 
@@ -388,7 +408,51 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
     session->m_sendBuffer.MoveFront(transferred);
     SendPacket(session);
 }
+void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transferred)
+{
 
+    stHeader header;
+    ringBufferSize useSize;
+    float qPersentage;
+
+    char *f, *r;
+    f = session->m_recvBuffer._frontPtr;
+    r = session->m_recvBuffer._rearPtr;
+
+    // ContentsQ의 상황이 어떤지를 체크.
+    qPersentage = OnRecv((ull)(session->m_SeqID.SeqNumberAndIdx), nullptr);
+    if (qPersentage >= 75.f)
+    {
+        RecvPostMessage(session);
+        return;
+    }
+    // Header의 크기만큼을 확인.
+    while (session->m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
+    {
+        useSize = session->m_recvBuffer.GetUseSize(f, r);
+        if (useSize < header._len + sizeof(stHeader))
+        {
+            break;
+        }
+        session->m_recvBuffer.MoveFront(sizeof(stHeader));
+        // 메세지 생성
+        CMessage *msg = CreateCMessage(session, header);
+        qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
+        f = session->m_recvBuffer._frontPtr;
+        if (qPersentage >= 75.f)
+        {
+            RecvPostMessage(session);
+            return;
+        }
+    }
+    useSize = session->m_recvBuffer.GetUseSize();
+    if (useSize >= 10)
+    {
+        RecvPostMessage(session);
+        return;
+    }
+    RecvPacket(session);
+}
 void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
 {
     if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
@@ -481,51 +545,72 @@ void CLanServer::RecvPacket(clsSession *const session)
     DWORD LastError;
     DWORD flag = 0;
     DWORD bufCnt;
+    wchar_t buffer[100];
 
-    WSABUF wsaBuf[2];
+    // WSABUF wsaBuf[2];
 
     char *f = session->m_recvBuffer._frontPtr, *r = session->m_recvBuffer._rearPtr;
 
     {
-        ZeroMemory(wsaBuf, sizeof(wsaBuf));
+        ZeroMemory(session->m_lastRecvWSABuf, sizeof(session->m_lastRecvWSABuf));
         ZeroMemory(&session->m_recvOverlapped, sizeof(OVERLAPPED));
     }
 
     directEnQsize = session->m_recvBuffer.DirectEnqueueSize(f, r);
     freeSize = session->m_recvBuffer.GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
-
+    if (freeSize < directEnQsize)
+        __debugbreak();
     if (freeSize <= directEnQsize)
     {
-        wsaBuf[0].buf = r;
-        wsaBuf[0].len = directEnQsize;
+        session->m_lastRecvWSABuf[0].buf = r;
+        session->m_lastRecvWSABuf[0].len = directEnQsize;
 
         bufCnt = 1;
     }
     else
     {
-        wsaBuf[0].buf = r;
-        wsaBuf[0].len = directEnQsize;
+        session->m_lastRecvWSABuf[0].buf = r;
+        session->m_lastRecvWSABuf[0].len = directEnQsize;
 
-        wsaBuf[1].buf = session->m_recvBuffer._begin;
-        wsaBuf[1].len = freeSize - directEnQsize;
+        session->m_lastRecvWSABuf[1].buf = session->m_recvBuffer._begin;
+        session->m_lastRecvWSABuf[1].len = freeSize - directEnQsize;
 
         bufCnt = 2;
     }
 
     _InterlockedIncrement(&session->m_ioCount);
 
-    wsaRecv_retval = WSARecv(session->m_sock, wsaBuf, bufCnt, nullptr, &flag, &session->m_recvOverlapped, nullptr);
+    wsaRecv_retval = WSARecv(session->m_sock, session->m_lastRecvWSABuf, bufCnt, nullptr, &flag, &session->m_recvOverlapped, nullptr);
     if (wsaRecv_retval < 0)
     {
         LastError = GetLastError();
         switch (LastError)
         {
         case WSA_IO_PENDING:
+            StringCchPrintfW(buffer, 30, L"Socket %lld WSARecv WSA_IO_PENDING", session->m_sock);
+            //AcquireSRWLockExclusive(&srw_Log);
+            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
+            //ReleaseSRWLockExclusive(&srw_Log);
             break;
+        case 10054:
+        case 10053:
+            break;
+
         default:
             _InterlockedDecrement(&session->m_ioCount);
-            ERROR_FILE_LOG(L"Socket_Error.txt", L"WSARecv_Error");
+
+            StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Failed", session->m_sock);
+            //AcquireSRWLockExclusive(&srw_Log);
+            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
+            //ReleaseSRWLockExclusive(&srw_Log);
         }
+    }
+    else
+    {
+        StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Sync", session->m_sock);
+        //AcquireSRWLockExclusive(&srw_Log);
+        //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
+        //ReleaseSRWLockExclusive(&srw_Log);
     }
 }
 
