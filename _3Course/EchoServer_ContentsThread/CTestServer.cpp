@@ -28,9 +28,9 @@ unsigned ContentsThread(void *arg)
 
         while (useSize >= 8)
         {
-            DeQSisze = server->m_ContentsQ.Peek(&addr, sizeof(size_t));
-            peekMessage = (CMessage *)addr;
-            peekMessage->_begin = peekMessage->_begin; 
+            //DeQSisze = server->m_ContentsQ.Peek(&addr, sizeof(size_t));
+            //peekMessage = (CMessage *)addr;
+            //peekMessage->_begin = peekMessage->_begin; 
             DeQSisze = server->m_ContentsQ.Dequeue(&addr, sizeof(size_t));
             if (DeQSisze != sizeof(size_t))
                 __debugbreak();
@@ -98,7 +98,7 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
         SetEvent(m_ContentsEvent);
     }
 
-    return double(m_ContentsQ.GetUseSize()) / 1000.f * 100.f;
+    return double(m_ContentsQ.GetUseSize()) / m_ContentsQ.s_BufferSize * 100.f;
 }
 
 void CTestServer::SendPostMessage(ull SessionID)

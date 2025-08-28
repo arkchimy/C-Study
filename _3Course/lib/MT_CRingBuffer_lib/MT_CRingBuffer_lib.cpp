@@ -71,6 +71,7 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
 
     if (freeSize < local_size)
     {
+        //TODO : 링버퍼가 가득차버림의 경우
         __debugbreak();
         return false;
     }
