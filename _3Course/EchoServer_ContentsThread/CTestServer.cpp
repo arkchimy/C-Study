@@ -4,6 +4,8 @@
 
 #include <thread>
 extern SRWLOCK srw_Log;
+
+
 unsigned ContentsThread(void *arg)
 {
     size_t addr;
@@ -193,7 +195,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     //TODO : 인덱스만 같은 다른 Session
     if (currentSessionID != stMsgSessionID)
     {
-        delete message;
+        CObjectPoolManager::pool.Release(message);
         return;
     }
     

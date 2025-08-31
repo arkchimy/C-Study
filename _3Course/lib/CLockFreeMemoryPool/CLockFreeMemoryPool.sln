@@ -1,11 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36212.18
+VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SerializeBuffer_exception", "SerializeBuffer_exception.vcxproj", "{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CLockFreeMemoryPool", "..\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj", "{75B1F209-92D7-4410-BF05-3C1EFFAB017B}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CLockFreeMemoryPool", "CLockFreeMemoryPool.vcxproj", "{75B1F209-92D7-4410-BF05-3C1EFFAB017B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,14 +13,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Debug|x64.ActiveCfg = Debug|x64
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Debug|x64.Build.0 = Debug|x64
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Debug|x86.ActiveCfg = Debug|Win32
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Debug|x86.Build.0 = Debug|Win32
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Release|x64.ActiveCfg = Release|x64
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Release|x64.Build.0 = Release|x64
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Release|x86.ActiveCfg = Release|Win32
-		{1D36FF30-E26E-4F5C-B13C-DB648CE9E8B8}.Release|x86.Build.0 = Release|Win32
 		{75B1F209-92D7-4410-BF05-3C1EFFAB017B}.Debug|x64.ActiveCfg = Debug|x64
 		{75B1F209-92D7-4410-BF05-3C1EFFAB017B}.Debug|x64.Build.0 = Debug|x64
 		{75B1F209-92D7-4410-BF05-3C1EFFAB017B}.Debug|x86.ActiveCfg = Debug|Win32
@@ -36,6 +26,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {0D276793-8C3F-4E4B-ACDC-00C77F1AC4C1}
+		SolutionGuid = {1C33B119-41F5-410F-B2BF-54E19B59AE7E}
 	EndGlobalSection
 EndGlobal

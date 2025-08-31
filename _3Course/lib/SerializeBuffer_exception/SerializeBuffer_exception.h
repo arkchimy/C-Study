@@ -1,14 +1,14 @@
 ﻿#pragma once
-#define WIN32_LEAN_AND_MEAN             // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
-
+#define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 
 #include <Windows.h>
 #include <exception>
 #include <iostream>
 
-#include <type_traits>
-#include <concepts>
 #include "../../../error_log.h"
+#include "../CLockFreeMemoryPool/CLockFreeMemoryPool.h"
+#include <concepts>
+#include <type_traits>
 
 using SerializeBufferSize = DWORD;
 class MessageException : public std::exception
@@ -19,7 +19,7 @@ class MessageException : public std::exception
         HasNotData,
         NotEnoughSpace
     };
-    
+
     MessageException(ErrorType type, const std::string &msg)
         : _type(type), _msg(msg) {}
 
@@ -52,14 +52,14 @@ struct CMessage
     CMessage &operator=(CMessage &&) = delete;
 
     template <Fundamental T>
-    CMessage &operator << (const T data)
+    CMessage &operator<<(const T data)
     {
         if (_end < _rearPtr + sizeof(data))
         {
             if (_size == en_BufferSize::bufferSize)
             {
                 ReSize();
-                HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin,_size );
+                HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin, _size);
             }
             else
             {
@@ -89,7 +89,7 @@ struct CMessage
     }
     SSIZE_T PutData(const char *src, SerializeBufferSize size);
     SSIZE_T GetData(char *desc, SerializeBufferSize size);
-    
+
     BOOL ReSize();
     void Peek(char *out, SerializeBufferSize size);
 
@@ -102,4 +102,11 @@ struct CMessage
     char *_rearPtr = nullptr;
 
     inline static LONG64 s_UseCnt = 0;
+
+    friend class CObjectPoolManager;
+    inline static HANDLE s_BufferHeap;
+};
+struct CObjectPoolManager
+{
+    inline static class CObjectPool<CMessage> pool;
 };

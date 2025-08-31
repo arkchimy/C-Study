@@ -154,6 +154,9 @@
     <ProjectReference Include="..\..\_1Course\lib\Profiler_lib\Profiler_lib.vcxproj">
       <Project>{e92ccfaa-ff06-4603-80d7-eb4bf977f2e8}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\lib\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj">
+      <Project>{75b1f209-92d7-4410-bf05-3c1effab017b}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\lib\CNetwork_lib\CNetwork_lib.vcxproj">
       <Project>{0eb45f67-f762-4bf9-9525-0d4ec658b32d}</Project>
     </ProjectReference>

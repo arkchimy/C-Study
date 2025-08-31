@@ -9,6 +9,7 @@
 #include <list>
 #include <thread>
 
+
 st_WSAData::st_WSAData()
 {
     WSAData wsa;
@@ -366,7 +367,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 
 CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &header)
 {
-    CMessage *msg = new CMessage();
+    CMessage *msg = &CObjectPoolManager::pool.Alloc()->data;
     // ringBufferSize directDeQsize;
 
     // directDeQsize = session->m_recvBuffer.DirectDequeueSize(f, r);
@@ -389,9 +390,10 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
     // session->m_sendBuffer.MoveFront(transferred);
     size_t m_SendMsgSize = session->m_SendMsg.size();
 
-    for (auto *msg : session->m_SendMsg)
+    for (CMessage *msg : session->m_SendMsg)
     {
-        delete msg;
+        CObjectPoolManager::pool.Release(msg);
+        
     }
     session->m_SendMsg.clear();
     SendPacket(session);

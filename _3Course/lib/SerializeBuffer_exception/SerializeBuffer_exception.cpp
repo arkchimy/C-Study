@@ -2,9 +2,8 @@
 //
 #include "pch.h"
 #include <strsafe.h>
-#define ERROR_BUFFER_SIZE 100
 
- static HANDLE s_BufferHeap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
+#define ERROR_BUFFER_SIZE 100
 
 CMessage::CMessage()
 {
@@ -14,16 +13,17 @@ CMessage::CMessage()
     _size = en_BufferSize::bufferSize;
 
     useCnt = InterlockedIncrement64(&s_UseCnt);
-    //if (useCnt == 1)
+    // if (useCnt == 1)
     //{
-    //    s_BufferHeap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
-    //    if (s_BufferHeap == nullptr)
-    //    {
-    //        ERROR_FILE_LOG(L"SerializeError.txt", L"HeapCreate Error\n");
-    //        return;
-    //    }
-    //}
-
+    //     s_BufferHeap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
+    //     if (s_BufferHeap == nullptr)
+    //     {
+    //         ERROR_FILE_LOG(L"SerializeError.txt", L"HeapCreate Error\n");
+    //         return;
+    //     }
+    // }
+    static HANDLE Allcoheap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
+    s_BufferHeap = Allcoheap;
     __try
     {
         _begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
@@ -60,16 +60,16 @@ CMessage::~CMessage()
 
     HeapFree(current_Heap, 0, _begin);
     _begin = nullptr;
-    //if (useCnt == 0)
+    // if (useCnt == 0)
     //{
-    //    bHeapDeleteRetval = HeapDestroy(current_Heap);
-    //    if (bHeapDeleteRetval == 0)
-    //    {
-    //        ERROR_FILE_LOG(L"SerializeError.txt", L"s_BufferHeap Delete Failed ");
-    //    }
-    //    else
-    //        printf("heap delete");
-    //}
+    //     bHeapDeleteRetval = HeapDestroy(current_Heap);
+    //     if (bHeapDeleteRetval == 0)
+    //     {
+    //         ERROR_FILE_LOG(L"SerializeError.txt", L"s_BufferHeap Delete Failed ");
+    //     }
+    //     else
+    //         printf("heap delete");
+    // }
 }
 
 SSIZE_T CMessage::PutData(const char *src, SerializeBufferSize size)
