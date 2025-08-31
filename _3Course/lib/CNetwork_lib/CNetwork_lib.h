@@ -12,6 +12,7 @@
 
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "clsSession.h"
+#include "stHeader.h"
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 
 class st_WSAData
@@ -86,16 +87,15 @@ class CLanServer
     int getSendMessageTPS();
 
   public:
-    SOCKET m_listen_sock;
-    HANDLE m_hIOCP;
-    HANDLE *m_hThread;
-    HANDLE m_hAccept;
-    HANDLE m_ContentsEvent;
-    HANDLE m_ServerOffEvent;
-    int m_ZeroByteTest;
-    bool bZeroCopy = false;
+    SOCKET m_listen_sock = INVALID_SOCKET;
+    HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
+    HANDLE *m_hThread= nullptr;
+    HANDLE m_hAccept = INVALID_HANDLE_VALUE;
 
-    std::map<ull, class clsSession *> sessions;
+    HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
+    HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
+    int m_ZeroByteTest = 0;
+    bool bZeroCopy = false;
 
     std::vector<class clsSession> sessions_vec;
     std::list<ull> m_idleIdx;

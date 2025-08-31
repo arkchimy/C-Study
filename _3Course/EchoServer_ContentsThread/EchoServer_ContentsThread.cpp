@@ -19,8 +19,6 @@ int main()
     wchar_t bindAddr[16];
     short bindPort;
 
-    int iWorkerCnt;
-
     int iZeroCopy;
     int WorkerThreadCnt;
     int reduceThreadCount;

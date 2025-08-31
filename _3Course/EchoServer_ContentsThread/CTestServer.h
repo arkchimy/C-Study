@@ -9,7 +9,7 @@ class CTestServer : public CLanServer
     virtual void SendPostMessage(ull SessionID) override; 
     virtual void RecvPostMessage(clsSession* session) override;
 
-    void EchoProcedure(CMessage *const message);
+    void EchoProcedure(ull sessionID, CMessage * message);
 
     SRWLOCK srw_ContentQ;
 

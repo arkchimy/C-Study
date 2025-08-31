@@ -14,9 +14,9 @@ CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
     _end = _begin + iBufferSize;
     ClearBuffer();
 }
-CRingBuffer::CRingBuffer(ringBufferSize iBufferSize,bool ContensQBuffer)
+CRingBuffer::CRingBuffer(ringBufferSize iBufferSize, bool ContensQBuffer)
 {
-    _begin = (char*)malloc(iBufferSize);
+    _begin = (char *)malloc(iBufferSize);
     if (_begin == nullptr)
     {
         __debugbreak();
@@ -60,18 +60,18 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
     ringBufferSize local_size = iSize;
 
     const char *chpSrc;
-    char *f,*r;
+    char *f, *r;
     f = _frontPtr;
     r = _rearPtr;
 
     chpSrc = reinterpret_cast<const char *>(pSrc);
 
-     directEnQSize = DirectEnqueueSize(f, r);
+    directEnQSize = DirectEnqueueSize(f, r);
     freeSize = GetFreeSize(f, r);
 
     if (freeSize < local_size)
     {
-        //TODO : 링버퍼가 가득차버림의 경우
+        // TODO : 링버퍼가 가득차버림의 경우
         __debugbreak();
         return false;
     }
@@ -188,17 +188,26 @@ void CRingBuffer::MoveRear(ringBufferSize iSize)
     char *distance;
     char *oldRear;
 
-    do
+    oldRear = _rearPtr;
+    pChk = oldRear + iSize;
+    distance = reinterpret_cast<char *>(pChk - _end);
+    if (_end < pChk)
     {
-        oldRear = _rearPtr;
-        pChk = oldRear + iSize;
-        distance = reinterpret_cast<char *>(pChk - _end);
-        if (_end < pChk)
-        {
-            pChk = _begin + long long(distance);
-        }
-    } while (InterlockedCompareExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk, (unsigned long long)oldRear) != (unsigned long long)oldRear);
-    // MoveRear(iSize, _rearPtr);
+        pChk = _begin + long long(distance);
+    }
+
+    InterlockedExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk);
+    // do
+    //{
+    //     oldRear = _rearPtr;
+    //     pChk = oldRear + iSize;
+    //     distance = reinterpret_cast<char *>(pChk - _end);
+    //     if (_end < pChk)
+    //     {
+    //         pChk = _begin + long long(distance);
+    //     }
+    // } while (InterlockedCompareExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk, (unsigned long long)oldRear) != (unsigned long long)oldRear);
+    //// MoveRear(iSize, _rearPtr);
 }
 
 void CRingBuffer::MoveFront(ringBufferSize iSize)
@@ -207,14 +216,23 @@ void CRingBuffer::MoveFront(ringBufferSize iSize)
     char *distance;
     char *oldFront;
 
-    do
+    oldFront = _frontPtr;
+    pChk = oldFront + iSize;
+    distance = reinterpret_cast<char *>(pChk - _end);
+    if (_end < pChk)
     {
-        oldFront = _frontPtr;
-        pChk = oldFront + iSize;
-        distance = reinterpret_cast<char *>(pChk - _end);
-        if (_end < pChk)
-        {
-            pChk = _begin + long long(distance);
-        }
-    } while (InterlockedCompareExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk, (unsigned long long)oldFront) != (unsigned long long)oldFront);
+        pChk = _begin + long long(distance);
+    }
+
+    InterlockedExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk);
+    /* do
+     {
+         oldFront = _frontPtr;
+         pChk = oldFront + iSize;
+         distance = reinterpret_cast<char *>(pChk - _end);
+         if (_end < pChk)
+         {
+             pChk = _begin + long long(distance);
+         }
+     } while (InterlockedCompareExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk, (unsigned long long)oldFront) != (unsigned long long)oldFront);*/
 }

@@ -97,7 +97,6 @@ unsigned AcceptThread(void *arg)
 
     DWORD listen_retval;
 
-    WSABUF wsabuf;
     DWORD flag;
 
     ull session_id = 10;
@@ -106,7 +105,6 @@ unsigned AcceptThread(void *arg)
     clsSession *session;
     CLanServer *server;
 
-    int wsarecv_retval;
     int addrlen;
     stSessionId stsessionID;
     wchar_t buffer[100];
@@ -154,14 +152,9 @@ unsigned AcceptThread(void *arg)
         session = &server->sessions_vec[idx];
         session->m_SeqID.SeqNumberAndIdx = stsessionID.SeqNumberAndIdx;
         session->m_sock = client_sock;
+
         InterlockedExchange(&session->m_sock, client_sock);
         InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
-
-        StringCchPrintfW(buffer, 100, L"Socket %lld Accept  Addr : %lld", session->m_sock, (ull)session);
-
-        //AcquireSRWLockExclusive(&srw_Log);
-        //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
-        //ReleaseSRWLockExclusive(&srw_Log);
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
 
@@ -187,7 +180,7 @@ unsigned WorkerThread(void *arg)
     clsSession *session;
 
     ull local_ioCount;
-    wchar_t buffer[100];
+
     while (1)
     {
         // 지역변수 초기화
@@ -209,12 +202,6 @@ unsigned WorkerThread(void *arg)
         switch (reinterpret_cast<stOverlapped *>(overlapped)->_mode)
         {
         case Job_Type::Recv:
-
-            StringCchPrintfW(buffer, 100, L"Socket %lld RecvComplete", session->m_sock);
-            //AcquireSRWLockExclusive(&srw_Log);
-            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
-            //ReleaseSRWLockExclusive(&srw_Log);
-
             server->RecvComplete(session, transferred);
             break;
         case Job_Type::Send:
@@ -223,12 +210,6 @@ unsigned WorkerThread(void *arg)
         case Job_Type::PostRecv:
 
             InterlockedDecrement((unsigned long long *)&session->m_RcvPostCnt);
-
-            StringCchPrintfW(buffer, 100, L"Socket %lld RecvPostComplete", session->m_sock);
-            //AcquireSRWLockExclusive(&srw_Log);
-            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
-            //ReleaseSRWLockExclusive(&srw_Log);
-
             server->RecvPostComplete(session, transferred);
             break;
         case Job_Type::PostSend:
@@ -338,7 +319,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 
     stHeader header;
     ringBufferSize useSize;
-    double qPersentage;
+    float qPersentage;
 
     char *f, *r;
     f = session->m_recvBuffer._frontPtr;
@@ -359,7 +340,6 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         {
             break;
         }
-        session->m_recvBuffer.MoveFront(sizeof(stHeader));
         // 메세지 생성
         CMessage *msg = CreateCMessage(session, header);
         qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
@@ -386,18 +366,16 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     // ringBufferSize directDeQsize;
 
     // directDeQsize = session->m_recvBuffer.DirectDequeueSize(f, r);
-    *msg << session->m_SeqID.SeqNumberAndIdx;
+    unsigned short type = 0;
+    ringBufferSize deQsize;
 
-    switch (header._len)
+
+    switch (type)
     {
     default:
     {
-        // short len;
-        char payload[8];
-        // session->m_recvBuffer.Dequeue(&len, sizeof(len));
-        session->m_recvBuffer.Dequeue(payload, sizeof(payload));
-        //*msg << len;
-        msg->PutData(payload, sizeof(payload));
+        deQsize = session->m_recvBuffer.Dequeue(msg->_begin, sizeof(header) + header._len);
+        msg->_rearPtr = msg->_begin + deQsize;
         msg->_begin = msg->_begin;
     }
     }
@@ -405,7 +383,15 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
 }
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
-    session->m_sendBuffer.MoveFront(transferred);
+    //session->m_sendBuffer.MoveFront(transferred);
+    size_t m_SendMsgSize = session->m_SendMsg.size();
+
+    for (auto* msg : session->m_SendMsg)
+    {
+        delete msg;
+
+    }
+    session->m_SendMsg.clear();
     SendPacket(session);
 }
 void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transferred)
@@ -413,7 +399,7 @@ void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transfe
 
     stHeader header;
     ringBufferSize useSize;
-    float qPersentage;
+    double qPersentage;
 
     char *f, *r;
     f = session->m_recvBuffer._frontPtr;
@@ -434,7 +420,6 @@ void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transfe
         {
             break;
         }
-        session->m_recvBuffer.MoveFront(sizeof(stHeader));
         // 메세지 생성
         CMessage *msg = CreateCMessage(session, header);
         qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
@@ -467,17 +452,16 @@ void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
 void CLanServer::SendPacket(clsSession *const session)
 {
     ringBufferSize useSize, directDQSize;
+    ringBufferSize deQSize;
+
     DWORD bufCnt;
     int send_retval;
 
-    WSABUF wsaBuf[2];
+    WSABUF wsaBuf[500];
     DWORD LastError;
-    char *f, *r;
 
-    f = session->m_sendBuffer._frontPtr;
-    r = session->m_sendBuffer._rearPtr;
 
-    useSize = session->m_sendBuffer.GetUseSize(f, r);
+    useSize = session->m_sendBuffer.GetUseSize();
 
     if (useSize == 0)
     {
@@ -493,26 +477,38 @@ void CLanServer::SendPacket(clsSession *const session)
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
     }
-    directDQSize = session->m_sendBuffer.DirectDequeueSize(f, r);
+    directDQSize = session->m_sendBuffer.DirectDequeueSize();
+    ull msgAddr;
+    CMessage *msg;
 
-    if (useSize <= directDQSize)
+    bufCnt = 0;
+
+    while (useSize >= 8)
     {
-        wsaBuf[0].buf = f;
-        wsaBuf[0].len = useSize;
+        {
+            deQSize = session->m_sendBuffer.Peek(&msgAddr, sizeof(size_t));
+            msg = reinterpret_cast<CMessage *>(msgAddr);
+            wsaBuf[bufCnt].buf = msg->_frontPtr;
+            wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
+        }
+        deQSize = session->m_sendBuffer.Dequeue(&msgAddr, sizeof(size_t));
+        if (deQSize != sizeof(size_t))
+            __debugbreak();
 
-        bufCnt = 1;
+        msg = reinterpret_cast<CMessage *>(msgAddr);
+        session->m_SendMsg.push_back(msg);
+
+        wsaBuf[bufCnt].buf = msg->_frontPtr;
+        wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
+        bufCnt++;
+        useSize -= 8;
     }
-    else
+    if (bufCnt == 0)
     {
-        wsaBuf[0].buf = f;
-        wsaBuf[0].len = directDQSize;
-
-        wsaBuf[1].buf = session->m_sendBuffer._begin;
-        wsaBuf[1].len = useSize - directDQSize;
-
-        bufCnt = 2;
+        //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
+        _InterlockedCompareExchange(&session->m_flag, 0, 1);
+        return;
     }
-
     _InterlockedIncrement(&session->m_ioCount);
 
     if (bZeroCopy)
@@ -588,9 +584,7 @@ void CLanServer::RecvPacket(clsSession *const session)
         {
         case WSA_IO_PENDING:
             StringCchPrintfW(buffer, 30, L"Socket %lld WSARecv WSA_IO_PENDING", session->m_sock);
-            //AcquireSRWLockExclusive(&srw_Log);
-            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
-            //ReleaseSRWLockExclusive(&srw_Log);
+
             break;
         case 10054:
         case 10053:
@@ -600,17 +594,13 @@ void CLanServer::RecvPacket(clsSession *const session)
             _InterlockedDecrement(&session->m_ioCount);
 
             StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Failed", session->m_sock);
-            //AcquireSRWLockExclusive(&srw_Log);
-            //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
-            //ReleaseSRWLockExclusive(&srw_Log);
+
         }
     }
     else
     {
         StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Sync", session->m_sock);
-        //AcquireSRWLockExclusive(&srw_Log);
-        //ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
-        //ReleaseSRWLockExclusive(&srw_Log);
+
     }
 }
 

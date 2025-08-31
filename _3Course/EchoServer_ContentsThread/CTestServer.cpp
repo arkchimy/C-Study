@@ -1,5 +1,4 @@
 #include "stdafx.h"
-
 #include "../lib/CNetwork_lib/CNetwork_lib.h"
 #include "CTestServer.h"
 
@@ -8,12 +7,13 @@ extern SRWLOCK srw_Log;
 unsigned ContentsThread(void *arg)
 {
     size_t addr;
-    CMessage *message,*peekMessage;
+    CMessage *message, *peekMessage;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
     char *f, *r;
     HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
     DWORD hSignalIdx;
-    ringBufferSize useSize,DeQSisze;
+    ringBufferSize useSize, DeQSisze;
+    ull l_sessionID;
 
     // bool 이 좋아보임.
     while (1)
@@ -26,20 +26,27 @@ unsigned ContentsThread(void *arg)
         r = server->m_ContentsQ._rearPtr;
         useSize = server->m_ContentsQ.GetUseSize(f, r);
 
-        while (useSize >= 8)
+        // ID + msg  크기 메세지 하나에 16Byte
+        while (useSize >= 16)
         {
-            //DeQSisze = server->m_ContentsQ.Peek(&addr, sizeof(size_t));
-            //peekMessage = (CMessage *)addr;
-            //peekMessage->_begin = peekMessage->_begin; 
+  
+
+            DeQSisze = server->m_ContentsQ.Dequeue(&l_sessionID, sizeof(ull));
+            if (DeQSisze != sizeof(ull))
+                __debugbreak();
+
+            DeQSisze = server->m_ContentsQ.Peek(&addr, sizeof(size_t));
+            peekMessage = (CMessage *)addr;
+            peekMessage->_begin = peekMessage->_begin;
+
             DeQSisze = server->m_ContentsQ.Dequeue(&addr, sizeof(size_t));
             if (DeQSisze != sizeof(size_t))
                 __debugbreak();
             message = (CMessage *)addr;
             // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            server->EchoProcedure(message);
+            server->EchoProcedure(l_sessionID,message);
             f = server->m_ContentsQ._frontPtr;
-            useSize = server->m_ContentsQ.GetUseSize(f, r);
-
+            useSize -= 16;
         }
     }
 
@@ -49,7 +56,7 @@ unsigned ContentsThread(void *arg)
 unsigned MonitorThread(void *arg)
 {
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-    char *f, *r;
+
     HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
 
     while (1)
@@ -93,6 +100,9 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
         CMessage **ppMsg;
         ppMsg = &msg;
 
+        if (m_ContentsQ.Enqueue(&sessionID, sizeof(sessionID)) != sizeof(sessionID))
+            __debugbreak();
+
         if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
             __debugbreak();
         SetEvent(m_ContentsEvent);
@@ -130,11 +140,10 @@ void CTestServer::SendPostMessage(ull SessionID)
 
 void CTestServer::RecvPostMessage(clsSession *session)
 {
-   BOOL EnQSucess;
-    wchar_t buffer[100];
+    BOOL EnQSucess;
 
     {
-       ZeroMemory(&session->m_RecvpostOverlapped, sizeof(OVERLAPPED));
+        ZeroMemory(&session->m_RecvpostOverlapped, sizeof(OVERLAPPED));
     }
 
     InterlockedIncrement((unsigned long long *)&session->m_ioCount);
@@ -146,60 +155,33 @@ void CTestServer::RecvPostMessage(clsSession *session)
         InterlockedDecrement(&session->m_ioCount);
         ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
     }
-    else
-    {
-
-        StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Failed", session->m_sock);
-   /*     AcquireSRWLockExclusive(&srw_Log);
-        ERROR_FILE_LOG(L"RecvOreder.txt", buffer);
-        ReleaseSRWLockExclusive(&srw_Log);*/
-    }
 }
 
-void CTestServer::EchoProcedure(CMessage *const message)
+void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
 {
-    ull session_id;
-    stSessionId stSessionid;
-    stSessionid.SeqNumberAndIdx = 0;
-
-    char payload[8];
-    short len = 8;
+    stSessionId stMsgSessionID,currentSessionID;
     clsSession *session;
-    char *payloadoffset;
-    char messageData[10];
 
-    memcpy(messageData, &len, sizeof(len));
-    payloadoffset = messageData + sizeof(len);
-    try
-    {
-        *message >> session_id;
-        message->GetData(payloadoffset, len);
-        stSessionid.SeqNumberAndIdx = session_id;
-    }
-    catch (MessageException::ErrorType err)
-    {
-        switch (err)
-        {
-        case MessageException::HasNotData:
-            __debugbreak();
-            break;
-        }
-    }
+    stMsgSessionID.SeqNumberAndIdx = sessionID;
 
+    session = &sessions_vec[stMsgSessionID.idx];
+    currentSessionID = session->m_SeqID;
+
+    //TODO : 인덱스만 같은 다른 Session
+    if (currentSessionID != stMsgSessionID)
+    {
+        delete message;
+        return;
+    }
+    
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // TODO : cs_sessionMap Lock 제거
     {
         stSRWLock srw(&srw_session_idleList);
+        CMessage **ppMsg;
+        ppMsg = &message;
 
-        session = &sessions_vec[stSessionid.idx];
-
-        if (session->m_SeqID.SeqNumberAndIdx != session_id)
-        {
-            // TODO : disConnect 시 debugbreak 타야함.
-            __debugbreak();
-            return;
-        }
-        if (session->m_sendBuffer.Enqueue(messageData, sizeof(messageData)) != sizeof(messageData))
+        if (session->m_sendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
         {
             session->m_blive = false;
             ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer.Enqueue another");
@@ -208,7 +190,6 @@ void CTestServer::EchoProcedure(CMessage *const message)
         }
     }
     if (InterlockedCompareExchange(&session->m_Postflag, 1, 0) == 0)
-        SendPostMessage(session_id);
+        SendPostMessage(stMsgSessionID.SeqNumberAndIdx);
 
-    delete message;
 }

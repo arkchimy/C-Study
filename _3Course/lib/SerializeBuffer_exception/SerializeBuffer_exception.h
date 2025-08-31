@@ -41,8 +41,8 @@ struct CMessage
 {
     enum en_BufferSize : DWORD
     {
-        bufferSize = 100,
-        MaxSize = 200,
+        bufferSize = 1000,
+        MaxSize = 2000,
     };
     CMessage();
     ~CMessage();
@@ -54,7 +54,7 @@ struct CMessage
     template <Fundamental T>
     CMessage &operator << (const T data)
     {
-        if (_end < _rear + sizeof(data))
+        if (_end < _rearPtr + sizeof(data))
         {
             if (_size == en_BufferSize::bufferSize)
             {
@@ -68,8 +68,8 @@ struct CMessage
             }
         }
 
-        memcpy(_rear, &data, sizeof(data));
-        _rear = _rear + sizeof(data);
+        memcpy(_rearPtr, &data, sizeof(data));
+        _rearPtr = _rearPtr + sizeof(data);
 
         return *this;
     }
@@ -77,14 +77,14 @@ struct CMessage
     template <Fundamental T>
     CMessage &operator>>(T &data)
     {
-        if (_front > _rear)
+        if (_frontPtr > _rearPtr)
         {
             HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin, _size);
             throw MessageException(MessageException::HasNotData, "false Packet \n");
         }
 
-        memcpy(&data, _front, sizeof(data));
-        _front = _front + sizeof(data);
+        memcpy(&data, _frontPtr, sizeof(data));
+        _frontPtr = _frontPtr + sizeof(data);
         return *this;
     }
     SSIZE_T PutData(const char *src, SerializeBufferSize size);
@@ -98,8 +98,8 @@ struct CMessage
     char *_begin = nullptr;
     char *_end = nullptr;
 
-    char *_front = nullptr;
-    char *_rear = nullptr;
+    char *_frontPtr = nullptr;
+    char *_rearPtr = nullptr;
 
     inline static LONG64 s_UseCnt = 0;
 };

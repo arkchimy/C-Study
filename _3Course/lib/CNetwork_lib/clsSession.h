@@ -2,6 +2,7 @@
 #include <WS2tcpip.h>
 #include <WinSock2.h>
 #include <Windows.h>
+#include <list>
 
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "ws2_32")
@@ -37,7 +38,7 @@ typedef struct stSessionId
             ull idx : 16;
             ull seqNumber : 48;
         };
-        ull SeqNumberAndIdx;
+        ull SeqNumberAndIdx = 0;
     };
 
 } stSessionId;
@@ -62,6 +63,9 @@ class clsSession
     CRingBuffer m_recvBuffer;
 
     WSABUF m_lastRecvWSABuf[2];
+
+
+    std::list<struct CMessage *> m_SendMsg;
 
     stSessionId m_SeqID;
     ull m_ioCount = 0;
