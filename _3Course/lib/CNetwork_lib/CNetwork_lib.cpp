@@ -156,6 +156,8 @@ unsigned AcceptThread(void *arg)
         InterlockedExchange(&session->m_sock, client_sock);
         InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
 
+        server->OnAccept(session->m_SeqID.SeqNumberAndIdx, addr);
+
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
 
         server->RecvPacket(session);
@@ -207,14 +209,16 @@ unsigned WorkerThread(void *arg)
         case Job_Type::Send:
             server->SendComplete(session, transferred);
             break;
-        case Job_Type::PostRecv:
 
+        case Job_Type::PostRecv:
             InterlockedDecrement((unsigned long long *)&session->m_RcvPostCnt);
             server->RecvPostComplete(session, transferred);
             break;
+
         case Job_Type::PostSend:
             server->PostComplete(session, transferred);
             break;
+
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
             __debugbreak();
@@ -294,7 +298,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
     for (int i = 0; i < WorkerCreateCnt; i++)
         m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
-    Sleep(1000);
+    Sleep(1000);// 지역변수가 반환 되므로 Sleep을 했음. 
     return true;
 }
 
@@ -369,7 +373,6 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     unsigned short type = 0;
     ringBufferSize deQsize;
 
-
     switch (type)
     {
     default:
@@ -383,13 +386,12 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
 }
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
-    //session->m_sendBuffer.MoveFront(transferred);
+    // session->m_sendBuffer.MoveFront(transferred);
     size_t m_SendMsgSize = session->m_SendMsg.size();
 
-    for (auto* msg : session->m_SendMsg)
+    for (auto *msg : session->m_SendMsg)
     {
         delete msg;
-
     }
     session->m_SendMsg.clear();
     SendPacket(session);
@@ -459,7 +461,6 @@ void CLanServer::SendPacket(clsSession *const session)
 
     WSABUF wsaBuf[500];
     DWORD LastError;
-
 
     useSize = session->m_sendBuffer.GetUseSize();
 
@@ -594,13 +595,11 @@ void CLanServer::RecvPacket(clsSession *const session)
             _InterlockedDecrement(&session->m_ioCount);
 
             StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Failed", session->m_sock);
-
         }
     }
     else
     {
         StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Sync", session->m_sock);
-
     }
 }
 

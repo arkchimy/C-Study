@@ -6,6 +6,8 @@ class CTestServer : public CLanServer
     CTestServer();
     virtual ~CTestServer();
     virtual double OnRecv(ull SessionID, CMessage *msg) override;
+    virtual bool OnAccept(ull SessionID, SOCKADDR_IN addr) override;
+
     virtual void SendPostMessage(ull SessionID) override; 
     virtual void RecvPostMessage(clsSession* session) override;
 
@@ -13,7 +15,7 @@ class CTestServer : public CLanServer
 
     SRWLOCK srw_ContentQ;
 
-    CRingBuffer m_ContentsQ = CRingBuffer(CRingBuffer::s_BufferSize,1);
-
+    CRingBuffer m_ContentsQ = CRingBuffer(s_ContentsQsize, 1); // Pool에서 할당하지않음 
+    inline static ringBufferSize s_ContentsQsize;
     HANDLE hContentsThread;
 };

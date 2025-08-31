@@ -69,6 +69,7 @@ unsigned MonitorThread(void *arg)
 }
 
 CTestServer::CTestServer()
+
 {
     InitializeSRWLock(&srw_ContentQ);
     InitializeSRWLock(&srw_session_idleList);
@@ -78,6 +79,7 @@ CTestServer::CTestServer()
 
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
 }
+
 
 CTestServer::~CTestServer()
 {
@@ -110,6 +112,27 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
 
     return double(m_ContentsQ.GetUseSize()) / m_ContentsQ.s_BufferSize * 100.f;
 }
+
+bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)
+{
+    stHeader header;
+    clsSession *session;
+    stSessionId currentID;
+    char buffer[] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
+
+    header._len = 8;
+
+
+    currentID.SeqNumberAndIdx = SessionID;
+    session = &sessions_vec[currentID.idx];
+    
+    if (currentID != session->m_SeqID)
+        return false;
+
+    send(session->m_sock, buffer, 10, 0);
+    return true;
+}
+
 
 void CTestServer::SendPostMessage(ull SessionID)
 {

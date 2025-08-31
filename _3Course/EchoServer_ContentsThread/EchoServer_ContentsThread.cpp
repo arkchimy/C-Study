@@ -27,6 +27,7 @@ int main()
     int ZeroByteTest;
     LINGER linger;
     int iRingBufferSize;
+    int ContentsRingBufferSize;
 
     {
         Parser parser;
@@ -45,10 +46,14 @@ int main()
         parser.GetValue(L"MaxSessions", maxSessions);
 
         parser.GetValue(L"RingBufferSize", iRingBufferSize);
+        parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
         CRingBuffer::s_BufferSize = iRingBufferSize;
+        
+
     }
 
     {
+        CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         CTestServer EchoServer;
         EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions, ZeroByteTest);
 
