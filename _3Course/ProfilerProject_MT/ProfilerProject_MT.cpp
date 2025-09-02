@@ -2,10 +2,49 @@
 //
 
 #include <iostream>
+#include "CProfileManager.h"
+#include <thread>
+#include <conio.h>
+unsigned Thread1(void *arg)
+{
+    while (1)
+    {
+        ProfilerMT::Start(L"hi");
+        ProfilerMT::Start(L"Who");
+        ProfilerMT::Start(L"Dead");
+
+        ProfilerMT::End(L"hi");
+        ProfilerMT::End(L"Dead");
+        ProfilerMT::End(L"Who");
+        Sleep(100);
+    }
+
+    return 0;
+}
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    for (int i =0; i < 5; i++)
+        _beginthreadex(nullptr, 0, Thread1, nullptr, 0, nullptr);
+
+    while (1)
+    {
+        if (_kbhit())
+        {
+            char ch = _getch();
+            switch (ch)
+            {
+            case 'a':
+            case 'A':
+                ProfilerMT::SaveAsLog(L"TestProfile.txt");
+                break;
+            case VK_ESCAPE:
+                ProfilerMT::Reset();
+                break;
+
+            }
+        }
+    }
 }
 
 // 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴

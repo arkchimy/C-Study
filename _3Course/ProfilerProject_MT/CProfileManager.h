@@ -1,8 +1,99 @@
 #pragma once
-
-namespace ProfilerMT
+#include <Windows.h>
+#include <iostream>
+#include <strsafe.h>
+enum 
 {
-	void Start(const wchar_t const lpTagName);
-	void End(const wchar_t const lpTagName);
+    MAX_THREAD_COUNT = 50,
+    MAX_RECORD_COUNT = 16,
 
-} // namespace ProfilerMT
+    MAX_TAG_NAME_LENGTH = 31 + 1,
+    ABNORMAL_COUNT = 2, // 가장 큰 수, 가장 작은 수 noise의 판단 갯수를 정의
+
+    NOISE_1ST = 0,
+    NOISE_2ND = 1,
+
+    FORMAT_HEADER = 0,
+    FORMAT_BORDER = 1,
+    FORMAT_NO_RECORD = 2,
+    FORMAT_ONCE_RECORD = 3,
+    FORMAT_NO_AVG_RECORD = 4,
+    FORMAT_VALID_RECORD = 5,
+
+    CCH_RECORD_CAPACITY = 154,
+
+};
+struct stRecord
+{
+    //bool IsCheckout;
+    LARGE_INTEGER StartAt;
+    LONGLONG TotalElapsed;
+
+    LONGLONG MaxAbnormal[ABNORMAL_COUNT];
+    LONGLONG MinAbnormal[ABNORMAL_COUNT];
+    ULONGLONG CountOfCall;
+
+    struct
+    {
+        WCHAR Name[MAX_TAG_NAME_LENGTH];
+        unsigned int CchLength;
+    } Tag;
+};
+
+struct stRecordSet
+{
+    DWORD ThreadId;
+    stRecord Records[MAX_RECORD_COUNT];
+    size_t RecordCount;
+
+    stRecord *SearchRecordOrNull(const wchar_t *const lpTagName);
+
+    stRecordSet(void)
+    {
+        Reset();
+    }
+
+    void Reset(void)
+    {
+        size_t recordIndex;
+
+        ThreadId = GetCurrentThreadId();
+        RecordCount = 0;
+
+        for (recordIndex = 0; recordIndex < MAX_RECORD_COUNT; recordIndex++)
+        {
+            stRecord &refRecord = Records[recordIndex];
+            ZeroMemory(&refRecord, sizeof(stRecord));
+
+            // min은 최대 값
+            refRecord.MinAbnormal[NOISE_1ST] = MAXLONGLONG;
+            refRecord.MinAbnormal[NOISE_2ND] = MAXLONGLONG;
+        }
+    }
+
+};
+class ProfilerMT
+{
+  public:
+    static void Start(const wchar_t *const lpTagName);
+    static void End(const wchar_t *const lpTagName);
+
+    static void Reset(void);
+    static void SaveAsLog(const wchar_t *const lpFileName);
+
+    static double ConvertFrequencyToMicroseconds(const LONGLONG frequency);
+
+    static bool Initialization();
+
+    static stRecordSet *GetTlsValueRecordSetOrNull();
+    static stRecordSet *CreateTlsRecordSet();
+
+    inline static const wchar_t *s_FileName;
+    inline static bool sbInit = Initialization();
+    inline static LARGE_INTEGER s_Frequency;
+    inline static DWORD s_Tlsidx;
+    inline static const wchar_t NO_RECORD[] = L"-";
+
+    inline static stRecordSet *sRecordSetPtrs[MAX_THREAD_COUNT];
+    inline static size_t sThreadCount;
+};

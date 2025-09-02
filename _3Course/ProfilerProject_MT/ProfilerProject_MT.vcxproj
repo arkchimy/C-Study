@@ -133,6 +133,7 @@
     <ClCompile Include="ProfilerProject_MT.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\error_log.h" />
     <ClInclude Include="CProfileManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

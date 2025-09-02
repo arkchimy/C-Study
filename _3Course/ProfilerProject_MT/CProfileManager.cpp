@@ -1,123 +1,256 @@
 #include "CProfileManager.h"
-#include <Windows.h>
-#include <strsafe.h>
+#include "../../error_log.h"
 
-
-namespace ProfilerMT
+void ProfilerMT::SaveAsLog(const wchar_t *const lpFileName)
 {
-    enum
-    {
-        MAX_THREAD_COUNT = 16,
-        MAX_RECORD_COUNT = 16,
-        MAX_TAG_NAME_LENGTH = 31 + 1,
-        OUTLINER_COUNT = 2, // ?
+    s_FileName = lpFileName;
+    stRecordSet *pTlsRecordInfo;
+    FILE *pFileLog;
+    errno_t retFileOpen;
+    size_t threadIndex;
 
-        MAX_1ST = 0,
-        MIN_1ST = 0,
-        MAX_2ND = 1,
-        MIN_2ND = 1,
-
+    unsigned int recordIndex;
+    wchar_t recordString[CCH_RECORD_CAPACITY];
+    static const wchar_t *PRINT_FORMATS[] = {
+        L" Tid   | No  | Name                     | Calls    | Avg w/o           | Max         #1    | Min         #1    | Max         #2    | Min         #2    |\n",
+        L"-------+-----+--------------------------+----------+-------------------+-------------------+-------------------+-------------------+-------------------+\n",
+        L" %5u | %3u | %24s | %8llu | %14s レs | %14s レs | %14s レs | %14s レs | %14s レs |\n",
+        L" %5u | %3u | %24s | %8llu | %14s レs | %14.4lf レs | %14.4lf レs | %14s レs | %14s レs |\n",
+        L" %5u | %3u | %24s | %8llu | %14s レs | %14.4lf レs | %14.4lf レs | %14.4lf レs | %14.4lf レs |\n",
+        L" %5u | %3u | %24s | %8llu | %14.4lf レs | %14.4lf レs | %14.4lf レs | %14.4lf レs | %14.4lf レs |\n",
     };
-
-    struct ProfileRecord
+    pFileLog = nullptr;
+    retFileOpen = _wfopen_s(&pFileLog, lpFileName, L"w,ccs=UTF-8");
+    if (retFileOpen != 0 || pFileLog == nullptr)
     {
-        struct
-        {
-            WCHAR Name[MAX_TAG_NAME_LENGTH];
-            unsigned int CchLength;
-        } Tag;
+        return;
+    }
 
-        bool IsCheckout;
-        LARGE_INTEGER StartAt;
-        LONGLONG TotalElapsed;
-        LONGLONG MaxOutliners[OUTLINER_COUNT];
-        LONGLONG MinOutliners[OUTLINER_COUNT];
-        ULONGLONG CountOfCall;
-    };
+    fwrite(PRINT_FORMATS[FORMAT_HEADER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
+    fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
 
-    struct stRecordInfo
+    for (threadIndex = 0; threadIndex < sThreadCount; ++threadIndex)
     {
-        stRecordInfo(void)
+        pTlsRecordInfo = sRecordSetPtrs[threadIndex];
+
+        for (recordIndex = 0; recordIndex < pTlsRecordInfo->RecordCount; ++recordIndex)
         {
-            Reset();
-        }
+            const stRecord &refProfileRecord = pTlsRecordInfo->Records[recordIndex];
 
-        void Reset(void)
-        {
-            size_t recordIndex;
-
-            ThreadId = GetCurrentThreadId();
-            RecordCount = 0;
-
-            for (recordIndex = 0; recordIndex < MAX_RECORD_COUNT; recordIndex++)
+            switch (refProfileRecord.CountOfCall)
             {
-                ProfileRecord &refRecord = Records[recordIndex];
-                ZeroMemory(&refRecord, sizeof(ProfileRecord));
+            case 0:
+                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_NO_RECORD],
+                                 pTlsRecordInfo->ThreadId,
+                                 recordIndex,
+                                 refProfileRecord.Tag.Name,
+                                 refProfileRecord.CountOfCall,
+                                 NO_RECORD,
+                                 NO_RECORD,
+                                 NO_RECORD,
+                                 NO_RECORD,
+                                 NO_RECORD);
+                break;
 
-                //min精 置企 葵
-                refRecord.MinOutliners[MIN_1ST] = MAXLONGLONG;
-                refRecord.MinOutliners[MIN_2ND] = MAXLONGLONG;
+            case 1:
+                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_ONCE_RECORD],
+                                 pTlsRecordInfo->ThreadId,
+                                 recordIndex,
+                                 refProfileRecord.Tag.Name,
+                                 refProfileRecord.CountOfCall,
+                                 NO_RECORD,
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MaxAbnormal[NOISE_1ST]),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MinAbnormal[NOISE_2ND]),
+                                 NO_RECORD,
+                                 NO_RECORD);
+                break;
+
+            case 2:
+                __fallthrough;
+            case 3:
+                __fallthrough;
+            case 4:
+                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_NO_AVG_RECORD],
+                                 pTlsRecordInfo->ThreadId,
+                                 recordIndex,
+                                 refProfileRecord.Tag.Name,
+                                 refProfileRecord.CountOfCall,
+                                 NO_RECORD,
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MaxAbnormal[NOISE_1ST]),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MinAbnormal[NOISE_1ST]),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MaxAbnormal[NOISE_2ND]),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MinAbnormal[NOISE_2ND]));
+                break;
+
+            default:
+                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_VALID_RECORD],
+                                 pTlsRecordInfo->ThreadId,
+                                 recordIndex,
+                                 refProfileRecord.Tag.Name,
+                                 refProfileRecord.CountOfCall,
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.TotalElapsed - refProfileRecord.MaxAbnormal[NOISE_1ST] - refProfileRecord.MinAbnormal[NOISE_1ST] - refProfileRecord.MaxAbnormal[NOISE_2ND] - refProfileRecord.MinAbnormal[NOISE_2ND]) / (refProfileRecord.CountOfCall - ABNORMAL_COUNT * 2),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MaxAbnormal[NOISE_1ST]),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MinAbnormal[NOISE_1ST]),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MaxAbnormal[NOISE_2ND]),
+                                 ConvertFrequencyToMicroseconds(refProfileRecord.MinAbnormal[NOISE_2ND]));
+                break;
             }
+
+            fwrite(recordString, sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
         }
-
-        DWORD ThreadId;
-        ProfileRecord Records[MAX_RECORD_COUNT];
-        size_t RecordCount;
-    };
-    bool Initialization() 
-    {
-        BOOL retval_QueryPerformanceFrequency;
-
-        s_Tlsidx = TlsAlloc();
-        if (s_Tlsidx == TLS_OUT_OF_INDEXES)
-        {
-            __debugbreak();
-            return false;
-        }
-        retval_QueryPerformanceFrequency = QueryPerformanceFrequency(&s_Frequency);    
-        if (retval_QueryPerformanceFrequency == 0)
-        {
-            __debugbreak();
-            return false;
-        }
-
-        return true;
+        fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
     }
-    stRecordInfo *GetTlsRecordInfo() 
+   
+    fclose(pFileLog);
+}
+double ProfilerMT::ConvertFrequencyToMicroseconds(const LONGLONG frequency)
+{
+    return frequency * 1e6 / s_Frequency.QuadPart;
+}
+bool ProfilerMT::Initialization()
+{
+    BOOL retval_QueryPerformanceFrequency;
+
+    s_Tlsidx = TlsAlloc();
+    if (s_Tlsidx == TLS_OUT_OF_INDEXES)
     {
-        return reinterpret_cast<stRecordInfo*>(TlsGetValue(s_Tlsidx));
+        ERROR_FILE_LOG(L"Error.txt", L"TlsAlloc retval : TLS_OUT_OF_INDEXES");
+        return false;
     }
-    stRecordInfo* CreateTlsRecordInfo()
+    retval_QueryPerformanceFrequency = QueryPerformanceFrequency(&s_Frequency);
+    if (retval_QueryPerformanceFrequency == 0)
     {
-        return new stRecordInfo();
-    }
-    void Start(const wchar_t const lpTagName)
-    {
-
-        WCHAR *pOutTagEnd;
-        stRecordInfo *pTlsRecordInfo;
-
-
-        ProfileRecord record(lpTagName);
-
-        pTlsRecordInfo = GetTlsRecordInfo();
-        if (pTlsRecordInfo == nullptr)
-            pTlsRecordInfo = CreateTlsRecordInfo();
-
-        pTlsRecordInfo->ThreadId = GetCurrentThreadId();
-        pTlsRecordInfo->Records[pTlsRecordInfo->RecordCount] = record;
-        
+        ERROR_FILE_LOG(L"Error.txt", L"QueryPerformanceFrequency retval : 0");
+        return false;
     }
 
-    void End(const wchar_t const lpTagName)
-    {
-
-    }
-    static bool sbInit = Initialization();
-
-    static LARGE_INTEGER s_Frequency;
-    inline static DWORD s_Tlsidx;
+    return true;
 }
 
+stRecordSet *ProfilerMT::GetTlsValueRecordSetOrNull()
+{
+    return reinterpret_cast<stRecordSet *>(TlsGetValue(s_Tlsidx));
+}
 
+stRecordSet *ProfilerMT::CreateTlsRecordSet()
+{
+    stRecordSet *instance = new stRecordSet;
+    sRecordSetPtrs[sThreadCount++] = instance;
+    TlsSetValue(s_Tlsidx, instance);
+    return instance;
+}
 
+void ProfilerMT::Reset(void)
+{
+    stRecordSet *pTlsRecordInfoOrNull;
+    for (int i = 0; i < MAX_THREAD_COUNT; i++)
+    {
+        pTlsRecordInfoOrNull = sRecordSetPtrs[i];
+        if (pTlsRecordInfoOrNull == nullptr)
+        {
+            continue;
+        }
+        pTlsRecordInfoOrNull->Reset();
+    }
+    SaveAsLog(s_FileName);
+}
+
+void ProfilerMT::Start(const wchar_t *const lpTagName)
+{
+    LPWSTR pStrEnd;
+    stRecordSet *pTlsRecordSet;
+    stRecord *currentRecord;
+    HRESULT StringCchCopyExW_retval;
+
+    pTlsRecordSet = GetTlsValueRecordSetOrNull();
+
+    if (pTlsRecordSet == nullptr)
+        pTlsRecordSet = CreateTlsRecordSet();
+
+    pTlsRecordSet->ThreadId = GetCurrentThreadId();
+    currentRecord = pTlsRecordSet->SearchRecordOrNull(lpTagName);
+    if (currentRecord == nullptr)
+    {
+        stRecord &record = pTlsRecordSet->Records[pTlsRecordSet->RecordCount++];
+        StringCchCopyExW_retval = StringCchCopyExW(record.Tag.Name, _countof(record.Tag.Name), lpTagName, &pStrEnd, nullptr, 0);
+        if (StringCchCopyExW_retval != S_OK)
+        {
+            ERROR_FILE_LOG(L"Error.txt", L"StringCchCopyExW_retval is not S_OK");
+            __debugbreak();
+        }
+        record.Tag.CchLength = pStrEnd - record.Tag.Name;
+        QueryPerformanceCounter(&record.StartAt);
+    }
+    else
+    {
+        QueryPerformanceCounter(&currentRecord->StartAt);
+    }
+}
+stRecord * stRecordSet::SearchRecordOrNull(const wchar_t *const lpTagName)
+{
+    stRecordSet *pTlsRecordSet;
+    stRecord *startRecord, *endRecord;
+
+    pTlsRecordSet = ProfilerMT::GetTlsValueRecordSetOrNull();
+
+    startRecord = pTlsRecordSet->Records;
+    if (pTlsRecordSet->RecordCount == 0)
+        return nullptr;
+    endRecord = pTlsRecordSet->Records + pTlsRecordSet->RecordCount;
+    while (startRecord != endRecord)
+    {
+        if (wcsncmp(lpTagName, startRecord->Tag.Name, startRecord->Tag.CchLength) == 0)
+            return startRecord;
+        startRecord++;
+    }
+    return nullptr;
+}
+void ProfilerMT::End(const wchar_t *const lpTagName)
+{
+    LARGE_INTEGER endTime;
+    LONGLONG elapsedTime;
+
+    stRecord *currentRecord;
+    stRecordSet* currentRecordSet;
+
+    QueryPerformanceCounter(&endTime);
+    currentRecordSet = ProfilerMT::GetTlsValueRecordSetOrNull();
+
+    if (currentRecordSet == nullptr)
+        return;
+    currentRecord = currentRecordSet->SearchRecordOrNull(lpTagName);
+
+    if (currentRecord == nullptr)
+        return;
+    
+    currentRecord->CountOfCall++;
+    elapsedTime = endTime.QuadPart - currentRecord->StartAt.QuadPart;
+    currentRecord->TotalElapsed += elapsedTime;
+
+    if (currentRecord->CountOfCall <= ABNORMAL_COUNT)
+    {
+        currentRecord->MaxAbnormal[NOISE_1ST] = max(elapsedTime, currentRecord->MaxAbnormal[NOISE_1ST]);
+        currentRecord->MinAbnormal[NOISE_1ST] = min(elapsedTime, currentRecord->MinAbnormal[NOISE_1ST]);
+    }
+    else
+    {
+        if (currentRecord->MaxAbnormal[NOISE_1ST] <= elapsedTime)
+        {
+            currentRecord->MaxAbnormal[NOISE_2ND] = currentRecord->MaxAbnormal[NOISE_1ST];
+            currentRecord->MaxAbnormal[NOISE_1ST] = elapsedTime;
+        }
+        else if (currentRecord->MaxAbnormal[NOISE_2ND] <= elapsedTime)
+        {
+            currentRecord->MaxAbnormal[NOISE_2ND] = elapsedTime;
+        }
+        else if (currentRecord->MinAbnormal[NOISE_1ST] >= elapsedTime)
+        {
+            currentRecord->MinAbnormal[NOISE_2ND] = currentRecord->MinAbnormal[NOISE_1ST];
+            currentRecord->MinAbnormal[NOISE_1ST] = elapsedTime;
+        }
+        else if (currentRecord->MinAbnormal[NOISE_2ND] > elapsedTime)
+        {
+            currentRecord->MinAbnormal[NOISE_2ND] = elapsedTime;
+        }
+    }
+}
