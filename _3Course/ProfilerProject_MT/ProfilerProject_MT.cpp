@@ -7,6 +7,8 @@
 #include <conio.h>
 unsigned Thread1(void *arg)
 {
+    srand(GetCurrentThreadId());
+
     while (1)
     {
         ProfilerMT::Start(L"hi");
@@ -16,7 +18,7 @@ unsigned Thread1(void *arg)
         ProfilerMT::End(L"hi");
         ProfilerMT::End(L"Dead");
         ProfilerMT::End(L"Who");
-        Sleep(100);
+        Sleep(rand()%10);
     }
 
     return 0;
@@ -29,22 +31,16 @@ int main()
 
     while (1)
     {
-        if (_kbhit())
+        if (GetAsyncKeyState('a') || GetAsyncKeyState('A'))
         {
-            char ch = _getch();
-            switch (ch)
-            {
-            case 'a':
-            case 'A':
-                ProfilerMT::SaveAsLog(L"TestProfile.txt");
-                break;
-            case VK_ESCAPE:
-                ProfilerMT::Reset();
-                break;
-
-            }
+            ProfilerMT::SaveAsLog(L"TestProfile.txt");
+        }
+        if (GetAsyncKeyState(VK_ESCAPE))
+        {
+            ProfilerMT::Reset();
         }
     }
+
 }
 
 // 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴

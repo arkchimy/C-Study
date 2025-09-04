@@ -3,6 +3,8 @@
 
 void ProfilerMT::SaveAsLog(const wchar_t *const lpFileName)
 {
+    if (lpFileName == nullptr)
+        return;
     s_FileName = lpFileName;
     stRecordSet *pTlsRecordInfo;
     FILE *pFileLog;
@@ -209,6 +211,8 @@ void ProfilerMT::End(const wchar_t *const lpTagName)
 {
     LARGE_INTEGER endTime;
     LONGLONG elapsedTime;
+    LONGLONG startTime;
+
 
     stRecord *currentRecord;
     stRecordSet* currentRecordSet;
@@ -222,15 +226,37 @@ void ProfilerMT::End(const wchar_t *const lpTagName)
 
     if (currentRecord == nullptr)
         return;
-    
+    startTime = currentRecord->StartAt.QuadPart;
+
     currentRecord->CountOfCall++;
-    elapsedTime = endTime.QuadPart - currentRecord->StartAt.QuadPart;
+    elapsedTime = endTime.QuadPart - startTime;
     currentRecord->TotalElapsed += elapsedTime;
 
     if (currentRecord->CountOfCall <= ABNORMAL_COUNT)
     {
+
         currentRecord->MaxAbnormal[NOISE_1ST] = max(elapsedTime, currentRecord->MaxAbnormal[NOISE_1ST]);
         currentRecord->MinAbnormal[NOISE_1ST] = min(elapsedTime, currentRecord->MinAbnormal[NOISE_1ST]);
+        if (currentRecord->MaxAbnormal[NOISE_1ST] <= elapsedTime)
+        {
+            currentRecord->MaxAbnormal[NOISE_2ND] = currentRecord->MaxAbnormal[NOISE_1ST];
+            currentRecord->MaxAbnormal[NOISE_1ST] = elapsedTime;
+        }
+        else if (currentRecord->MaxAbnormal[NOISE_2ND] < elapsedTime)
+        {
+            currentRecord->MaxAbnormal[NOISE_2ND] = elapsedTime;
+        }
+
+        if (currentRecord->MinAbnormal[NOISE_1ST] >= elapsedTime)
+        {
+            currentRecord->MinAbnormal[NOISE_2ND] = currentRecord->MinAbnormal[NOISE_1ST];
+            currentRecord->MinAbnormal[NOISE_1ST] = elapsedTime;
+        }
+        else if (currentRecord->MinAbnormal[NOISE_2ND] > elapsedTime)
+        {
+            currentRecord->MinAbnormal[NOISE_2ND] = elapsedTime;
+        }
+
     }
     else
     {
