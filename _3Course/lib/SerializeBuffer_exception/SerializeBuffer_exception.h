@@ -41,7 +41,7 @@ struct CMessage
 {
     enum en_BufferSize : DWORD
     {
-        bufferSize = 1000,
+        bufferSize = 200,
         MaxSize = 2000,
     };
     CMessage();
@@ -109,4 +109,8 @@ struct CMessage
 struct CObjectPoolManager
 {
     inline static class CObjectPool<CMessage> pool;
+    inline static char *_buffer;
+    inline static int cnt = 0;
+    CObjectPoolManager();
+    static char* Alloc();
 };

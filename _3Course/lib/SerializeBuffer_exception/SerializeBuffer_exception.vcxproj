@@ -158,6 +158,9 @@
     <ClCompile Include="SerializeBuffer_exception.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\_1Course\lib\Parser_lib\Parser_lib.vcxproj">
+      <Project>{aeaec43e-1516-4224-889b-858c678ce028}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj">
       <Project>{75b1f209-92d7-4410-bf05-3c1effab017b}</Project>
     </ProjectReference>

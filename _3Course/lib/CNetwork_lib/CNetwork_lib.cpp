@@ -2,7 +2,7 @@
 
 #include "CNetwork_lib.h"
 
-#include "../../../_1Course/lib/Profiler_lib/Profiler_lib.h"
+#include "../Profiler_MultiThread/Profiler_MultiThread.h"
 #include "stHeader.h"
 
 #include "../../../error_log.h"
@@ -505,13 +505,15 @@ void CLanServer::SendPacket(clsSession *const session)
 
     if (bZeroCopy)
     {
-        Profile profile(L"ZeroCopy WSASend");
+        Profiler::Start(L"ZeroCopy WSASend");
         send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+        Profiler::End(L"ZeroCopy WSASend");
     }
     else
     {
-        Profile profile(L"WSASend");
+        Profiler::Start(L"WSASend");
         send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+        Profiler::End(L"WSASend");
     }
     if (send_retval < 0)
     {

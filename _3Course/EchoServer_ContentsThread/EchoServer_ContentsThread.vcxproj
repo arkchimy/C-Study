@@ -151,9 +151,6 @@
     <ProjectReference Include="..\..\_1Course\lib\Parser_lib\Parser_lib.vcxproj">
       <Project>{aeaec43e-1516-4224-889b-858c678ce028}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\..\_1Course\lib\Profiler_lib\Profiler_lib.vcxproj">
-      <Project>{e92ccfaa-ff06-4603-80d7-eb4bf977f2e8}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\lib\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj">
       <Project>{75b1f209-92d7-4410-bf05-3c1effab017b}</Project>
     </ProjectReference>
@@ -165,6 +162,9 @@
     </ProjectReference>
     <ProjectReference Include="..\lib\MT_CRingBuffer_lib\MT_CRingBuffer_lib.vcxproj">
       <Project>{c5117940-f3ef-4c6c-b22e-4d1f42f22d81}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\lib\Profiler_MultiThread\Profiler_MultiThread.vcxproj">
+      <Project>{5e8f90bb-3fc5-47bc-85e9-363129ba3713}</Project>
     </ProjectReference>
     <ProjectReference Include="..\lib\SerializeBuffer_exception\SerializeBuffer_exception.vcxproj">
       <Project>{1d36ff30-e26e-4f5c-b13c-db648ce9e8b8}</Project>
