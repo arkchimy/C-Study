@@ -10,28 +10,36 @@
 
 int main()
 {
+    WSADATA wsadata;
+    WSAStartup(MAKEWORD(2, 2), &wsadata);
     SOCKADDR_IN addr;
-    DWORD retRecv;
+    int retRecv;
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8000);
     InetPtonW(AF_INET, L"127.0.0.1", &addr.sin_addr);
 
-    SOCKET client_sock = socket(AF_INET, SOCK_STREAM, 0);
+    SOCKET client_sock;
 
     while (1)
     {
+        client_sock = socket(AF_INET, SOCK_STREAM, 0);
+
         connect(client_sock, (sockaddr *)&addr, sizeof(addr));
         printf("Connect ret\n");
-        char buffer[1000];
+        char buffer[10001];
         while (1)
         {
-            retRecv = recv(client_sock, buffer, 1000, 0);
+            retRecv = recv(client_sock, buffer, 10001, 0);
             if (retRecv < 0)
+            {
+                closesocket(client_sock);
+                printf(" %d  DisConnect\n ", GetLastError());
                 break;
+            }
         }
         
-        printf(" %d  Retry Connect\n ",GetLastError());
+        
     }
 
 }
