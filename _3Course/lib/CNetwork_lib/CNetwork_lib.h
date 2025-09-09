@@ -55,14 +55,13 @@ class CLanServer
     void SendComplete(class clsSession *const session, DWORD transferred);
 
     void RecvPostComplete(class clsSession *const session, DWORD transferred);
-    void PostComplete(class clsSession *const session, DWORD transferred);
 
     void SendPacket(class clsSession *const session);
     void RecvPacket(class clsSession *const session);
 
     virtual bool OnAccept(ull SessionID, SOCKADDR_IN addr) = 0;
     virtual double OnRecv(ull SessionID, CMessage *msg) = 0;
-    virtual void SendPostMessage(ull SessionID) = 0;
+
     virtual void RecvPostMessage(clsSession *session) = 0;
 
     /*

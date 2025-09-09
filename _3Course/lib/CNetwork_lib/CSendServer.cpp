@@ -1,16 +1,12 @@
-#include "stdafx.h"
-#include "../lib/CNetwork_lib/CNetwork_lib.h"
-#include "CTestServer.h"
-
+#include "CSendServer.h"
 #include <thread>
 extern SRWLOCK srw_Log;
-
 
 unsigned ContentsThread(void *arg)
 {
     size_t addr;
     CMessage *message, *peekMessage;
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+    CSendTestServer *server = reinterpret_cast<CSendTestServer *>(arg);
     char *f, *r;
     HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
     DWORD hSignalIdx;
@@ -31,7 +27,6 @@ unsigned ContentsThread(void *arg)
         // ID + msg  크기 메세지 하나에 16Byte
         while (useSize >= 16)
         {
-  
 
             DeQSisze = server->m_ContentsQ.Dequeue(&l_sessionID, sizeof(ull));
             if (DeQSisze != sizeof(ull))
@@ -46,7 +41,7 @@ unsigned ContentsThread(void *arg)
                 __debugbreak();
             message = (CMessage *)addr;
             // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            server->EchoProcedure(l_sessionID,message);
+            server->EchoProcedure(l_sessionID, message);
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
         }
@@ -57,7 +52,7 @@ unsigned ContentsThread(void *arg)
 
 unsigned MonitorThread(void *arg)
 {
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+    CSendTestServer *server = reinterpret_cast<CSendTestServer *>(arg);
 
     HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
 
@@ -70,7 +65,7 @@ unsigned MonitorThread(void *arg)
     return 0;
 }
 
-CTestServer::CTestServer()
+CSendTestServer::CSendTestServer()
 
 {
     InitializeSRWLock(&srw_ContentQ);
@@ -82,12 +77,11 @@ CTestServer::CTestServer()
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
 }
 
-
-CTestServer::~CTestServer()
+CSendTestServer::~CSendTestServer()
 {
 }
 
-double CTestServer::OnRecv(ull sessionID, CMessage *msg)
+double CSendTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
     double CurrentQ;
 
@@ -115,27 +109,12 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
     return double(m_ContentsQ.GetUseSize()) / m_ContentsQ.s_BufferSize * 100.f;
 }
 
-bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)
+bool CSendTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)
 {
-    stHeader header;
-    clsSession *session;
-    stSessionId currentID;
-    char buffer[] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
-
-    header._len = 8;
-
-
-    currentID.SeqNumberAndIdx = SessionID;
-    session = &sessions_vec[currentID.idx];
-    
-    if (currentID != session->m_SeqID)
-        return false;
-
-    send(session->m_sock, buffer, 10, 0);
     return true;
 }
 
-void CTestServer::RecvPostMessage(clsSession *session)
+void CSendTestServer::RecvPostMessage(clsSession *session)
 {
     BOOL EnQSucess;
 
@@ -154,9 +133,9 @@ void CTestServer::RecvPostMessage(clsSession *session)
     }
 }
 
-void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
+void CSendTestServer::EchoProcedure(ull sessionID, CMessage *message)
 {
-    stSessionId stMsgSessionID,currentSessionID;
+    stSessionId stMsgSessionID, currentSessionID;
     clsSession *session;
 
     stMsgSessionID.SeqNumberAndIdx = sessionID;
@@ -164,13 +143,13 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     session = &sessions_vec[stMsgSessionID.idx];
     currentSessionID = session->m_SeqID;
 
-    //TODO : 인덱스만 같은 다른 Session
+    // TODO : 인덱스만 같은 다른 Session
     if (currentSessionID != stMsgSessionID)
     {
         CObjectPoolManager::pool.Release(message);
         return;
     }
-    
+
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // TODO : cs_sessionMap Lock 제거
     {
@@ -188,5 +167,4 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     }
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
         SendPacket(session);
-
 }

@@ -216,9 +216,6 @@ unsigned WorkerThread(void *arg)
             server->RecvPostComplete(session, transferred);
             break;
 
-        case Job_Type::PostSend:
-            server->PostComplete(session, transferred);
-            break;
 
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
@@ -442,16 +439,6 @@ void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transfe
     }
     RecvPacket(session);
 }
-void CLanServer::PostComplete(clsSession *const session, DWORD transferred)
-{
-    if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
-    {
-        _InterlockedCompareExchange(&session->m_Postflag, 0, 1);
-        SendPacket(session);
-        return;
-    }
-    SendPostMessage(session->m_SeqID.SeqNumberAndIdx);
-}
 
 void CLanServer::SendPacket(clsSession *const session)
 {
@@ -468,12 +455,14 @@ void CLanServer::SendPacket(clsSession *const session)
 
     if (useSize == 0)
     {
-        if (!m_ZeroByteTest)
+        _InterlockedCompareExchange(&session->m_flag, 0, 1);
+        useSize = session->m_sendBuffer.GetUseSize();
+        if (useSize == 0)
         {
-            //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-            _InterlockedCompareExchange(&session->m_flag, 0, 1);
             return;
         }
+        if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 1)
+            return;
     }
 
     {
