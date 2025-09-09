@@ -74,5 +74,4 @@ class clsSession
     ull m_flag = 0;
     ull m_Recvflag = 1;
 
-    ull m_Postflag = 0;
 };
