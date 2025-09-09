@@ -1,11 +1,8 @@
-﻿#include "stdafx.h"
-#include "../../_1Course/lib/Profiler_lib/Profiler_lib.h"
+﻿
+#include "stdafx.h"
 #include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
-
-
+#include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
 #include "CTestServer.h"
-
-
 #include <conio.h>
 
 CDump cump;
@@ -48,10 +45,10 @@ int main()
         parser.GetValue(L"RingBufferSize", iRingBufferSize);
         parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
         CRingBuffer::s_BufferSize = iRingBufferSize;
-        
-
     }
+    wchar_t buffer[100];
 
+     StringCchPrintfW(buffer, 100, L"Profiler_%hs.txt", __DATE__);
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         CTestServer EchoServer;
@@ -59,22 +56,17 @@ int main()
 
         while (1)
         {
-            if (_kbhit())
+            if (GetAsyncKeyState(VK_ESCAPE))
             {
-                char ch = _getch();
-
-                if (ch == VK_ESCAPE)
-                {
-                    SetEvent(EchoServer.m_ServerOffEvent);
-                }
-                else if (ch == 'a' || ch == 'A')
-                    PROFILE_Manager::Instance.createProfile();
-                else if (ch == 'd' || ch == 'D')
-                {
-
-                    PROFILE_Manager::Instance.resetInfo();
-                }
+                SetEvent(EchoServer.m_ServerOffEvent);
             }
+            else if (GetAsyncKeyState('A') || GetAsyncKeyState('A'))
+                Profiler::SaveAsLog(buffer);
+            else if (GetAsyncKeyState('D') || GetAsyncKeyState('d'))
+            {
+                Profiler::Reset();
+            }
+        
         }
     }
 

@@ -1,9 +1,14 @@
 ﻿// SerializeBuffer_MT.cpp : 정적 라이브러리를 위한 함수를 정의합니다.
 //
+
 #include "pch.h"
 #include <strsafe.h>
+#include "../../../_1Course/lib/Parser_lib/Parser_lib.h"
 
 #define ERROR_BUFFER_SIZE 100
+
+static CObjectPoolManager instance;
+static int g_mode = 0;
 
 CMessage::CMessage()
 {
@@ -13,20 +18,17 @@ CMessage::CMessage()
     _size = en_BufferSize::bufferSize;
 
     useCnt = InterlockedIncrement64(&s_UseCnt);
-    // if (useCnt == 1)
-    //{
-    //     s_BufferHeap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
-    //     if (s_BufferHeap == nullptr)
-    //     {
-    //         ERROR_FILE_LOG(L"SerializeError.txt", L"HeapCreate Error\n");
-    //         return;
-    //     }
-    // }
+
     static HANDLE Allcoheap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
     s_BufferHeap = Allcoheap;
     __try
     {
-        _begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
+        if (g_mode == 0)
+            _begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
+        else
+        {
+            _begin = CObjectPoolManager::Alloc();
+        }
         _end = _begin + _size;
 
         _rearPtr = _begin;
@@ -129,4 +131,84 @@ void CMessage::Peek(char *out, SerializeBufferSize size)
     if (f + size > _rearPtr)
         throw MessageException(MessageException::HasNotData, "buffer has not Data\n");
     memcpy(out, f, size);
+}
+
+CObjectPoolManager::CObjectPoolManager()
+{
+    char *virtualMemoryBegin;
+
+    int g_PageCnt = 0;
+    {
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
+
+        parser.GetValue(L"LagePageTest", g_mode);
+        parser.GetValue(L"g_PageCnt", g_PageCnt);
+        parser.GetValue(L"g_PageCnt", g_PageCnt);
+    }
+
+    TOKEN_PRIVILEGES tp;
+    HANDLE hToken;
+    LUID luid;
+
+    if (!LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &luid))
+    {
+        printf("LookupPrivilegeValue error: %u\n", GetLastError());
+
+        return;
+    }
+
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken);
+    if (!AdjustTokenPrivileges(
+            hToken,                   // TokenHandle
+            FALSE,                    // DisableAllPrivileges: FALSE면 지정 권한만 변경
+            &tp,                      // NewState: 활성화할 권한 정보
+            sizeof(TOKEN_PRIVILEGES), // BufferLength
+            NULL,                     // PreviousState: 이전 상태 필요 없으면 NULL
+            NULL                      // ReturnLength: 필요 없으면 NULL
+            ))
+        ;
+    // AdjustTokenPrivileges(GetCurrentProcess(), FALSE, SE_PRIVILEGE_ENABLED,)
+    LUID PrivilegeRequired;
+    BOOL bRes = FALSE;
+
+    bRes = LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &PrivilegeRequired);
+
+    size_t sizeds = GetLargePageMinimum();
+    if (g_mode == 1)
+    {
+    realloc:
+        virtualMemoryBegin = (char *)VirtualAlloc(nullptr, sizeds * g_PageCnt, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE);
+        if (GetLastError() != 0)
+        {
+            printf("VirtualAlloc Error  %d \n", GetLastError());
+            Sleep(5000);
+            goto realloc;
+        }
+        else
+        {
+            printf("LargePage VirtualAlloc Success  \n");
+        }
+    }
+    else
+    {
+        virtualMemoryBegin = (char *)VirtualAlloc(nullptr, sizeds * g_PageCnt, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+        if (virtualMemoryBegin != nullptr)
+            printf("VirtualAlloc Success  \n");
+    }
+    InterlockedExchange((ull *)&CObjectPoolManager::_buffer, (ull)virtualMemoryBegin);
+}
+char *CObjectPoolManager::Alloc()
+{
+
+
+    char *pRetval;
+
+    pRetval = _buffer + cnt * CMessage::en_BufferSize::bufferSize;
+    cnt++;
+
+    return pRetval;
 }
