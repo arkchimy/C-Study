@@ -9,6 +9,9 @@
 #include <list>
 #include <thread>
 
+
+static CObjectPool<stSendOverlapped> pool;
+
 st_WSAData::st_WSAData()
 {
     WSAData wsa;
@@ -171,19 +174,11 @@ unsigned WorkerThread(void *arg)
      * arg[0] 에는 hIOCP의 가짜핸들을
      * arg[1] 에는 Server의 인스턴스
      */
-    static LONG64 s_arrTPS_idx = 0;
-
     size_t *arrArg = reinterpret_cast<size_t *>(arg);
     DWORD transferred;
 
     HANDLE hIOCP = (HANDLE)*arrArg;
     CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[1]);
-
-    LONG64 *arrTPS_idx = reinterpret_cast<LONG64 *>(TlsGetValue(server->m_TPS_tlsidx));
-    if (arrTPS_idx == nullptr)
-    {
-        arrTPS_idx = reinterpret_cast<LONG64 *>(_interlockedincrement64(&s_arrTPS_idx));
-    }
 
     ull key;
     OVERLAPPED *overlapped;
@@ -215,13 +210,14 @@ unsigned WorkerThread(void *arg)
             server->RecvComplete(session, transferred);
             break;
         case Job_Type::Send:
-            server->SendComplete(session, transferred);
+            server->SendComplete(session, transferred, overlapped);
             break;
 
         case Job_Type::PostRecv:
             InterlockedDecrement((unsigned long long *)&session->m_RcvPostCnt);
             server->RecvPostComplete(session, transferred);
             break;
+
 
         case Job_Type::MAX:
             ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
@@ -240,10 +236,6 @@ unsigned WorkerThread(void *arg)
 }
 BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions, int ZeroByteTest)
 {
-    m_TPS_tlsidx = TlsAlloc();
-    if (m_TPS_tlsidx == TLS_OUT_OF_INDEXES)
-        __debugbreak();
-
     linger linger;
     int buflen;
     DWORD lProcessCnt;
@@ -298,8 +290,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 
     m_hThread = new HANDLE[WorkerCreateCnt];
-    arrTPS = new LONG64[WorkerCreateCnt + 1];
-    m_WorkThreadCnt = WorkerCreateCnt;
 
     HANDLE WorkerArg[] = {m_hIOCP, this};
     HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock, this};
@@ -308,7 +298,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
     for (int i = 0; i < WorkerCreateCnt; i++)
         m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
-    Sleep(1000); // 지역변수가 반환 되므로 Sleep을 했음.
+    Sleep(1000);// 지역변수가 반환 되므로 Sleep을 했음. 
     return true;
 }
 
@@ -394,17 +384,16 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     }
     return msg;
 }
-void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
-{
-    // session->m_sendBuffer.MoveFront(transferred);
-    size_t m_SendMsgSize = session->m_SendMsg.size();
 
-    for (CMessage *msg : session->m_SendMsg)
-    {
-        CObjectPoolManager::pool.Release(msg);
-    }
-    session->m_SendMsg.clear();
-    SendPacket(session);
+void CLanServer::SendComplete(clsSession *const session, DWORD transferred, OVERLAPPED *overlapped)
+{
+    stSendOverlapped *sendOverlapped;
+    sendOverlapped = reinterpret_cast<stSendOverlapped *>(overlapped);
+    CObjectPoolManager::pool.Release(sendOverlapped->_msg);
+
+    ZeroMemory(sendOverlapped, sizeof(OVERLAPPED));
+    pool.Release(overlapped);
+    
 }
 void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transferred)
 {
@@ -451,96 +440,43 @@ void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transfe
     RecvPacket(session);
 }
 
-void CLanServer::SendPacket(clsSession *const session)
-{
 
+
+void CLanServer::SendPacket(clsSession *const session, CMessage *msg)
+{
+    stSendOverlapped *Sendoverlapped;
     ringBufferSize useSize, directDQSize;
     ringBufferSize deQSize;
 
     DWORD bufCnt;
     int send_retval;
 
-    WSABUF wsaBuf[500];
+    WSABUF wsaBuf;
     DWORD LastError;
-    LONG64 beforeTPS;
-    LONG64 TPSidx;
 
-    useSize = session->m_sendBuffer.GetUseSize();
-
-    TPSidx = (LONG64)TlsGetValue(m_TPS_tlsidx);
-
-    if (useSize == 0)
-    {
-        _InterlockedCompareExchange(&session->m_flag, 0, 1);
-        useSize = session->m_sendBuffer.GetUseSize();
-        if (useSize == 0)
-        {
-            return;
-        }
-        if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 1)
-            return;
-    }
+    Sendoverlapped = (stSendOverlapped *)(pool.Alloc());
 
     {
-        ZeroMemory(wsaBuf, sizeof(wsaBuf));
-        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+        ZeroMemory(&wsaBuf, sizeof(wsaBuf));
+        ZeroMemory(Sendoverlapped, sizeof(OVERLAPPED));
     }
-    directDQSize = session->m_sendBuffer.DirectDequeueSize();
-    ull msgAddr;
-    CMessage *msg;
 
-    bufCnt = 0;
+    wsaBuf.buf = msg->_frontPtr;
+    wsaBuf.len = msg->_rearPtr - msg->_frontPtr;
 
-    while (useSize >= 8)
-    {
-        {
-            deQSize = session->m_sendBuffer.Peek(&msgAddr, sizeof(size_t));
-            msg = reinterpret_cast<CMessage *>(msgAddr);
-            wsaBuf[bufCnt].buf = msg->_frontPtr;
-            wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
-        }
-        deQSize = session->m_sendBuffer.Dequeue(&msgAddr, sizeof(size_t));
-        if (deQSize != sizeof(size_t))
-            __debugbreak();
-
-        msg = reinterpret_cast<CMessage *>(msgAddr);
-        session->m_SendMsg.push_back(msg);
-
-        wsaBuf[bufCnt].buf = msg->_frontPtr;
-        wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
-        bufCnt++;
-        useSize -= 8;
-    }
-    if (bufCnt == 0)
-    {
-        //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-        _InterlockedCompareExchange(&session->m_flag, 0, 1);
-        return;
-    }
-    _InterlockedIncrement(&session->m_ioCount);
-
-    arrTPS[TPSidx] += bufCnt;
+    Sendoverlapped->_msg = msg;
 
     if (bZeroCopy)
     {
         Profiler::Start(L"ZeroCopy WSASend");
-        send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+        send_retval = WSASend(session->m_sock, &wsaBuf, 1, nullptr, 0, (OVERLAPPED *)Sendoverlapped, nullptr);
         Profiler::End(L"ZeroCopy WSASend");
     }
     else
     {
         Profiler::Start(L"WSASend");
-        send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+        send_retval = WSASend(session->m_sock, &wsaBuf, 1, nullptr, 0, (OVERLAPPED *)Sendoverlapped, nullptr);
         Profiler::End(L"WSASend");
-    }
-    if (send_retval < 0)
-    {
-        LastError = GetLastError();
-        if (LastError != WSA_IO_PENDING)
-        {
-            ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");
-            _InterlockedDecrement(&session->m_ioCount);
-        }
     }
 }
 

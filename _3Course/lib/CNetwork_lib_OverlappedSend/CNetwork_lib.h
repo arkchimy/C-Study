@@ -15,6 +15,8 @@
 #include "stHeader.h"
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 
+using ull = unsigned long long;
+
 
 class st_WSAData
 {
@@ -22,7 +24,6 @@ class st_WSAData
     st_WSAData();
     ~st_WSAData();
 };
-using ull = unsigned long long;
 
 struct stSRWLock
 {
@@ -52,11 +53,11 @@ class CLanServer
     void RecvComplete(class clsSession *const session, DWORD transferred);
     CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
 
-    void SendComplete(class clsSession *const session, DWORD transferred);
+    void SendComplete(class clsSession *const session, DWORD transferred,OVERLAPPED* overlapped);
 
     void RecvPostComplete(class clsSession *const session, DWORD transferred);
 
-    void SendPacket(class clsSession *const session);
+    void SendPacket(class clsSession *const session,CMessage* msg);
     void RecvPacket(class clsSession *const session);
 
     virtual bool OnAccept(ull SessionID, SOCKADDR_IN addr) = 0;
@@ -102,9 +103,4 @@ class CLanServer
     std::list<ull> m_idleIdx;
     // TODO : LockFree Q 가 올 때까지 사용
     SRWLOCK srw_session_idleList;
-
-    int m_WorkThreadCnt = 0;
-    DWORD m_TPS_tlsidx;
-    LONG64 *arrTPS;
-
 };

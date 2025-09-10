@@ -15,8 +15,6 @@ enum class Job_Type
     Recv,
     Send,
     PostRecv,
-    PostSend,
-
     MAX,
 };
 struct stOverlapped : public OVERLAPPED
@@ -24,6 +22,12 @@ struct stOverlapped : public OVERLAPPED
     stOverlapped(Job_Type mode) : _mode(mode) {}
     Job_Type _mode = Job_Type::MAX;
 };
+struct stSendOverlapped : public OVERLAPPED
+{
+    Job_Type _mode = Job_Type::Send;
+    struct CMessage * _msg;
+};
+
 typedef struct stSessionId
 {
     bool operator==(const stSessionId other)
@@ -41,7 +45,7 @@ typedef struct stSessionId
         ull SeqNumberAndIdx = 0;
     };
 
-} stSessionId;
+};
 
 class clsSession
 {
@@ -55,16 +59,12 @@ class clsSession
     SOCKET m_sock = 0;
 
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
-    stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
     stOverlapped m_RecvpostOverlapped = stOverlapped(Job_Type::PostRecv);
 
     CRingBuffer m_sendBuffer; // Echo에서는 미 사용
-    CRingBuffer m_recvBuffer; 
+    CRingBuffer m_recvBuffer;
 
     WSABUF m_lastRecvWSABuf[2];
-
-
-    std::list<struct CMessage *> m_SendMsg;
 
     stSessionId m_SeqID;
     ull m_ioCount = 0;

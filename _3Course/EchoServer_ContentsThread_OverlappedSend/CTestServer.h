@@ -18,4 +18,5 @@ class CTestServer : public CLanServer
     inline static ringBufferSize s_ContentsQsize;
     HANDLE hContentsThread;
     HANDLE hMonitorThread;
+    LONG64 m_TotalTPS = 0;
 };

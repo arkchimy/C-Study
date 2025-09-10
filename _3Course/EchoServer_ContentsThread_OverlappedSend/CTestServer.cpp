@@ -1,10 +1,9 @@
 #include "stdafx.h"
-#include "../lib/CNetwork_lib/CNetwork_lib.h"
+#include "../lib/CNetwork_lib_OverlappedSend/CNetwork_lib.h"
 #include "CTestServer.h"
 
 #include <thread>
 extern SRWLOCK srw_Log;
-
 
 unsigned ContentsThread(void *arg)
 {
@@ -59,34 +58,28 @@ unsigned MonitorThread(void *arg)
 {
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
-    HANDLE hWaitHandle = {server->m_ServerOffEvent};
+    HANDLE hWaitHandle = { server->m_ServerOffEvent};
 
     DWORD wait_retval;
     LONG64 beforeTotal = 0;
-    LONG64 Total = 0;
 
     double cnt = 0;
     double avg;
     while (1)
     {
         cnt++;
-        wait_retval = WaitForSingleObject(hWaitHandle, 1000);
-        
-        for (int i = 0; i <= server->m_WorkThreadCnt; i++)
-        {
-            Total += server->arrTPS[i];
-            InterlockedExchange64(&server->arrTPS[i], 0);
-        }
-        if (Total == beforeTotal)
+        wait_retval = WaitForSingleObject( hWaitHandle, 1000);
+
+        if (beforeTotal == server->m_TotalTPS)
         {
             cnt--;
             continue;
         }
         if (wait_retval != WAIT_OBJECT_0)
         {
-            beforeTotal = Total;
+            beforeTotal = server->m_TotalTPS;
             avg = beforeTotal / cnt;
-
+            
             printf("==================================\n");
             printf("Avg  Send TPS : %llf\n", avg);
             printf("==================================\n");
@@ -200,20 +193,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // TODO : cs_sessionMap Lock 제거
-    {
-        stSRWLock srw(&srw_session_idleList);
-        CMessage **ppMsg;
-        ppMsg = &message;
-
-        if (session->m_sendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
-        {
-            session->m_blive = false;
-            ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer.Enqueue another");
-            __debugbreak();
-            return;
-        }
-    }
-    if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
-        SendPacket(session);
-
+  
+    SendPacket(session, message);
+    m_TotalTPS++;
 }
