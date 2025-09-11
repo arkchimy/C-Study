@@ -299,7 +299,9 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     m_hThread = new HANDLE[WorkerCreateCnt];
     arrTPS = new LONG64[WorkerCreateCnt + 1];
+    ZeroMemory(arrTPS, sizeof(LONG64) * WorkerCreateCnt + 1);
     m_WorkThreadCnt = WorkerCreateCnt;
+    Sleep(1000);
 
     HANDLE WorkerArg[] = {m_hIOCP, this};
     HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock, this};
@@ -525,17 +527,19 @@ void CLanServer::SendPacket(clsSession *const session)
     {
         Profiler::Start(L"ZeroCopy WSASend");
         send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+        LastError = GetLastError();
         Profiler::End(L"ZeroCopy WSASend");
     }
     else
     {
         Profiler::Start(L"WSASend");
         send_retval = WSASend(session->m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+        LastError = GetLastError();
         Profiler::End(L"WSASend");
     }
     if (send_retval < 0)
     {
-        LastError = GetLastError();
+        
         if (LastError != WSA_IO_PENDING)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");

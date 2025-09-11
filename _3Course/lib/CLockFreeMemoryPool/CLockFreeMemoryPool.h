@@ -51,7 +51,6 @@ struct stNode
 {
     stNode()
     {
-
         this->seqAddr.addr = (ull)this;
         this->seqAddr.seqNumber1 = 0;
         this->seqAddr.seqNumber2 = 0;
