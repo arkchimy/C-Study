@@ -5,6 +5,8 @@ class CTestServer : public CLanServer
   public:
     CTestServer();
     virtual ~CTestServer();
+    virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest);
+
     virtual double OnRecv(ull SessionID, CMessage *msg) override;
     virtual bool OnAccept(ull SessionID, SOCKADDR_IN addr) override;
 

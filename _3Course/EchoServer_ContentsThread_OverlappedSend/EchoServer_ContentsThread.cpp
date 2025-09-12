@@ -25,6 +25,7 @@ int main()
     LINGER linger;
     int iRingBufferSize;
     int ContentsRingBufferSize;
+    int Serialize_PoolAlloc;
 
     {
         Parser parser;
@@ -44,6 +45,7 @@ int main()
 
         parser.GetValue(L"RingBufferSize", iRingBufferSize);
         parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
+        parser.GetValue(L"Serialize_PoolAlloc", Serialize_PoolAlloc);
         CRingBuffer::s_BufferSize = iRingBufferSize;
     }
     wchar_t buffer[100];
@@ -52,6 +54,7 @@ int main()
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         CTestServer EchoServer;
+        EchoServer.Serialize_PoolAlloc = Serialize_PoolAlloc;
         EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions, ZeroByteTest);
 
         while (1)

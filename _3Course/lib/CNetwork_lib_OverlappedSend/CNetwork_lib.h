@@ -97,10 +97,12 @@ class CLanServer
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
     int m_ZeroByteTest = 0;
+    int Serialize_PoolAlloc = 0;
     bool bZeroCopy = false;
 
     std::vector<class clsSession> sessions_vec;
     std::list<ull> m_idleIdx;
     // TODO : LockFree Q 가 올 때까지 사용
     SRWLOCK srw_session_idleList;
+
 };

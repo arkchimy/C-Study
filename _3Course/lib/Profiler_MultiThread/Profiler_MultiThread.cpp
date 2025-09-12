@@ -40,7 +40,7 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
     {
         pTlsRecordInfo = sRecordSetPtrs[threadIndex];
 
-        for (recordIndex = 0; recordIndex < pTlsRecordInfo->RecordCount; ++recordIndex)
+        for (recordIndex = 0; recordIndex < pTlsRecordInfo->RecordCount; recordIndex++)
         {
             const stRecord &refProfileRecord = pTlsRecordInfo->Records[recordIndex];
 

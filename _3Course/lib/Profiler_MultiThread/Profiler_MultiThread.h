@@ -8,7 +8,7 @@
 enum
 {
     MAX_THREAD_COUNT = 50,
-    MAX_RECORD_COUNT = 16,
+    MAX_RECORD_COUNT = 30,
 
     MAX_TAG_NAME_LENGTH = 31 + 1,
     ABNORMAL_COUNT = 2, // 가장 큰 수, 가장 작은 수 noise의 판단 갯수를 정의

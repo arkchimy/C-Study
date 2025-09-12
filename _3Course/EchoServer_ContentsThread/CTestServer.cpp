@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "../lib/CNetwork_lib/CNetwork_lib.h"
 #include "CTestServer.h"
-
+#include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
 #include <thread>
 extern SRWLOCK srw_Log;
 
@@ -64,32 +64,38 @@ unsigned MonitorThread(void *arg)
     DWORD wait_retval;
     LONG64 beforeTotal = 0;
     LONG64 Total = 0;
-
+    LONG64 currentTPS;
     double cnt = 0;
     double avg;
+    LONG64 *arrTPS;
+    LONG64 *before_arrTPS;
+
+    arrTPS = new LONG64[server->m_WorkThreadCnt + 1];
+    before_arrTPS = new LONG64[server->m_WorkThreadCnt + 1];
+    ZeroMemory(arrTPS, sizeof(LONG64) * server->m_WorkThreadCnt + 1);
+    ZeroMemory(before_arrTPS, sizeof(LONG64) * server->m_WorkThreadCnt + 1);
+
     while (1)
     {
-        cnt++;
         wait_retval = WaitForSingleObject(hWaitHandle, 1000);
         
-        for (int i = 0; i <= server->m_WorkThreadCnt; i++)
-        {
-            Total += server->arrTPS[i];
-            InterlockedExchange64(&server->arrTPS[i], 0);
-        }
-        if (Total == beforeTotal)
-        {
-            cnt--;
-            continue;
-        }
         if (wait_retval != WAIT_OBJECT_0)
         {
-            beforeTotal = Total;
-            avg = beforeTotal / cnt;
+            for (int i = 0; i <= server->m_WorkThreadCnt; i++)
+            {
+                arrTPS[i] = server->arrTPS[i] - before_arrTPS[i];
+                before_arrTPS[i] = server->arrTPS[i];
+            }
 
-            printf("==================================\n");
-            printf("Avg  Send TPS : %llf\n", avg);
-            printf("==================================\n");
+            for (int i = 0; i <= server->m_WorkThreadCnt; i++)
+            {
+                if (i == 0)
+                 printf(" Conetents Send TPS : %lld\n", arrTPS[i]);
+                else
+                 printf(" Send TPS : %lld\n", arrTPS[i]);
+
+            }
+            
         }
     }
 
@@ -104,9 +110,6 @@ CTestServer::CTestServer()
 
     m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
-
-    hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
-    hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
 }
 
 
@@ -114,19 +117,44 @@ CTestServer::~CTestServer()
 {
 }
 
+BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest)
+{
+    BOOL retval;
+
+    retval  = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions, ZeroByteTest);
+    hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
+    hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
+
+    return retval;
+
+}
+
 double CTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
     double CurrentQ;
+    static ll visited = 0;
+    ringBufferSize ContentsUseSize;
 
+    stSRWLock srw(&srw_ContentQ);
+
+    ContentsUseSize = m_ContentsQ.GetUseSize();
     if (msg == nullptr)
     {
-        CurrentQ = double(m_ContentsQ.GetUseSize()) / m_ContentsQ.s_BufferSize * 100.f;
         SetEvent(m_ContentsEvent);
-        return CurrentQ;
+        return double(ContentsUseSize) / double(m_ContentsQ.s_BufferSize) * 100.f;
+        
     }
 
     {
-        stSRWLock srw(&srw_ContentQ);
+        Profiler profile;
+
+        profile.Start(L"ContentsQ_Enqueue");
+
+        //while (_InterlockedCompareExchange64(&visited, 1, 0) != 0)
+        //{
+        //    YieldProcessor();
+        //}
+
         // 포인터를 넣고
         CMessage **ppMsg;
         ppMsg = &msg;
@@ -136,10 +164,14 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
 
         if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
             __debugbreak();
+
+ 
+        profile.End(L"ContentsQ_Enqueue");
         SetEvent(m_ContentsEvent);
     }
 
-    return double(m_ContentsQ.GetUseSize()) / m_ContentsQ.s_BufferSize * 100.f;
+    return double(ContentsUseSize) / double(m_ContentsQ.s_BufferSize) * 100.f;
+    
 }
 
 bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)

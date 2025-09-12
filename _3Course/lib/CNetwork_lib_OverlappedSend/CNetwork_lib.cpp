@@ -366,10 +366,22 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 
 CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &header)
 {
-    CMessage *msg = &CObjectPoolManager::pool.Alloc()->data;
-    // ringBufferSize directDeQsize;
+    Profiler Alloc_Profiler;
+    CMessage *msg;
+    if (Serialize_PoolAlloc)
+    {
+        Alloc_Profiler.Start(L"CObjectPoolManager");
+        msg = reinterpret_cast<CMessage*>(CObjectPoolManager::pool.Alloc());
+        Alloc_Profiler.End(L"CObjectPoolManager");
+    }
+    else
+    {
+        Alloc_Profiler.Start(L"new");
+        msg = new CMessage;
+        Alloc_Profiler.End(L"new");
+    }
+   
 
-    // directDeQsize = session->m_recvBuffer.DirectDequeueSize(f, r);
     unsigned short type = 0;
     ringBufferSize deQsize;
 
@@ -389,7 +401,13 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred, OVER
 {
     stSendOverlapped *sendOverlapped;
     sendOverlapped = reinterpret_cast<stSendOverlapped *>(overlapped);
-    CObjectPoolManager::pool.Release(sendOverlapped->_msg);
+
+    if (Serialize_PoolAlloc)
+    {
+        CObjectPoolManager::pool.Release(sendOverlapped->_msg);
+    }
+    else
+        delete sendOverlapped->_msg;
 
     ZeroMemory(sendOverlapped, sizeof(OVERLAPPED));
     pool.Release(overlapped);

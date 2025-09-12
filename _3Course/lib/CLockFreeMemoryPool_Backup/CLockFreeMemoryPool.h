@@ -127,12 +127,14 @@ class CObjectPool
         ull id = _InterlockedIncrement64((ll *)&seqNumber);
         DWORD iThreadID = GetCurrentThreadId();
 
+        if (reinterpret_cast<stNode<T> *>(newNode)->ownerThreadID == 0)
+            __debugbreak();
         do
         {
             oldTop = reinterpret_cast<stNode<T>*>(m_Top);
             newTop = reinterpret_cast<stNode<T>*>((ll)newNode | id << 47);
             reinterpret_cast<stNode<T>*>(newNode)->next = oldTop;
-
+            reinterpret_cast<stNode<T> *>(newNode)->ownerThreadID = 0;
         } while (_InterlockedCompareExchangePointer(&m_Top, newTop, oldTop) != oldTop);
 
 #ifdef POOLTEST

@@ -44,7 +44,7 @@ class CLanServer
   public:
     ~CLanServer();
     // 오픈 IP / 포트 / 워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
-    BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest);
+    virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest);
     void Stop();
     int GetSessionCount();
     bool Disconnect(class clsSession *const session);
@@ -106,5 +106,7 @@ class CLanServer
     int m_WorkThreadCnt = 0;
     DWORD m_TPS_tlsidx;
     LONG64 *arrTPS;
+    HANDLE WorkerArg[2];
+    HANDLE AcceptArg[3];
 
 };

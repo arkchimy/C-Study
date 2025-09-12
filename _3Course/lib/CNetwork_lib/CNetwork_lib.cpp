@@ -182,7 +182,7 @@ unsigned WorkerThread(void *arg)
     LONG64 *arrTPS_idx = reinterpret_cast<LONG64 *>(TlsGetValue(server->m_TPS_tlsidx));
     if (arrTPS_idx == nullptr)
     {
-        arrTPS_idx = reinterpret_cast<LONG64 *>(_interlockedincrement64(&s_arrTPS_idx));
+        TlsSetValue(server->m_TPS_tlsidx, (void *)_interlockedincrement64(&s_arrTPS_idx));
     }
 
     ull key;
@@ -190,6 +190,9 @@ unsigned WorkerThread(void *arg)
     clsSession *session;
 
     ull local_ioCount;
+
+    thread_local int a = 0;
+    Profiler profile;
 
     while (1)
     {
@@ -200,8 +203,12 @@ unsigned WorkerThread(void *arg)
             overlapped = nullptr;
             session = nullptr;
         }
-
+        if (a != 0)
+            profile.End(L"GetQueuedCompletionStatus");
+        else
+            a++;
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
+        profile.Start(L"GetQueuedCompletionStatus");
         if (overlapped == nullptr)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt", L"GetQueuedCompletionStatus Overlapped is nullptr");
@@ -303,14 +310,18 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     m_WorkThreadCnt = WorkerCreateCnt;
     Sleep(1000);
 
-    HANDLE WorkerArg[] = {m_hIOCP, this};
-    HANDLE AcceptArg[] = {m_hIOCP, (HANDLE)m_listen_sock, this};
+    WorkerArg[0] = m_hIOCP;
+    WorkerArg[1] = this;
+
+    AcceptArg[0] = m_hIOCP;
+    AcceptArg[1] = (HANDLE)m_listen_sock;
+    AcceptArg[2] = this;
     // TODO : 넘겨줄 매개변수를  지역변수로 ???  다른 방안 생각하기
 
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
     for (int i = 0; i < WorkerCreateCnt; i++)
         m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
-    Sleep(1000); // 지역변수가 반환 되므로 Sleep을 했음.
+
     return true;
 }
 
@@ -358,7 +369,12 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         }
         // 메세지 생성
         CMessage *msg = CreateCMessage(session, header);
-        qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
+        {
+            Profiler profile;
+            profile.Start(L"OnRecv");
+            qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
+            profile.End(L"OnRecv");
+        }
         f = session->m_recvBuffer._frontPtr;
         if (qPersentage >= 75.0)
         {
@@ -378,10 +394,12 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 
 CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &header)
 {
-    CMessage *msg = &CObjectPoolManager::pool.Alloc()->data;
-    // ringBufferSize directDeQsize;
+    Profiler profile;
 
-    // directDeQsize = session->m_recvBuffer.DirectDequeueSize(f, r);
+    profile.Start(L"PoolAlloc");
+    CMessage *msg = reinterpret_cast<CMessage *>(CObjectPoolManager::pool.Alloc());
+    profile.End(L"PoolAlloc");
+
     unsigned short type = 0;
     ringBufferSize deQsize;
 
@@ -426,6 +444,7 @@ void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transfe
         RecvPostMessage(session);
         return;
     }
+    // 
     // Header의 크기만큼을 확인.
     while (session->m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
     {
