@@ -245,7 +245,14 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
             return;
         }
     }
+    Profiler profile;
+    
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
-        SendPacket(session);
+    {
+        profile.Start(L"Contetns_SendPacket");
+        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+        //SendPacket(session);
+        profile.End(L"Contetns_SendPacket");
+    }
 
 }
