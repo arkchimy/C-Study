@@ -171,20 +171,18 @@ unsigned WorkerThread(void *arg)
      * arg[0] 에는 hIOCP의 가짜핸들을
      * arg[1] 에는 Server의 인스턴스
      */
-    static LONG64 s_arrTPS_idx = 0;
-
     size_t *arrArg = reinterpret_cast<size_t *>(arg);
-    DWORD transferred;
-
     HANDLE hIOCP = (HANDLE)*arrArg;
     CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[1]);
 
+    static LONG64 s_arrTPS_idx = 0;
     LONG64 *arrTPS_idx = reinterpret_cast<LONG64 *>(TlsGetValue(server->m_TPS_tlsidx));
     if (arrTPS_idx == nullptr)
     {
         TlsSetValue(server->m_TPS_tlsidx, (void *)_interlockedincrement64(&s_arrTPS_idx));
     }
 
+    DWORD transferred;
     ull key;
     OVERLAPPED *overlapped;
     clsSession *session;

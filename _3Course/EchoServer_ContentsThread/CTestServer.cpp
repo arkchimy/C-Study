@@ -62,11 +62,7 @@ unsigned MonitorThread(void *arg)
     HANDLE hWaitHandle = {server->m_ServerOffEvent};
 
     DWORD wait_retval;
-    LONG64 beforeTotal = 0;
-    LONG64 Total = 0;
-    LONG64 currentTPS;
-    double cnt = 0;
-    double avg;
+
     LONG64 *arrTPS;
     LONG64 *before_arrTPS;
 
