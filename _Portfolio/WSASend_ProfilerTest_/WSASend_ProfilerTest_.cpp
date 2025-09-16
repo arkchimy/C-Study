@@ -14,6 +14,7 @@
 #include <list>
 #include 	<assert.h>
 #include "CLargePage.h"
+#include <vector>
 
 #pragma comment(lib, "ws2_32")
 
@@ -32,6 +33,8 @@ int BUFFER_LEN_MAX = 1000;
 int WSABUF_CNT = 1;
 int LargePage;
 
+std::vector<ull> TPS_vec; // TPS의 전에 측정된 값
+
 
 
 struct clsSession
@@ -45,7 +48,7 @@ struct clsSession
     OVERLAPPED overlapped;
 
     char *buffer = CLargePage::GetInstance().Alloc(BUFFER_LEN_MAX,LargePage);
-    WSABUF wsabuf[100];
+    WSABUF wsabuf[1000];
 };
 void SendPack(clsSession *session)
 {
@@ -53,7 +56,7 @@ void SendPack(clsSession *session)
     DWORD flag = 0;
     for (int i = 0; i < WSABUF_CNT; i++)
     {
-        session->wsabuf[i].len = BUFFER_LEN_MAX / WSABUF_CNT * (i + 1);
+        session->wsabuf[i].len = BUFFER_LEN_MAX / WSABUF_CNT;
         if (i == 0)
             session->wsabuf[i].buf = session->buffer;
         else
@@ -78,6 +81,53 @@ void SendPack(clsSession *session)
     }
     if (sendRetval != 0)
     {
+
+        switch (LastError)
+        {
+        case WSA_IO_PENDING:
+            break;
+        case 10054:
+        case 10053:
+            break;
+
+        default:
+            closesocket(session->m_sock);
+        }
+    }
+}
+void SendPack(clsSession *session,DWORD ithreadID)
+{
+    int sendRetval, LastError;
+    DWORD flag = 0;
+    for (int i = 0; i < WSABUF_CNT; i++)
+    {
+        session->wsabuf[i].len = BUFFER_LEN_MAX / WSABUF_CNT ;
+        if (i == 0)
+            session->wsabuf[i].buf = session->buffer;
+        else
+            session->wsabuf[i].buf = session->buffer + session->wsabuf[i].len;
+    }
+    ZeroMemory(&session->overlapped, sizeof(OVERLAPPED));
+    if (bZeroCopy == false)
+    {
+        Profiler profile;
+        profile.Start(L"WSASend");
+        sendRetval = WSASend(session->m_sock, &session->wsabuf[0], WSABUF_CNT, nullptr, flag, &session->overlapped, nullptr);
+        LastError = GetLastError();
+        profile.End(L"WSASend");
+        TPSarr[ithreadID] += WSABUF_CNT;
+    }
+    else
+    {
+        Profiler profile;
+        profile.Start(L"bZeroCopy_WSASend");
+        sendRetval = WSASend(session->m_sock, &session->wsabuf[0], WSABUF_CNT, nullptr, flag, &session->overlapped, nullptr);
+        LastError = GetLastError();
+        profile.End(L"bZeroCopy_WSASend");
+        TPSarr[ithreadID] += WSABUF_CNT;
+    }
+    if (sendRetval != 0)
+    {
         
         switch (LastError)
         {
@@ -98,10 +148,17 @@ unsigned AcceptThread(void *arg)
     WSAStartup(MAKEWORD(2, 2), &wsadata);
 
     SOCKADDR_IN addr;
+    LINGER linger;
+    linger.l_onoff = 1;
+    linger.l_linger = 0;
+
+
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8000);
     InetPtonW(AF_INET, L"127.0.0.1", &addr.sin_addr);
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    setsockopt(listen_sock, SOL_SOCKET, SO_LINGER, (const char*)&linger, sizeof(LINGER));
 
     if (bZeroCopy)
     {
@@ -132,6 +189,7 @@ unsigned AcceptThread(void *arg)
         
 
         SendPack(session);
+
     }
 
     return 0;
@@ -166,9 +224,7 @@ unsigned WorkerThread(void *arg)
 
         if (session == nullptr)
             __debugbreak();
-        SendPack(session);
-        TPSarr[TPSid]++;
-
+        SendPack(session, TPSid);
     }
     return 0;
 }
@@ -184,38 +240,38 @@ unsigned MonitorThread(void *arg)
     double avgTPS;
 
     totalTPS = 0;
-  
+    
     while (1)
     {
-        static double cnt = 0;
-        cnt++;
         currentTPS = 0;
         retWait = WaitForSingleObject(hExitEvent, 1000);
-        printf("ZeroCopy :  %d \n" , bZeroCopy);
-        printf("WokerThreadCnt : %d \n", WokerThreadCnt);
-        printf("BUFFER_LEN_MAX : %d \n", BUFFER_LEN_MAX);
-        printf("WSABUF_CNT : %d \n", WSABUF_CNT);
-        printf("LargePage : %d \n", LargePage);
+        //printf("ZeroCopy :  %d \n" , bZeroCopy);
+        //printf("WokerThreadCnt : %d \n", WokerThreadCnt);
+        //printf("BUFFER_LEN_MAX : %d \n", BUFFER_LEN_MAX);
+        //printf("WSABUF_CNT : %d \n", WSABUF_CNT);
+        //printf("LargePage : %d \n", LargePage);
 
         if (WAIT_OBJECT_0 != retWait)
         {
-            printf("======================= \n");
+            currentTPS = 0;
             for (int i = 0; i < WokerThreadCnt; i++)
             {
-                printf("%lld :  TPS \n", TPSarr[i]);
-                currentTPS += TPSarr[i];
-                InterlockedExchange(&TPSarr[i], 0);
+                TPS_vec[i] = TPSarr[i] - TPS_vec[i];
+                currentTPS += TPS_vec[i];
             }
-            if (currentTPS == 0)
+            
+            if (currentTPS  == 0)
             {
-                cnt--;
                 continue;
             }
-            totalTPS += currentTPS;
-            avgTPS = totalTPS / cnt;
-
-            printf("totalTPS : %llf:  TPS \n", avgTPS);
-            printf("======================= \n");
+            
+            printf(" ======================= \n");
+            for (int i = 0; i < WokerThreadCnt; i++)
+            {
+                printf(" %lld:  TPS \n ", TPS_vec[i]);
+            }
+            printf(" totalTPS : %lld:  TPS \n ", currentTPS);
+            printf(" ======================= \n ");
         }
         else
             break;
@@ -223,9 +279,10 @@ unsigned MonitorThread(void *arg)
 
     return 0;
 }
+
 int main()
 {
-
+    
 
     {
         Parser parser;
@@ -237,6 +294,9 @@ int main()
         parser.GetValue(L"LargePage", LargePage);
     }
     TPSarr = new ull[WokerThreadCnt];
+    for (int i = 0; i < WokerThreadCnt; i++)
+        TPS_vec.push_back(0);
+
     ZeroMemory(TPSarr, sizeof(ull) * WokerThreadCnt);
 
     hExitEvent = (HANDLE)CreateEvent(nullptr, 1, false, nullptr);
@@ -260,7 +320,7 @@ int main()
         }
         else if (GetAsyncKeyState('a') || GetAsyncKeyState('A'))
         {
-            StringCchPrintfW(fileName, sizeof(fileName) / sizeof(wchar_t), L"%hs_Profile_BufferLen%d_ZeroCopy%d_BufferCnt%d.txt", __DATE__, BUFFER_LEN_MAX, bZeroCopy, WSABUF_CNT);
+            StringCchPrintfW(fileName, sizeof(fileName) / sizeof(wchar_t), L"%hs_Profile_BufferLen%d_ZeroCopy%d_BufferCnt%d.txt", __DATE__, BUFFER_LEN_MAX / WSABUF_CNT, bZeroCopy, WSABUF_CNT);
             Profiler::SaveAsLog(fileName);
 
         }

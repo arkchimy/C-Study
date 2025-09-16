@@ -24,7 +24,11 @@ CMessage::CMessage()
     __try
     {
         if (g_mode == 0)
+        {
             _begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
+            if (_begin == nullptr)
+                __debugbreak();
+        }
         else
         {
             _begin = CObjectPoolManager::Alloc();
@@ -208,6 +212,7 @@ char *CObjectPoolManager::Alloc()
     char *pRetval;
 
     pRetval = _buffer + cnt * CMessage::en_BufferSize::bufferSize;
+    *pRetval = 0;
     cnt++;
 
     return pRetval;

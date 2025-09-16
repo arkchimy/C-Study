@@ -64,28 +64,6 @@ class CLanServer
 
     virtual void RecvPostMessage(clsSession *session) = 0;
 
-    /*
-            virtual bool OnConnectionRequest(IP, Port) = 0; //
-        < accept 직후
-
-        return false; 시 클라이언트 거부.
-        return true;  시 접속 허용
-
-            virtual void OnAccept(Client 정보 / SessionID / 기타등등) = 0;
-        < Accept 후 접속처리 완료 후 호출.
-
-            virtual void OnRelease(SessionID) = 0;
-        < Release 후 호출
-
-        //	virtual void OnWorkerThreadBegin() = 0;                    < 워커스레드 GQCS 바로 하단에서 호출
-        //	virtual void OnWorkerThreadEnd() = 0;                      < 워커스레드 1루프 종료 후
-
-        virtual void OnError(int errorcode, wchar *) = 0;
-
-        */
-    int getAcceptTPS();
-    int getRecvMessageTPS();
-    int getSendMessageTPS();
 
   public:
     SOCKET m_listen_sock = INVALID_SOCKET;

@@ -4,7 +4,7 @@
 
 #include <thread>
 extern SRWLOCK srw_Log;
-
+unsigned SendThread(void *arg);
 unsigned ContentsThread(void *arg)
 {
     size_t addr;
@@ -100,6 +100,8 @@ CTestServer::CTestServer()
 
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
     hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
+    
+    _beginthreadex(nullptr, 0, SendThread, this, 0, nullptr);
 }
 
 
@@ -155,6 +157,8 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)
     return true;
 }
 
+HANDLE hSendThreadIOCP;
+
 void CTestServer::RecvPostMessage(clsSession *session)
 {
     BOOL EnQSucess;
@@ -194,6 +198,62 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // TODO : cs_sessionMap Lock 제거
   
-    SendPacket(session, message);
-    m_TotalTPS++;
+    stSendOverlapped *overlapped = new stSendOverlapped();
+    overlapped->_msg = message;
+    overlapped->_mode = Job_Type::Send;
+
+    PostQueuedCompletionStatus(hSendThreadIOCP, 0, (ULONG_PTR)session, overlapped);
+}
+
+
+unsigned SendThread(void *arg)
+{
+
+    DWORD transferred;
+    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+
+    ull key;
+
+    stSendOverlapped *overlapped;
+    clsSession *session;
+
+    ull local_ioCount;
+    hSendThreadIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, 1 );
+    WSABUF wsabuf;
+
+    while (1)
+    {
+        // 지역변수 초기화
+        {
+            transferred = 0;
+            key = 0;
+            overlapped = nullptr;
+            session = nullptr;
+        }
+        GetQueuedCompletionStatus(hSendThreadIOCP, &transferred, &key, (LPOVERLAPPED*)&overlapped, INFINITE);
+
+        if (overlapped == nullptr)
+            __debugbreak();
+        session = reinterpret_cast<clsSession *>(key);
+
+        switch (overlapped->_mode)
+        {
+        case Job_Type::Send:
+            wsabuf.buf = overlapped->_msg->_frontPtr;
+            wsabuf.len = overlapped->_msg->_rearPtr - overlapped->_msg->_frontPtr;
+            overlapped->_mode = Job_Type::Recv;
+            server->SendPacket(session, overlapped->_msg);
+            server->m_TotalTPS++;
+
+            PostQueuedCompletionStatus(hSendThreadIOCP, 0, (ULONG_PTR)session, overlapped);
+            break;
+        case Job_Type::Recv:
+
+            delete overlapped;
+            break;
+        }
+
+
+    }
+    return 0;
 }
