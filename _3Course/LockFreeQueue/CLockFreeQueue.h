@@ -46,37 +46,52 @@ void CLockFreeQueue<T>::Push(T data)
     LONG64 seq;
     stNode *newNode;
 
+    stNode *tail;
+    stNode *tailAddr;
+
     newNode = reinterpret_cast<stNode *>(pool.Alloc());
     newNode->next = nullptr;
-
     newNode->data = data;
+
     seq = _interlockedincrement64(&seqNumber);
-
     newNode = reinterpret_cast<stNode *>(seq << 47 | (LONG64)newNode);
+    
+    do
+    {
+        tail = _tail;
+        tailAddr = reinterpret_cast<stNode *>((LONG64)tail & ADDR_MASK);
 
-    reinterpret_cast<stNode *>((LONG64)_tail & ADDR_MASK)->next = newNode;
-    _tail = newNode;
+    } while (InterlockedCompareExchangePointer((PVOID *)&(tailAddr->next), newNode, nullptr) != nullptr);
+    if (InterlockedCompareExchangePointer((PVOID*)&_tail, newNode, tail) != tail)
+    {
+        InterlockedCompareExchangePointer((PVOID *)&_tail, newNode, tail);
+    }
+       
 }
 
 template <typename T>
 T CLockFreeQueue<T>::Pop()
 {
-
+ 
     stNode *nextNode;
     stNode *headAddr;
+    stNode *head;
 
     T outData;
 
-    headAddr = reinterpret_cast<stNode *>((LONG64)_head & ADDR_MASK);
-    nextNode = headAddr->next;
 
-    if (headAddr == nullptr)
-        __debugbreak();
+    do
+    {
+        head = _head;
+        headAddr = reinterpret_cast<stNode *>((LONG64)head & ADDR_MASK);
+        nextNode = headAddr->next;
 
-    outData = reinterpret_cast<stNode *>((LONG64)nextNode & ADDR_MASK)->data;
+        outData = reinterpret_cast<stNode *>((LONG64)nextNode & ADDR_MASK)->data;
+
+
+    } while (InterlockedCompareExchangePointer((PVOID *)&_head, nextNode, head) != head);
 
     pool.Release(headAddr);
-    _head = nextNode;
 
     return outData;
 }
