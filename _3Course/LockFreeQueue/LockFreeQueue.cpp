@@ -1,15 +1,14 @@
 ﻿// LockFreeQueue.cpp : 이 파일에는 'main' 함수가 포함됩니다. 거기서 프로그램 실행이 시작되고 종료됩니다.
 //
 
-#include "CLockFreeQueue.h"
 #include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
-
+#include "CLockFreeQueue.h"
 
 #include <iostream>
 
+#include <list>
 #include <queue>
 #include <thread>
-#include <list>
 
 #define WORKERTHREADCNT 6
 
@@ -19,16 +18,17 @@ std::list<int> original_list;
 SRWLOCK srw_test_list;
 SRWLOCK srw_original_list;
 
-
 HANDLE hStartEvent;
-unsigned TestThread(void* arg)
+unsigned TestThread(void *arg)
 {
-    CLockFreeQueue<int>* q;
+    CLockFreeQueue<int> *q;
     int input_data;
-    int out_data;
+
     q = reinterpret_cast<CLockFreeQueue<int> *>(arg);
 
-    WaitForSingleObject(hStartEvent, INFINITE);
+    std::vector<int> vec;
+    std::vector<int> outData_vec;
+    srand(GetCurrentThreadId());
 
     while (1)
     {
@@ -39,13 +39,28 @@ unsigned TestThread(void* arg)
 
         input_data = test_list.front();
         test_list.pop_front();
+        vec.push_back(input_data);
 
         ReleaseSRWLockExclusive(&srw_test_list);
+    }
 
+    WaitForSingleObject(hStartEvent, INFINITE);
+
+    ReleaseSRWLockExclusive(&srw_test_list);
+
+    for (auto input_data : vec)
+    {
         q->Push(input_data);
-        out_data = q->Pop();
+    }
+    for (auto input_data : vec)
+    {
+        outData_vec.push_back(q->Pop());
+    }
 
-        AcquireSRWLockExclusive(&srw_original_list);
+
+    AcquireSRWLockExclusive(&srw_original_list);
+    for (auto out_data : outData_vec)
+    {
         for (auto iter = original_list.begin(); iter != original_list.end(); iter++)
         {
             if (*iter == out_data)
@@ -54,9 +69,8 @@ unsigned TestThread(void* arg)
                 break;
             }
         }
-        ReleaseSRWLockExclusive(&srw_original_list);
     }
-    ReleaseSRWLockExclusive(&srw_test_list);
+    ReleaseSRWLockExclusive(&srw_original_list);
 
     return 0;
 }
@@ -71,7 +85,6 @@ int main()
     int data_cnt;
     int input_data;
 
-
     ull LoopCnt = 0;
 
     HANDLE hWorkerThread[WORKERTHREADCNT];
@@ -82,7 +95,7 @@ int main()
 
     while (1)
     {
-        data_cnt = rand() % 1000;
+        data_cnt = rand() % 100;
 
         for (int i = 0; i < data_cnt; i++)
         {
@@ -90,11 +103,12 @@ int main()
             original_list.push_back(input_data);
             test_list.push_back(input_data);
         }
-        
+
         CLockFreeQueue<int> q;
         for (int i = 0; i < WORKERTHREADCNT; i++)
             hWorkerThread[i] = (HANDLE)_beginthreadex(nullptr, 0, TestThread, &q, 0, nullptr);
 
+        Sleep(1000);
         SetEvent(hStartEvent);
 
         WaitForMultipleObjects(WORKERTHREADCNT, hWorkerThread, true, INFINITE);
@@ -110,11 +124,9 @@ int main()
         for (int i = 0; i < WORKERTHREADCNT; i++)
             CloseHandle(hWorkerThread[i]);
     }
-
-
 }
-// 
-//int main()
+//
+// int main()
 //{
 //    ull Cnt = 1;
 //    int rand_num, loopCnt;
