@@ -19,6 +19,7 @@ SRWLOCK srw_test_list;
 SRWLOCK srw_original_list;
 
 HANDLE hStartEvent;
+HANDLE hListInitEvent;
 unsigned TestThread(void *arg)
 {
     CLockFreeQueue<int> *q;
@@ -30,6 +31,7 @@ unsigned TestThread(void *arg)
     std::vector<int> outData_vec;
     srand(GetCurrentThreadId());
 
+    WaitForSingleObject(hListInitEvent, INFINITE);
     while (1)
     {
         AcquireSRWLockExclusive(&srw_test_list);
@@ -42,11 +44,13 @@ unsigned TestThread(void *arg)
         vec.push_back(input_data);
 
         ReleaseSRWLockExclusive(&srw_test_list);
+        Sleep(0);
     }
+
+    ReleaseSRWLockExclusive(&srw_test_list);
 
     WaitForSingleObject(hStartEvent, INFINITE);
 
-    ReleaseSRWLockExclusive(&srw_test_list);
 
     for (auto input_data : vec)
     {
@@ -56,7 +60,6 @@ unsigned TestThread(void *arg)
     {
         outData_vec.push_back(q->Pop());
     }
-
 
     AcquireSRWLockExclusive(&srw_original_list);
     for (auto out_data : outData_vec)
@@ -71,7 +74,8 @@ unsigned TestThread(void *arg)
         }
     }
     ReleaseSRWLockExclusive(&srw_original_list);
-
+    
+    printf("Thread id :  %d  Loop %zu \n", GetCurrentThreadId(), vec.size());
     return 0;
 }
 CDump dump;
@@ -92,11 +96,15 @@ int main()
     hStartEvent = CreateEvent(nullptr, 1, 0, nullptr);
     if (hStartEvent == nullptr)
         __debugbreak();
+    hListInitEvent = CreateEvent(nullptr, 1, 0, nullptr);
+    if (hListInitEvent == nullptr)
+        __debugbreak();
+
+    
 
     while (1)
     {
-        data_cnt = rand() % 100;
-
+        data_cnt = rand() % 10000;
         for (int i = 0; i < data_cnt; i++)
         {
             input_data = rand() % 100;
@@ -107,6 +115,9 @@ int main()
         CLockFreeQueue<int> q;
         for (int i = 0; i < WORKERTHREADCNT; i++)
             hWorkerThread[i] = (HANDLE)_beginthreadex(nullptr, 0, TestThread, &q, 0, nullptr);
+        printf("===============================\n");
+        Sleep(1000);
+        SetEvent(hListInitEvent);
 
         Sleep(1000);
         SetEvent(hStartEvent);
@@ -119,8 +130,11 @@ int main()
         if (test_list.size() != 0)
             __debugbreak();
 
+        ResetEvent(hListInitEvent);
         ResetEvent(hStartEvent);
+
         printf("LoopCnt : %lld \n", ++LoopCnt);
+        printf("===============================\n");
         for (int i = 0; i < WORKERTHREADCNT; i++)
             CloseHandle(hWorkerThread[i]);
     }
