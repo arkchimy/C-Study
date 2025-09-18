@@ -1,6 +1,5 @@
 #pragma once
 #include "../lib/CLockFreeMemoryPool_Backup/CLockFreeMemoryPool.h"
-
 template <typename T>
 class CLockFreeQueue
 {
@@ -49,6 +48,8 @@ void CLockFreeQueue<T>::Push(T data)
     stNode *tail;
     stNode *tailAddr;
 
+    stNode *tailNext;
+
     newNode = reinterpret_cast<stNode *>(pool.Alloc());
     newNode->next = nullptr;
     newNode->data = data;
@@ -60,8 +61,18 @@ void CLockFreeQueue<T>::Push(T data)
     {
         tail = _tail;
         tailAddr = reinterpret_cast<stNode *>((LONG64)tail & ADDR_MASK);
+        tailNext = tailAddr->next;
 
-    } while (InterlockedCompareExchangePointer((PVOID *)&(tailAddr->next), newNode, nullptr) != nullptr);
+        if (tailNext != nullptr)
+        {
+            InterlockedCompareExchangePointer((PVOID *)&_tail, tailNext, tail);
+            continue;
+        }
+        if (InterlockedCompareExchangePointer((PVOID *)&(tailAddr->next), newNode, nullptr) == nullptr)
+            break;
+
+    } while (1);
+
     if (InterlockedCompareExchangePointer((PVOID*)&_tail, newNode, tail) != tail)
     {
         InterlockedCompareExchangePointer((PVOID *)&_tail, newNode, tail);
@@ -77,19 +88,35 @@ T CLockFreeQueue<T>::Pop()
     stNode *headAddr;
     stNode *head;
 
+    stNode *tail;
+
+    stNode *tailNextNode;
+
     T outData;
 
 
     do
     {
         head = _head;
+        tail = _tail;
+
+        if (head == tail)
+        {
+            tailNextNode = reinterpret_cast<stNode *>((ull)tail & ADDR_MASK)->next;
+            if (tailNextNode == nullptr)
+                continue;
+            InterlockedCompareExchangePointer((PVOID *)&_tail, tailNextNode, tail);
+        }
+
         headAddr = reinterpret_cast<stNode *>((LONG64)head & ADDR_MASK);
         nextNode = headAddr->next;
-
+        if (nextNode == nullptr)
+            continue;
         outData = reinterpret_cast<stNode *>((LONG64)nextNode & ADDR_MASK)->data;
+        if(InterlockedCompareExchangePointer((PVOID *)&_head, nextNode, head) == head)
+            break;
 
-
-    } while (InterlockedCompareExchangePointer((PVOID *)&_head, nextNode, head) != head);
+    }while(1);
 
     pool.Release(headAddr);
 

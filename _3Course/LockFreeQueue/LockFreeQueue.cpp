@@ -2,42 +2,150 @@
 //
 
 #include "CLockFreeQueue.h"
+#include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+
+
 #include <iostream>
 
 #include <queue>
+#include <thread>
+#include <list>
+
+#define WORKERTHREADCNT 6
+
+std::list<int> test_list;
+std::list<int> original_list;
+
+SRWLOCK srw_test_list;
+SRWLOCK srw_original_list;
+
+
+HANDLE hStartEvent;
+unsigned TestThread(void* arg)
+{
+    CLockFreeQueue<int>* q;
+    int input_data;
+    int out_data;
+    q = reinterpret_cast<CLockFreeQueue<int> *>(arg);
+
+    WaitForSingleObject(hStartEvent, INFINITE);
+
+    while (1)
+    {
+        AcquireSRWLockExclusive(&srw_test_list);
+
+        if (test_list.empty() == true)
+            break;
+
+        input_data = test_list.front();
+        test_list.pop_front();
+
+        ReleaseSRWLockExclusive(&srw_test_list);
+
+        q->Push(input_data);
+        out_data = q->Pop();
+
+        AcquireSRWLockExclusive(&srw_original_list);
+        for (auto iter = original_list.begin(); iter != original_list.end(); iter++)
+        {
+            if (*iter == out_data)
+            {
+                original_list.erase(iter);
+                break;
+            }
+        }
+        ReleaseSRWLockExclusive(&srw_original_list);
+    }
+    ReleaseSRWLockExclusive(&srw_test_list);
+
+    return 0;
+}
+CDump dump;
 
 int main()
 {
-    ull Cnt = 1;
-    int rand_num, loopCnt;
 
+    InitializeSRWLock(&srw_test_list);
+    InitializeSRWLock(&srw_original_list);
     srand(3);
+    int data_cnt;
+    int input_data;
+
+
+    ull LoopCnt = 0;
+
+    HANDLE hWorkerThread[WORKERTHREADCNT];
+
+    hStartEvent = CreateEvent(nullptr, 1, 0, nullptr);
+    if (hStartEvent == nullptr)
+        __debugbreak();
+
     while (1)
     {
+        data_cnt = rand() % 1000;
+
+        for (int i = 0; i < data_cnt; i++)
+        {
+            input_data = rand() % 100;
+            original_list.push_back(input_data);
+            test_list.push_back(input_data);
+        }
+        
         CLockFreeQueue<int> q;
-        std::queue<int> stl_q;
+        for (int i = 0; i < WORKERTHREADCNT; i++)
+            hWorkerThread[i] = (HANDLE)_beginthreadex(nullptr, 0, TestThread, &q, 0, nullptr);
 
-        loopCnt = rand() % 5;
-        for (int i = 0; i < loopCnt; i++)
-        {
-            rand_num = rand() % 521;
+        SetEvent(hStartEvent);
 
-            q.Push(rand_num);
-            stl_q.push(rand_num);
-        }
-        for (int i = 0; i < loopCnt; i++)
-        {
-            int test1, test2;
+        WaitForMultipleObjects(WORKERTHREADCNT, hWorkerThread, true, INFINITE);
 
-            test1 = q.Pop();
-            test2 = stl_q.front();
-            stl_q.pop();
-            if (test1 != test2)
-                __debugbreak();
-        }
-        printf("Loop Cnt : %lld \n", Cnt++);
+        if (original_list.size() != 0)
+            __debugbreak();
+
+        if (test_list.size() != 0)
+            __debugbreak();
+
+        ResetEvent(hStartEvent);
+        printf("LoopCnt : %lld \n", ++LoopCnt);
+        for (int i = 0; i < WORKERTHREADCNT; i++)
+            CloseHandle(hWorkerThread[i]);
     }
+
+
 }
+// 
+//int main()
+//{
+//    ull Cnt = 1;
+//    int rand_num, loopCnt;
+//
+//    srand(3);
+//    while (1)
+//    {
+//        CLockFreeQueue<int> q;
+//        std::queue<int> stl_q;
+//
+//        loopCnt = rand() % 5;
+//        for (int i = 0; i < loopCnt; i++)
+//        {
+//            rand_num = rand() % 521;
+//
+//            q.Push(rand_num);
+//            stl_q.push(rand_num);
+//        }
+//        for (int i = 0; i < loopCnt; i++)
+//        {
+//            int test1, test2;
+//
+//            test1 = q.Pop();
+//            test2 = stl_q.front();
+//            stl_q.pop();
+//            if (test1 != test2)
+//                __debugbreak();
+//        }
+//        printf("Loop Cnt : %lld \n", Cnt++);
+//    }
+//}
 
 // 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴
 // 프로그램 디버그: <F5> 키 또는 [디버그] > [디버깅 시작] 메뉴
