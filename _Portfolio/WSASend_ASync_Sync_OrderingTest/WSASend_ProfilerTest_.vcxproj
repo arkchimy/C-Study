@@ -137,14 +137,6 @@
     <ClCompile Include="WSASend_ProfilerTest_.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\_1Course\lib\Parser_lib\Parser_lib.vcxproj">
-      <Project>{aeaec43e-1516-4224-889b-858c678ce028}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\..\_3Course\lib\Profiler_MultiThread\Profiler_MultiThread.vcxproj">
-      <Project>{5e8f90bb-3fc5-47bc-85e9-363129ba3713}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="Config.txt" />
   </ItemGroup>
   <ItemGroup>
