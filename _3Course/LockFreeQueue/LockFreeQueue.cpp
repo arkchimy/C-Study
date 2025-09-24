@@ -51,15 +51,12 @@ unsigned TestThread(void *arg)
 
     WaitForSingleObject(hStartEvent, INFINITE);
 
-
     for (auto input_data : vec)
     {
         q->Push(input_data);
-    }
-    for (auto input_data : vec)
-    {
         outData_vec.push_back(q->Pop());
     }
+    
 
     AcquireSRWLockExclusive(&srw_original_list);
     for (auto out_data : outData_vec)
@@ -104,7 +101,7 @@ int main()
 
     while (1)
     {
-        data_cnt = rand() % 10000;
+        data_cnt = rand() % 100000;
         for (int i = 0; i < data_cnt; i++)
         {
             input_data = rand() % 100;
@@ -116,10 +113,10 @@ int main()
         for (int i = 0; i < WORKERTHREADCNT; i++)
             hWorkerThread[i] = (HANDLE)_beginthreadex(nullptr, 0, TestThread, &q, 0, nullptr);
         printf("===============================\n");
-        Sleep(1000);
+        Sleep(10);
         SetEvent(hListInitEvent);
 
-        Sleep(1000);
+        Sleep(10);
         SetEvent(hStartEvent);
 
         WaitForMultipleObjects(WORKERTHREADCNT, hWorkerThread, true, INFINITE);
