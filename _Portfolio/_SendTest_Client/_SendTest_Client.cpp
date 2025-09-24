@@ -16,10 +16,9 @@ int main()
     addr.sin_port = htons(8000);
     InetPtonW(AF_INET, L"127.0.0.1", &addr.sin_addr);
 
-    SOCKET client_sock;
-
-    while (1)
     {
+        SOCKET client_sock;
+
         client_sock = socket(AF_INET, SOCK_STREAM, 0);
 
         connect(client_sock, (sockaddr *)&addr, sizeof(addr));
@@ -30,13 +29,12 @@ int main()
             retRecv = recv(client_sock, buffer, 10001, 0);
             if (retRecv < 0)
             {
+                printf(" %d  DisConnect %d \n ", WSAGetLastError());
                 closesocket(client_sock);
-                printf(" %d  DisConnect\n ", GetLastError());
                 break;
             }
         }
-        
-        
     }
+    Sleep(INFINITE);
 
 }

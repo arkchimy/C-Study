@@ -11,7 +11,7 @@ CLargePage::CLargePage()
 
     if (!LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &luid))
     {
-        printf("LookupPrivilegeValue error: %u\n", GetLastError());
+        printf("LookupPrivilegeValue error: %u\n", WSAGetLastError());
 
         return;
     }
@@ -39,9 +39,9 @@ CLargePage::CLargePage()
 
 
     virtualMemoryBegin = (char *)VirtualAlloc(nullptr, sizeds , MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE);
-    if (GetLastError() != 0)
+    if (WSAGetLastError() != 0)
     {
-        printf("VirtualAlloc Error  %d \n", GetLastError());
+        printf("VirtualAlloc Error  %d \n", WSAGetLastError());
         Sleep(5000);
     }
     else

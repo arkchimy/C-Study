@@ -73,7 +73,7 @@ void SendPack(clsSession *session)
     int sendRetval, LastError;
     int Async_sendRetval, Async_LastError;
 
-    LastError = GetLastError();
+    LastError = WSAGetLastError();
     MyOVERLAPPED *overlapped;
     {
         WSABUF wsabuf;
@@ -83,14 +83,13 @@ void SendPack(clsSession *session)
         if (wsabuf.buf == nullptr)
             __debugbreak();
 
-        memset(wsabuf.buf, overlapped->_id, MAX_LEN_BUFFER);
         wsabuf.len = MAX_LEN_BUFFER;
 
         SetLastError(0);
         Async_sendRetval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, overlapped, nullptr);
-        LastError = GetLastError();
+        LastError = WSAGetLastError();
 
-        if (Async_sendRetval != 0)
+        if (Async_sendRetval == SOCKET_ERROR)
         {
 
             switch (LastError)
@@ -100,7 +99,7 @@ void SendPack(clsSession *session)
                 break;
 
             default:
-                printf("Error  SeqNumber %lld GetLastError :  %d \n", overlapped->_id, LastError);
+                printf("%lld Error  GetLastError : %d  \n", overlapped->_id, LastError);
                 //__debugbreak();
             }
         }
@@ -118,9 +117,9 @@ void SendPack(clsSession *session)
         SetLastError(0);
         sendRetval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, overlapped, nullptr);
 
-        LastError = GetLastError();
+        LastError = WSAGetLastError();
 
-        if (sendRetval != 0)
+        if (sendRetval == SOCKET_ERROR)
         {
 
             switch (LastError)
@@ -130,7 +129,7 @@ void SendPack(clsSession *session)
                 break;
 
             default:
-                printf("Error  SeqNumber %lld GetLastError : %d  \n", overlapped->_id, LastError);
+                printf("%lld Error  GetLastError : %d  \n", overlapped->_id, LastError);
                 //__debugbreak();
             }
         }
@@ -149,6 +148,8 @@ unsigned AcceptThread(void *arg)
         if (listenError != 0)
             printf("CreateAndStartListen Error\n");
     }
+
+    hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, 0);
 
     {
         SOCKADDR_IN clientAddr;
@@ -176,10 +177,6 @@ ull arridx = -1;
 
 unsigned WorkerThread(void *arg)
 {
-    int LastError;
-    int sendRetval;
-    size_t *arrArg = reinterpret_cast<size_t *>(arg);
-
     DWORD transferred;
     ull key;
     OVERLAPPED *overlapped;
@@ -221,40 +218,25 @@ unsigned WorkerThread(void *arg)
             printf("Not equle  seqNumber :%lld  >  overlappedID : %lld\n", seqNumber, myOverlapped->_id);
             __debugbreak();
         }
+        else if (seqNumber < myOverlapped->_id)
+        {
+            printf(" Did not receive IO completion message \/ send error \n");
+            seqNumber++;
+            goto retry; // 실패한 Overlapped ID 는 완료통지에 없음. 했다치고 seq 증가 와 Toggle 변경
+        }
 
         switch (myOverlapped->_mode)
         {
         case en_SendMode::BigMessage:
-            if (Toggle != 0)
-            {
-                printf(" Did not receive IO completion message \/ send error \n");
-                seqNumber++;
-                Toggle = 0;
-                goto retry; // 실패한 Overlapped ID 는 완료통지에 없음. 했다치고 seq 증가 와 Toggle 변경
-            }
             printf("en_SendMode::BigMessage \n");
-            Toggle = 1;
             break;
 
         case en_SendMode::SmallMessage:
-            if (Toggle != 1)
-            {
-                printf(" Did not receive IO completion message \/ send error \n");
-                seqNumber++;
-                Toggle = 1;
-                goto retry; // 실패한 Overlapped ID 는 완료통지에 없음.
-            }
             printf("en_SendMode::SmallMessage \n");
-            Toggle = 0;
             break;
 
         default:
             printf("Not Define en_SendModeType \n");
-            __debugbreak();
-        }
-        if (seqNumber != myOverlapped->_id)
-        {
-            printf(" seqNumber :%lld  !=  overlappedID : %lld\n", seqNumber, myOverlapped->_id);
             __debugbreak();
         }
 
@@ -307,7 +289,7 @@ int CreateAndStartListen()
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_sock == INVALID_SOCKET)
     {
-        printf("listen_sock Create Error  %d \n", GetLastError());
+        printf("listen_sock Create Error  %d \n", WSAGetLastError());
         return -1;
     }
 
@@ -327,15 +309,13 @@ int CreateAndStartListen()
     bind_retval = bind(listen_sock, (sockaddr *)&addr, sizeof(addr));
     if (bind_retval != 0)
     {
-        printf("bind Error  %d\n", GetLastError());
+        printf("bind Error  %d\n", WSAGetLastError());
         return -1;
     }
-
-    hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, 0);
     listen_retval = listen(listen_sock, SOMAXCONN_HINT(65535));
     if (listen_retval != 0)
     {
-        printf("listen Error  %d\n", GetLastError());
+        printf("listen Error  %d\n", WSAGetLastError());
         return -1;
     }
     printf("listen Success \n");
