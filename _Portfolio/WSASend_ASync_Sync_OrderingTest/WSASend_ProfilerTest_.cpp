@@ -287,7 +287,17 @@ unsigned WorkerThread(void *arg)
         if (g_iSendLoopCnt * 2 == seqNumber)
         {
             if (bBreakChk)
-                __debugbreak();
+            {
+                FILE *file;
+                _wfopen_s(&file, L"OrderingError.txt", L"a+,ccs=utf-16LE");
+                wchar_t lineBreak[] = L"\t ======================== \t\n";
+                if (file != nullptr)
+                {
+                    fwrite(lineBreak, 2, wcslen(lineBreak), file);
+                    fclose(file);
+                    __debugbreak();
+                }
+            }
 
             seqNumber = 0;
             MyOVERLAPPED::s_id = 0;
