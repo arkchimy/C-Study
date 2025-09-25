@@ -4,6 +4,8 @@
 
 #include <assert.h>
 #include <thread>
+#include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+#include <strsafe.h>
 
 #pragma comment(lib, "ws2_32")
 
@@ -16,9 +18,9 @@ HANDLE hIOCP;
 HANDLE hWSASend_Overapped; // WSASend를 100회 다 떄리면 SetEvent
 
 int bZeroCopy = false;
-
-int MAX_LEN_BUFFER = 1024 * 1024;
-#define LOOP_CNT 50                    // 반복 횟수
+int g_BigMessageLen = 1024 * 1024;
+int g_iSendLoopCnt = 50; //
+CDump dump;
 
 /*
 * 실험 목표 : ASync와 Sync의 순서가 맞는가?
@@ -45,6 +47,12 @@ enum class en_SendMode
     SmallMessage,
     MAX,
 };
+enum class en_IOType
+{
+    Pending,
+    Sync,
+    None,
+};
 struct MyOVERLAPPED : public OVERLAPPED
 {
     MyOVERLAPPED(en_SendMode mode) : _mode(mode)
@@ -53,6 +61,7 @@ struct MyOVERLAPPED : public OVERLAPPED
     }
 
     ll _id = 0;
+    en_IOType bIOType = en_IOType::None;
     inline static ll s_id = 0;
     en_SendMode _mode;
 };
@@ -63,6 +72,9 @@ struct clsSession
         : m_sock(sock)
     {
     }
+    char *BigMessageBuffer = (char*)malloc(g_BigMessageLen);
+    char SmallMessageBUFFER = 0xff;
+
     SOCKET m_sock;
 };
 
@@ -73,7 +85,7 @@ void SendPack(clsSession *session)
     int sendRetval, LastError;
     int Async_sendRetval, Async_LastError;
     SOCKET sock;
- 
+
 
     LastError = WSAGetLastError();
     MyOVERLAPPED *overlapped;
@@ -82,11 +94,10 @@ void SendPack(clsSession *session)
         overlapped = new MyOVERLAPPED(en_SendMode::BigMessage);
         if (overlapped == nullptr)
             __debugbreak();
-        big_msg_wsabuf.buf = (char *)malloc(MAX_LEN_BUFFER);
-        if (big_msg_wsabuf.buf == nullptr)
-            __debugbreak();
+        ZeroMemory(overlapped, sizeof(OVERLAPPED));
 
-        big_msg_wsabuf.len = MAX_LEN_BUFFER;
+        big_msg_wsabuf.buf = session->BigMessageBuffer;
+        big_msg_wsabuf.len = g_BigMessageLen;
 
         SetLastError(0);
         sock = session->m_sock; // 디버깅 용
@@ -99,16 +110,16 @@ void SendPack(clsSession *session)
             switch (LastError)
             {
             case WSA_IO_PENDING:
-                printf("%lld WSA_IO_PENDING  Socket_Handle %lld  \n", overlapped->_id, sock);
+                overlapped->bIOType = en_IOType::Pending;
                 break;
 
             default:
-                printf("%lld Error  BigMessage GetLastError : %d   Socket_Handle %lld \n", overlapped->_id, LastError, sock);
-                //__debugbreak();
+                //printf("%lld Error  BigMessage GetLastError : %d   \n", overlapped->_id, LastError);
+                __debugbreak();
             }
         }
         else
-            printf("%lld Sync Socket_Handle %lld \n", overlapped->_id, sock);
+            overlapped->bIOType = en_IOType::Sync;
     }
     {
         WSABUF small_msg_wsabuf;
@@ -117,11 +128,9 @@ void SendPack(clsSession *session)
 
         if (overlapped == nullptr)
             __debugbreak();
+        ZeroMemory(overlapped, sizeof(OVERLAPPED));
 
-        small_msg_wsabuf.buf = (char *)malloc(sizeof(BYTE));
-
-        if (small_msg_wsabuf.buf == nullptr)
-            __debugbreak();
+        small_msg_wsabuf.buf = &session->SmallMessageBUFFER;
         small_msg_wsabuf.len = sizeof(BYTE);
 
         SetLastError(0);
@@ -136,16 +145,15 @@ void SendPack(clsSession *session)
             switch (LastError)
             {
             case WSA_IO_PENDING:
-                printf("%lld WSA_IO_PENDING  Socket_Handle %lld  \n", overlapped->_id ,sock);
+                overlapped->bIOType = en_IOType::Pending;
                 break;
 
             default:
-                printf("%lld Error  SmallMessage GetLastError : %d   Socket_Handle %lld \n", overlapped->_id, LastError, sock);
-                //__debugbreak();
+                __debugbreak();
             }
         }
         else
-            printf("%lld Sync Socket_Handle %lld \n", overlapped->_id , sock);
+            overlapped->bIOType = en_IOType::Sync;
     }
 }
 
@@ -194,7 +202,7 @@ unsigned AcceptThread(void *arg)
             __debugbreak();
 
         }
-        for (ull i = 0; i < LOOP_CNT; i++)
+        for (ull i = 0; i < g_iSendLoopCnt; i++)
         {
             SendPack(session);
         }
@@ -216,7 +224,9 @@ unsigned WorkerThread(void *arg)
 
     ll Toggle = 0;    // BigMessage  와 SmallMessage의 번갈음을  표기
     ll seqNumber = 0; // 완료통지를 뺄때마다 1씩 증가. 
-
+    ull SucessCount = 0;
+    bool bBreakChk = false;
+    wchar_t LogPrintfBuffer[1000];
 
     WaitForSingleObject(hWSASend_Overapped, INFINITE);
     while (1)
@@ -242,44 +252,51 @@ unsigned WorkerThread(void *arg)
         if (overlapped == nullptr)
             __debugbreak();
 
-    retry:
-        printf("seqNumber  : %lld ", seqNumber);
-
-        // WSASend에 실패한다고 seqNumber가 id보다 커질순 없음. 순서가 지켜지지않음의 증명.
-        if (seqNumber > myOverlapped->_id)
+        // 
+        if (seqNumber != myOverlapped->_id)
         {
-            printf("Not equle  seqNumber :%lld  >  overlappedID : %lld\n", seqNumber, myOverlapped->_id);
-            __debugbreak();
-        }
-        else if (seqNumber < myOverlapped->_id)
-        {
-            printf(" Did not receive IO completion message \/ send error \n");
-            seqNumber++;
-            goto retry; // 실패한 Overlapped ID 는 완료통지에 없음. 했다치고 seq 증가 와 Toggle 변경
-        }
+            
+            //StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t), L"Not equle  seqNumber :%lld  !=  overlappedID : %lld  IOType %s \n", seqNumber, myOverlapped->_id, "IO_Pending");
+            switch (myOverlapped->bIOType)
+            {
+            case en_IOType::Pending:
+                StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t), L"Not equle  seqNumber :%lld"
+                    "  !=  overlappedID : %lld  IOType %s \n", seqNumber, myOverlapped->_id, L"IO_Pending");
+                break;
+            case en_IOType::Sync:
+                StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t), L"Not equle  seqNumber :%lld"
+                    "  !=  overlappedID : %lld  IOType %s \n", seqNumber, myOverlapped->_id, L"Sync");
+                break;
 
-        switch (myOverlapped->_mode)
-        {
-        case en_SendMode::BigMessage:
-            printf("en_SendMode::BigMessage \n");
-            break;
-
-        case en_SendMode::SmallMessage:
-            printf("en_SendMode::SmallMessage \n");
-            break;
-
-        default:
-            printf("Not Define en_SendModeType \n");
-            __debugbreak();
+            }
+            wprintf(L"%s", LogPrintfBuffer);
+            FILE *file;
+            _wfopen_s(&file, L"OrderingError.txt", L"a+,ccs=utf-16LE");
+            if (file != nullptr)
+            {
+                fwrite(LogPrintfBuffer, sizeof(wchar_t), wcslen(LogPrintfBuffer), file);
+                fclose(file);
+            }
+            if (bBreakChk == false)
+                bBreakChk = true;
         }
 
         seqNumber++;
+        delete myOverlapped;
 
-        if (LOOP_CNT * 2 == seqNumber)
+        if (g_iSendLoopCnt * 2 == seqNumber)
         {
-            printf("==================================== \n");
-            printf("모든 메세지를 처리 함.\n");
-            return 0;
+            if (bBreakChk)
+                __debugbreak();
+
+            seqNumber = 0;
+            MyOVERLAPPED::s_id = 0;
+            for (ull i = 0; i < g_iSendLoopCnt; i++)
+            {
+                SendPack(session);
+            }
+            printf("SucessCount  :  %lld \n", ++SucessCount);
+            continue;
         }
     }
     return 0;
@@ -291,19 +308,22 @@ int main()
     int a;
     printf("BigMessage의 크기 : \n 1. 100Byte \n 2. 1KB \n 3. 1MB  \n 4. 4MB\n");
     scanf_s("%d", &a);
+    printf("WSASend 번갈아가며 몇번씩 Send할지\n");
+    scanf_s("%d", &g_iSendLoopCnt);
+
     switch (a)
     {
     case 1:
-        MAX_LEN_BUFFER = 100;
+        g_BigMessageLen = 100;
         break;
     case 2:
-        MAX_LEN_BUFFER = 1024;
+        g_BigMessageLen = 1024;
         break;
     case 3:
-        MAX_LEN_BUFFER = 1024 * 1024;
+        g_BigMessageLen = 1024 * 1024;
         break;
     case 4:
-        MAX_LEN_BUFFER = 1024 * 1024 * 4;
+        g_BigMessageLen = 1024 * 1024 * 4;
         break;
     }
     
@@ -347,16 +367,18 @@ int CreateAndStartListen()
 
     setsockopt(listen_sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(LINGER));
 
+    int buflen;
     if (bZeroCopy)
     {
-        int buflen = 0;
+        buflen = 0;
         setsockopt(listen_sock, SOL_SOCKET, SO_SNDBUF, (const char *)&buflen, sizeof(buflen));
     }
     else
     {
-        int buflen = 1000;
+        buflen = 1600;
         setsockopt(listen_sock, SOL_SOCKET, SO_SNDBUF, (const char *)&buflen, sizeof(buflen));
     }
+    printf("SO_SNDBUF size  %d\n", buflen);
 
     bind_retval = bind(listen_sock, (sockaddr *)&addr, sizeof(addr));
     if (bind_retval != 0)

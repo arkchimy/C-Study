@@ -1,6 +1,8 @@
 ﻿#include <iostream>
 #include <WS2tcpip.h>
 #include <WinSock2.h>
+#include <strsafe.h>
+
 #pragma comment(lib, "ws2_32")
 
 
@@ -14,7 +16,17 @@ int main()
 
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8000);
-    InetPtonW(AF_INET, L"127.0.0.1", &addr.sin_addr);
+    
+    wchar_t Serveraddr[16];
+    ZeroMemory(Serveraddr, sizeof(wchar_t) * 16);
+
+    printf("Port  8000 고정  Server IP :");
+    int retval = wscanf_s(L"%s", Serveraddr, sizeof(Serveraddr) / sizeof(wchar_t));
+    if (retval == EOF)
+        __debugbreak();
+
+
+    InetPtonW(AF_INET, Serveraddr, &addr.sin_addr);
 
     {
         SOCKET client_sock;
