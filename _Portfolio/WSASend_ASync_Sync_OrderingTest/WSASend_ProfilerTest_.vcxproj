@@ -133,14 +133,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CLargePage.cpp" />
     <ClCompile Include="WSASend_ProfilerTest_.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Config.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="CLargePage.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

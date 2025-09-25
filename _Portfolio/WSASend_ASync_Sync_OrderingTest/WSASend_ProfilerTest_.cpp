@@ -17,7 +17,7 @@ HANDLE hWSASend_Overapped; // WSASend를 100회 다 떄리면 SetEvent
 
 int bZeroCopy = false;
 
-#define MAX_LEN_BUFFER 1024 * 1024 * 2 // BigMessage 의 크기
+int MAX_LEN_BUFFER = 1024 * 1024;
 #define LOOP_CNT 50                    // 반복 횟수
 
 /*
@@ -34,10 +34,10 @@ int bZeroCopy = false;
 *       SmallMessage  WSASend 
 *   
 *   모든 I/O요청을 한 후 Event객체를 이용하여 WorkerThread를 깨움.
-*   WorkerThread는 MyOVERLAPPED를 확인하여 Togle 변수를 이용하여 BigMessage 과 SmallMessage 이 번갈아 오는지 확인.
+*   WorkerThread는 MyOVERLAPPED의 id와  SeqNumber 의 역전 현상이 있는지 확인   *  SeqNumber 는  완료통지 Cnt임
 
   문제 상황 :
-    WSASend가 중간에  LastError 6을 반환한 경우가 발생 함. 
+    WSASend가 중간에  LastError 6을 반환한 경우가 발생 함.   * 이로인해 완료통지 Cnt 보다 id가 더 큰 현상이 나올 수 있음 
 */
 enum class en_SendMode
 {
@@ -72,21 +72,25 @@ void SendPack(clsSession *session)
 {
     int sendRetval, LastError;
     int Async_sendRetval, Async_LastError;
+    SOCKET sock;
+ 
 
     LastError = WSAGetLastError();
     MyOVERLAPPED *overlapped;
     {
-        WSABUF wsabuf;
+        WSABUF big_msg_wsabuf;
         overlapped = new MyOVERLAPPED(en_SendMode::BigMessage);
-
-        wsabuf.buf = (char *)malloc(MAX_LEN_BUFFER);
-        if (wsabuf.buf == nullptr)
+        if (overlapped == nullptr)
+            __debugbreak();
+        big_msg_wsabuf.buf = (char *)malloc(MAX_LEN_BUFFER);
+        if (big_msg_wsabuf.buf == nullptr)
             __debugbreak();
 
-        wsabuf.len = MAX_LEN_BUFFER;
+        big_msg_wsabuf.len = MAX_LEN_BUFFER;
 
         SetLastError(0);
-        Async_sendRetval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, overlapped, nullptr);
+        sock = session->m_sock; // 디버깅 용
+        Async_sendRetval = WSASend(sock, &big_msg_wsabuf, 1, nullptr, 0, overlapped, nullptr);
         LastError = WSAGetLastError();
 
         if (Async_sendRetval == SOCKET_ERROR)
@@ -95,27 +99,34 @@ void SendPack(clsSession *session)
             switch (LastError)
             {
             case WSA_IO_PENDING:
-                printf("%lld WSA_IO_PENDING \n", overlapped->_id);
+                printf("%lld WSA_IO_PENDING  Socket_Handle %lld  \n", overlapped->_id, sock);
                 break;
 
             default:
-                printf("%lld Error  GetLastError : %d  \n", overlapped->_id, LastError);
+                printf("%lld Error  BigMessage GetLastError : %d   Socket_Handle %lld \n", overlapped->_id, LastError, sock);
                 //__debugbreak();
             }
         }
         else
-            printf("%lld Sync \n", overlapped->_id);
+            printf("%lld Sync Socket_Handle %lld \n", overlapped->_id, sock);
     }
     {
-        WSABUF wsabuf;
+        WSABUF small_msg_wsabuf;
 
         overlapped = new MyOVERLAPPED(en_SendMode::SmallMessage);
 
-        wsabuf.buf = (char *)malloc(sizeof(BYTE));
-        wsabuf.len = sizeof(BYTE);
+        if (overlapped == nullptr)
+            __debugbreak();
+
+        small_msg_wsabuf.buf = (char *)malloc(sizeof(BYTE));
+
+        if (small_msg_wsabuf.buf == nullptr)
+            __debugbreak();
+        small_msg_wsabuf.len = sizeof(BYTE);
 
         SetLastError(0);
-        sendRetval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, overlapped, nullptr);
+        sock = session->m_sock; // 디버깅 용
+        sendRetval = WSASend(sock, &small_msg_wsabuf, 1, nullptr, 0, overlapped, nullptr);
 
         LastError = WSAGetLastError();
 
@@ -125,16 +136,16 @@ void SendPack(clsSession *session)
             switch (LastError)
             {
             case WSA_IO_PENDING:
-                printf("%lld WSA_IO_PENDING \n", overlapped->_id);
+                printf("%lld WSA_IO_PENDING  Socket_Handle %lld  \n", overlapped->_id ,sock);
                 break;
 
             default:
-                printf("%lld Error  GetLastError : %d  \n", overlapped->_id, LastError);
+                printf("%lld Error  SmallMessage GetLastError : %d   Socket_Handle %lld \n", overlapped->_id, LastError, sock);
                 //__debugbreak();
             }
         }
         else
-            printf("%lld Sync \n", overlapped->_id);
+            printf("%lld Sync Socket_Handle %lld \n", overlapped->_id , sock);
     }
 }
 
@@ -146,24 +157,43 @@ unsigned AcceptThread(void *arg)
     {
         listenError = CreateAndStartListen();
         if (listenError != 0)
+        {
             printf("CreateAndStartListen Error\n");
+            __debugbreak();
+        }
     }
 
     hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, 0);
+    if (hIOCP == nullptr)
+    {
+        printf("Create hIOCP Failed  GetLastError:  %d \n",GetLastError());
+        __debugbreak();
+    }
 
     {
         SOCKADDR_IN clientAddr;
         SOCKET client_sock;
+        void* CreateIoCompletionPort_retval;
 
         int len = sizeof(clientAddr);
 
         client_sock = accept(listen_sock, (sockaddr *)&clientAddr, &len);
         if (client_sock == INVALID_SOCKET)
             __debugbreak();
+
+        printf("Accept Success ");
+        system("pause");
+
         clsSession *session = new clsSession(client_sock);
+        if (session == nullptr)
+            __debugbreak();
+        CreateIoCompletionPort_retval = CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ULONG_PTR)session, 0);
+        if (CreateIoCompletionPort_retval == nullptr)
+        {
+            printf("IOCP_Connect Failed\n");
+            __debugbreak();
 
-        CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ULONG_PTR)session, 0);
-
+        }
         for (ull i = 0; i < LOOP_CNT; i++)
         {
             SendPack(session);
@@ -187,8 +217,8 @@ unsigned WorkerThread(void *arg)
     ll Toggle = 0;    // BigMessage  와 SmallMessage의 번갈음을  표기
     ll seqNumber = 0; // 완료통지를 뺄때마다 1씩 증가. 
 
-    WaitForSingleObject(hWSASend_Overapped, INFINITE);
 
+    WaitForSingleObject(hWSASend_Overapped, INFINITE);
     while (1)
     {
         // 지역변수 초기화
@@ -202,11 +232,14 @@ unsigned WorkerThread(void *arg)
 
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
 
+
         session = reinterpret_cast<clsSession *>(key);
 
         myOverlapped = reinterpret_cast<MyOVERLAPPED *>(overlapped);
 
         if (session == nullptr)
+            __debugbreak();
+        if (overlapped == nullptr)
             __debugbreak();
 
     retry:
@@ -255,7 +288,26 @@ unsigned WorkerThread(void *arg)
 int main()
 {
 
-    hWSASend_Overapped = (HANDLE)CreateEvent(nullptr, 0, false, nullptr);
+    int a;
+    printf("BigMessage의 크기 : \n 1. 100Byte \n 2. 1KB \n 3. 1MB  \n 4. 4MB\n");
+    scanf_s("%d", &a);
+    switch (a)
+    {
+    case 1:
+        MAX_LEN_BUFFER = 100;
+        break;
+    case 2:
+        MAX_LEN_BUFFER = 1024;
+        break;
+    case 3:
+        MAX_LEN_BUFFER = 1024 * 1024;
+        break;
+    case 4:
+        MAX_LEN_BUFFER = 1024 * 1024 * 4;
+        break;
+    }
+    
+    hWSASend_Overapped = (HANDLE)CreateEvent(nullptr,1, false, nullptr);
     assert(hWSASend_Overapped != 0);
 
     _beginthreadex(nullptr, 0, AcceptThread, nullptr, 0, nullptr);
@@ -285,7 +337,7 @@ int CreateAndStartListen()
     addr.sin_family = AF_INET;
     addr.sin_port = htons(8000);
 
-    InetPtonW(AF_INET, L"127.0.0.1", &addr.sin_addr);
+    InetPtonW(AF_INET, L"0.0.0.0", &addr.sin_addr);
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_sock == INVALID_SOCKET)
     {
