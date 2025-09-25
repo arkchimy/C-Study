@@ -133,6 +133,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="stDebugManager.cpp" />
     <ClCompile Include="WSASend_ProfilerTest_.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +143,9 @@
     <ProjectReference Include="..\..\_3Course\lib\CrushDump_lib\CrushDump_lib\CrushDump_lib.vcxproj">
       <Project>{b5035720-6cd1-4206-a4d5-c190fab6cdde}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stDebugManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

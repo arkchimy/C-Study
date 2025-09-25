@@ -2,15 +2,13 @@
 #include <WinSock2.h>
 #include <iostream>
 
-#include <assert.h>
-#include <thread>
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+#include "stDebugManager.h"
+#include <assert.h>
 #include <strsafe.h>
+#include <thread>
 
 #pragma comment(lib, "ws2_32")
-
-using ull = unsigned long long;
-using ll = long long;
 
 SOCKET listen_sock;
 
@@ -20,6 +18,8 @@ HANDLE hWSASend_Overapped; // WSASend를 100회 다 떄리면 SetEvent
 int bZeroCopy = false;
 int g_BigMessageLen = 1024 * 1024;
 int g_iSendLoopCnt = 50; //
+ll g_overlapped_id;
+
 CDump dump;
 
 /*
@@ -27,43 +27,29 @@ CDump dump;
 * 구조 :
 *      AcceptThread x 1 ,  WorkerThread x 1 , main
 * 설명 :
-*   
+*
 *   AcceptThread가  1개의 Session을 받으면  총 LOOP_CNT * 2 만큼 WSASend 한다.
 *   MyOVERLAPPED은  생성자마다 id 값을 갖는다.  // 완료통지Cnt (SeqNumber) 와 비교 변수.
-* 
+*
 *   for ( 0 < LOOP_CNT )
 *       BigMessage   WSASend 후    // 목적 : ASync 유도
-*       SmallMessage  WSASend 
-*   
+*       SmallMessage  WSASend
+*
 *   모든 I/O요청을 한 후 Event객체를 이용하여 WorkerThread를 깨움.
 *   WorkerThread는 MyOVERLAPPED의 id와  SeqNumber 의 역전 현상이 있는지 확인   *  SeqNumber 는  완료통지 Cnt임
 
   문제 상황 :
-    WSASend가 중간에  LastError 6을 반환한 경우가 발생 함.   * 이로인해 완료통지 Cnt 보다 id가 더 큰 현상이 나올 수 있음 
+    WSASend가 중간에  LastError 6을 반환한 경우가 발생 함.   * 이로인해 완료통지 Cnt 보다 id가 더 큰 현상이 나올 수 있음
 */
-enum class en_SendMode
-{
-    BigMessage,
-    SmallMessage,
-    MAX,
-};
-enum class en_IOType
-{
-    Pending,
-    Sync,
-    None,
-};
+
 struct MyOVERLAPPED : public OVERLAPPED
 {
-    MyOVERLAPPED(en_SendMode mode) : _mode(mode)
+    MyOVERLAPPED(en_MessageType mode) : _mode(mode)
     {
-        _id = s_id++;
+        _id = g_overlapped_id++;
     }
-
     ll _id = 0;
-    en_IOType bIOType = en_IOType::None;
-    inline static ll s_id = 0;
-    en_SendMode _mode;
+    en_MessageType _mode = en_MessageType::None;
 };
 
 struct clsSession
@@ -72,7 +58,7 @@ struct clsSession
         : m_sock(sock)
     {
     }
-    char *BigMessageBuffer = (char*)malloc(g_BigMessageLen);
+    char *BigMessageBuffer = (char *)malloc(g_BigMessageLen);
     char SmallMessageBUFFER = 0xff;
 
     SOCKET m_sock;
@@ -80,82 +66,8 @@ struct clsSession
 
 int CreateAndStartListen();
 
-void SendPack(clsSession *session)
-{
-    int sendRetval, LastError;
-    int Async_sendRetval, Async_LastError;
-    SOCKET sock;
-
-
-    LastError = WSAGetLastError();
-    MyOVERLAPPED *overlapped;
-    {
-        WSABUF big_msg_wsabuf;
-        overlapped = new MyOVERLAPPED(en_SendMode::BigMessage);
-        if (overlapped == nullptr)
-            __debugbreak();
-        ZeroMemory(overlapped, sizeof(OVERLAPPED));
-
-        big_msg_wsabuf.buf = session->BigMessageBuffer;
-        big_msg_wsabuf.len = g_BigMessageLen;
-
-        SetLastError(0);
-        sock = session->m_sock; // 디버깅 용
-        Async_sendRetval = WSASend(sock, &big_msg_wsabuf, 1, nullptr, 0, overlapped, nullptr);
-        LastError = WSAGetLastError();
-
-        if (Async_sendRetval == SOCKET_ERROR)
-        {
-
-            switch (LastError)
-            {
-            case WSA_IO_PENDING:
-                overlapped->bIOType = en_IOType::Pending;
-                break;
-
-            default:
-                //printf("%lld Error  BigMessage GetLastError : %d   \n", overlapped->_id, LastError);
-                __debugbreak();
-            }
-        }
-        else
-            overlapped->bIOType = en_IOType::Sync;
-    }
-    {
-        WSABUF small_msg_wsabuf;
-
-        overlapped = new MyOVERLAPPED(en_SendMode::SmallMessage);
-
-        if (overlapped == nullptr)
-            __debugbreak();
-        ZeroMemory(overlapped, sizeof(OVERLAPPED));
-
-        small_msg_wsabuf.buf = &session->SmallMessageBUFFER;
-        small_msg_wsabuf.len = sizeof(BYTE);
-
-        SetLastError(0);
-        sock = session->m_sock; // 디버깅 용
-        sendRetval = WSASend(sock, &small_msg_wsabuf, 1, nullptr, 0, overlapped, nullptr);
-
-        LastError = WSAGetLastError();
-
-        if (sendRetval == SOCKET_ERROR)
-        {
-
-            switch (LastError)
-            {
-            case WSA_IO_PENDING:
-                overlapped->bIOType = en_IOType::Pending;
-                break;
-
-            default:
-                __debugbreak();
-            }
-        }
-        else
-            overlapped->bIOType = en_IOType::Sync;
-    }
-}
+void SendPack(clsSession *session);
+unsigned WorkerThread(void *arg);
 
 unsigned AcceptThread(void *arg)
 {
@@ -174,14 +86,14 @@ unsigned AcceptThread(void *arg)
     hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, 0);
     if (hIOCP == nullptr)
     {
-        printf("Create hIOCP Failed  GetLastError:  %d \n",GetLastError());
+        printf("Create hIOCP Failed  GetLastError:  %d \n", GetLastError());
         __debugbreak();
     }
 
     {
         SOCKADDR_IN clientAddr;
         SOCKET client_sock;
-        void* CreateIoCompletionPort_retval;
+        void *CreateIoCompletionPort_retval;
 
         int len = sizeof(clientAddr);
 
@@ -200,14 +112,9 @@ unsigned AcceptThread(void *arg)
         {
             printf("IOCP_Connect Failed\n");
             __debugbreak();
-
         }
-        for (ull i = 0; i < g_iSendLoopCnt; i++)
-        {
-            SendPack(session);
-        }
+        _beginthreadex(nullptr, 0, WorkerThread, session, 0, nullptr);
     }
-    SetEvent(hWSASend_Overapped);
 
     return 0; // 한명만 받고 return 함.  closesocket 은 없음
 }
@@ -223,12 +130,17 @@ unsigned WorkerThread(void *arg)
     clsSession *session;
 
     ll Toggle = 0;    // BigMessage  와 SmallMessage의 번갈음을  표기
-    ll seqNumber = 0; // 완료통지를 뺄때마다 1씩 증가. 
+    ll seqNumber = 0; // 완료통지를 뺄때마다 1씩 증가.
     ull SucessCount = 0;
     bool bBreakChk = false;
-    wchar_t LogPrintfBuffer[1000];
 
-    WaitForSingleObject(hWSASend_Overapped, INFINITE);
+    session = reinterpret_cast<clsSession *>(arg);
+
+    for (ull i = 0; i < g_iSendLoopCnt; i++)
+    {
+        SendPack(session);
+    }
+
     while (1)
     {
         // 지역변수 초기화
@@ -238,49 +150,23 @@ unsigned WorkerThread(void *arg)
             overlapped = nullptr;
             session = nullptr;
         }
-        SetLastError(0);
 
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
 
-
         session = reinterpret_cast<clsSession *>(key);
-
         myOverlapped = reinterpret_cast<MyOVERLAPPED *>(overlapped);
 
         if (session == nullptr)
             __debugbreak();
         if (overlapped == nullptr)
             __debugbreak();
-
-        // 
         if (seqNumber != myOverlapped->_id)
         {
-            
-            //StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t), L"Not equle  seqNumber :%lld  !=  overlappedID : %lld  IOType %s \n", seqNumber, myOverlapped->_id, "IO_Pending");
-            switch (myOverlapped->bIOType)
-            {
-            case en_IOType::Pending:
-                StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t), L"Not equle  seqNumber :%lld"
-                    "  !=  overlappedID : %lld  IOType %s \n", seqNumber, myOverlapped->_id, L"IO_Pending");
-                break;
-            case en_IOType::Sync:
-                StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t), L"Not equle  seqNumber :%lld"
-                    "  !=  overlappedID : %lld  IOType %s \n", seqNumber, myOverlapped->_id, L"Sync");
-                break;
-
-            }
-            wprintf(L"%s", LogPrintfBuffer);
-            FILE *file;
-            _wfopen_s(&file, L"OrderingError.txt", L"a+,ccs=utf-16LE");
-            if (file != nullptr)
-            {
-                fwrite(LogPrintfBuffer, sizeof(wchar_t), wcslen(LogPrintfBuffer), file);
-                fclose(file);
-            }
-            if (bBreakChk == false)
-                bBreakChk = true;
+            bBreakChk = true;
         }
 
+        stDebugManager::GetInstance().CompletionPush(myOverlapped->_mode, myOverlapped->_id);
+        
         seqNumber++;
         delete myOverlapped;
 
@@ -288,19 +174,12 @@ unsigned WorkerThread(void *arg)
         {
             if (bBreakChk)
             {
-                FILE *file;
-                _wfopen_s(&file, L"OrderingError.txt", L"a+,ccs=utf-16LE");
-                wchar_t lineBreak[] = L"\t ======================== \t\n";
-                if (file != nullptr)
-                {
-                    fwrite(lineBreak, 2, wcslen(lineBreak), file);
-                    fclose(file);
-                    __debugbreak();
-                }
+                stDebugManager::GetInstance().CreateLogFile();
+                __debugbreak(); // Dump 남기기.
             }
-
+ 
+            stDebugManager::GetInstance().ReSet();
             seqNumber = 0;
-            MyOVERLAPPED::s_id = 0;
             for (ull i = 0; i < g_iSendLoopCnt; i++)
             {
                 SendPack(session);
@@ -336,12 +215,11 @@ int main()
         g_BigMessageLen = 1024 * 1024 * 4;
         break;
     }
-    
-    hWSASend_Overapped = (HANDLE)CreateEvent(nullptr,1, false, nullptr);
+
+    hWSASend_Overapped = (HANDLE)CreateEvent(nullptr, 1, false, nullptr);
     assert(hWSASend_Overapped != 0);
 
     _beginthreadex(nullptr, 0, AcceptThread, nullptr, 0, nullptr);
-    _beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
 
     Sleep(INFINITE);
 }
@@ -405,4 +283,75 @@ int CreateAndStartListen()
     printf("listen Success \n");
     printf("==================================== \n");
     return 0;
+}
+
+void SendPack(clsSession *session)
+{
+    int sendRetval, LastError;
+    int Async_sendRetval, Async_LastError;
+    SOCKET sock;
+
+    LastError = WSAGetLastError();
+    MyOVERLAPPED *overlapped;
+    {
+        WSABUF big_msg_wsabuf;
+        overlapped = new MyOVERLAPPED(en_MessageType::BigMessage);
+        if (overlapped == nullptr)
+            __debugbreak();
+        ZeroMemory(overlapped, sizeof(OVERLAPPED));
+
+        big_msg_wsabuf.buf = session->BigMessageBuffer;
+        big_msg_wsabuf.len = g_BigMessageLen;
+
+        sock = session->m_sock; // 디버깅 용
+        Async_sendRetval = WSASend(sock, &big_msg_wsabuf, 1, nullptr, 0, overlapped, nullptr);
+        LastError = WSAGetLastError();
+
+        if (Async_sendRetval == SOCKET_ERROR)
+        {
+            switch (LastError)
+            {
+            case WSA_IO_PENDING:
+                stDebugManager::GetInstance().ReQuestPush(en_IOType::Pending_ReQuest, overlapped->_id);
+                break;
+
+            default:
+                __debugbreak();
+            }
+        }
+        else
+            stDebugManager::GetInstance().ReQuestPush(en_IOType::Sync_ReQuest, overlapped->_id);
+    }
+    {
+        WSABUF small_msg_wsabuf;
+
+        overlapped = new MyOVERLAPPED(en_MessageType::SmallMessage);
+
+        if (overlapped == nullptr)
+            __debugbreak();
+        ZeroMemory(overlapped, sizeof(OVERLAPPED));
+
+        small_msg_wsabuf.buf = &session->SmallMessageBUFFER;
+        small_msg_wsabuf.len = sizeof(BYTE);
+
+        sock = session->m_sock; // 디버깅 용
+        sendRetval = WSASend(sock, &small_msg_wsabuf, 1, nullptr, 0, overlapped, nullptr);
+
+        LastError = WSAGetLastError();
+
+        if (sendRetval == SOCKET_ERROR)
+        {
+            switch (LastError)
+            {
+            case WSA_IO_PENDING:
+                stDebugManager::GetInstance().ReQuestPush(en_IOType::Pending_ReQuest, overlapped->_id);
+                break;
+
+            default:
+                __debugbreak();
+            }
+        }
+        else
+            stDebugManager::GetInstance().ReQuestPush(en_IOType::Sync_ReQuest, overlapped->_id);
+    }
 }
