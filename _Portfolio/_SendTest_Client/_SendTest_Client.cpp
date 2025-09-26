@@ -15,12 +15,12 @@ int main()
     int retRecv;
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(8000);
+    addr.sin_port = htons(21350);
     
     wchar_t Serveraddr[16];
     ZeroMemory(Serveraddr, sizeof(wchar_t) * 16);
 
-    printf("Port  8000 고정  Server IP :");
+    printf("Port  21350 고정  Server IP :");
     int retval = wscanf_s(L"%s", Serveraddr, sizeof(Serveraddr) / sizeof(wchar_t));
     if (retval == EOF)
         __debugbreak();

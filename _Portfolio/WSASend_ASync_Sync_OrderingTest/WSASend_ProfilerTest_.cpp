@@ -243,7 +243,7 @@ int CreateAndStartListen()
     linger.l_linger = 0;
 
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(8000);
+    addr.sin_port = htons(21350);
 
     InetPtonW(AF_INET, L"0.0.0.0", &addr.sin_addr);
     listen_sock = socket(AF_INET, SOCK_STREAM, 0);
