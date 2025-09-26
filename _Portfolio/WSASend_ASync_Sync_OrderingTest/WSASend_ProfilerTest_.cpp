@@ -8,6 +8,7 @@
 #include <strsafe.h>
 #include <thread>
 
+
 #pragma comment(lib, "ws2_32")
 
 SOCKET listen_sock;
@@ -129,6 +130,7 @@ unsigned WorkerThread(void *arg)
 
     clsSession *session;
 
+
     ll Toggle = 0;    // BigMessage  와 SmallMessage의 번갈음을  표기
     ll seqNumber = 0; // 완료통지를 뺄때마다 1씩 증가.
     ull SucessCount = 0;
@@ -140,6 +142,7 @@ unsigned WorkerThread(void *arg)
     {
         SendPack(session);
     }
+
 
     while (1)
     {
@@ -174,10 +177,11 @@ unsigned WorkerThread(void *arg)
         {
             if (bBreakChk)
             {
-                stDebugManager::GetInstance().CreateLogFile();
+                stDebugManager::GetInstance().CreateLogFile(bBreakChk);
                 __debugbreak(); // Dump 남기기.
             }
-
+            stDebugManager::GetInstance().CreateLogFile(bBreakChk);
+            
             stDebugManager::GetInstance().ReSet();
             seqNumber = 0;
             for (ull i = 0; i < g_iSendLoopCnt; i++)

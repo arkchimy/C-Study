@@ -44,7 +44,7 @@ class stDebugManager
     void CompletionPush(const en_MessageType & messageType,const ll overlappedID);
 
     void ReSet();
-    void CreateLogFile();
+    void CreateLogFile(bool bError);
 
     ll m_ReQuestSeqNumber = 0;
     ll m_CompleteSeqNumber = 0;

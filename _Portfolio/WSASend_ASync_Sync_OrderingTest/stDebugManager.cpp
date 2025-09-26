@@ -35,17 +35,39 @@ const wchar_t Lineboard[] = L"|---------------------------+---------------------
 const wchar_t format[] =    L"| ReQuest SeqNumber : %5lld | ioType : %20s | ReQuest SeqNumber : %5lld  \|  Completion SeqNumber : %5lld  \| <=  |   %15s  \|\n";
 const wchar_t format2[] =   L"| ReQuest SeqNumber : %5lld | ioType : %20s | ReQuest SeqNumber : %5lld  \|  Completion SeqNumber : %5lld  \|     |  %15s  \|\n";
 
-void stDebugManager::CreateLogFile()
+void stDebugManager::CreateLogFile(bool bError)
 {
     // StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t), L"Not equle  seqNumber :%lld  !=  overlappedID : %lld  IOType %s \n", seqNumber, myOverlapped->_id, "IO_Pending");
     wchar_t LogPrintfBuffer[1500] = {
         0,
     };
+    SYSTEMTIME stNowTime;
+    WCHAR error_filename[MAX_PATH];
+    WCHAR normal_filename[MAX_PATH];
+    WCHAR *fileName;
     FILE *file;
-    _wfopen_s(&file, L"OrderingError.txt", L"w,ccs=utf-16LE");
+
+    GetLocalTime(&stNowTime);
+
+    wsprintf(error_filename, L"error_filename_%d%02d%02d_%02d.%02d.%02d_.txt",
+             stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wYear);
+    wsprintf(normal_filename, L"normal_filename_%d%02d%02d_%02d.%02d.%02d_.txt",
+             stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wYear);
+
+    if (bError)
+    {
+        _wfopen_s(&file, error_filename, L"a+,ccs=utf-16LE");
+    }
+    else
+    {
+        _wfopen_s(&file, normal_filename, L"w,ccs=utf-16LE");
+    }
+    
+    
     wchar_t bigMessageType[] = L"BigMessage";
     wchar_t smallMessageType[] = L"SmallMessage";
     wchar_t *MessageType = nullptr;
+
     if (file != nullptr)
     {
         fwrite(board, sizeof(wchar_t), wcslen(board), file);
