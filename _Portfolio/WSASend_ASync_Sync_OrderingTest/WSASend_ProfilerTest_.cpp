@@ -177,7 +177,7 @@ unsigned WorkerThread(void *arg)
                 stDebugManager::GetInstance().CreateLogFile();
                 __debugbreak(); // Dump 남기기.
             }
- 
+
             stDebugManager::GetInstance().ReSet();
             seqNumber = 0;
             for (ull i = 0; i < g_iSendLoopCnt; i++)

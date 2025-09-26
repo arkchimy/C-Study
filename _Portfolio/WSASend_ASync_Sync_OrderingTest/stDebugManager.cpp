@@ -30,10 +30,10 @@ void stDebugManager::ReSet()
     g_overlapped_id = 0;
 }
 //                        ReQuest SeqNumber : 0      ioType : ASync     |   ReQuest SeqNumber : 1   Completion SeqNumber : 0
-const wchar_t board[] =     L"|           요청 순서        |           동기 or 비동기        |        OVERLAPPED_ID       |        완료 통지 순서            |  순서 틀림  | \n";
-const wchar_t Lineboard[] = L"|----------------------------+---------------------------------+----------------------------+----------------------------------+-------------+\n";
-const wchar_t format[] =    L"| ReQuest SeqNumber : %5lld | ioType : %20s | ReQuest SeqNumber : %5lld  \|  Completion SeqNumber : %5lld  \| <= \n";
-const wchar_t format2[] =   L"| ReQuest SeqNumber : %5lld | ioType : %20s | ReQuest SeqNumber : %5lld  \|  Completion SeqNumber : %5lld  \|  \n";
+const wchar_t board[] =     L"|           요청 순서        |           동기 or 비동기        |        OVERLAPPED_ID       |        완료 통지 순서            | 틀림 |     메세지 종류    |  \n";
+const wchar_t Lineboard[] = L"|---------------------------+-------------------------------+----------------------------+--------------------------------+-----+-------------------+\n";
+const wchar_t format[] =    L"| ReQuest SeqNumber : %5lld | ioType : %20s | ReQuest SeqNumber : %5lld  \|  Completion SeqNumber : %5lld  \| <=  |   %15s  \|\n";
+const wchar_t format2[] =   L"| ReQuest SeqNumber : %5lld | ioType : %20s | ReQuest SeqNumber : %5lld  \|  Completion SeqNumber : %5lld  \|     |  %15s  \|\n";
 
 void stDebugManager::CreateLogFile()
 {
@@ -43,6 +43,9 @@ void stDebugManager::CreateLogFile()
     };
     FILE *file;
     _wfopen_s(&file, L"OrderingError.txt", L"w,ccs=utf-16LE");
+    wchar_t bigMessageType[] = L"BigMessage";
+    wchar_t smallMessageType[] = L"SmallMessage";
+    wchar_t *MessageType = nullptr;
     if (file != nullptr)
     {
         fwrite(board, sizeof(wchar_t), wcslen(board), file);
@@ -50,33 +53,40 @@ void stDebugManager::CreateLogFile()
 
         for (int i = 0; i < g_iSendLoopCnt * 2; i++)
         {
-            ZeroMemory(LogPrintfBuffer, sizeof(wchar_t) * 1000);
+            ZeroMemory(LogPrintfBuffer, sizeof(LogPrintfBuffer));
+
+            if (m_pCompleteInfos[i]._mode == en_MessageType::BigMessage)
+                MessageType = bigMessageType;
+            else
+                MessageType = smallMessageType;
 
             switch (m_pReQuestInfos[i].IOType)
             {
+
             case en_IOType::Pending_ReQuest:
                 if (m_pCompleteInfos[i].RequestSeqNumber != m_pCompleteInfos[i].seqNumber)
                     StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t),
                                      format,
                                      m_pReQuestInfos[i].seqNumber, L"Pending_ReQuest",
-                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber);
+                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber, MessageType);
                 else
                     StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t),
                                      format2,
                                      m_pReQuestInfos[i].seqNumber, L"Pending_ReQuest",
-                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber);
+                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber, MessageType);
                 break;
+
             case en_IOType::Sync_ReQuest:
                 if (m_pCompleteInfos[i].RequestSeqNumber != m_pCompleteInfos[i].seqNumber)
                     StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t),
                                      format,
                                      m_pReQuestInfos[i].seqNumber, L"Sync_ReQuest",
-                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber);
+                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber, MessageType);
                 else
                     StringCchPrintfW(LogPrintfBuffer, sizeof(LogPrintfBuffer) / sizeof(wchar_t),
                                      format2,
                                      m_pReQuestInfos[i].seqNumber, L"Sync_ReQuest",
-                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber);
+                                     m_pCompleteInfos[i].RequestSeqNumber, m_pCompleteInfos[i].seqNumber, MessageType);
                 break;
             }
 
