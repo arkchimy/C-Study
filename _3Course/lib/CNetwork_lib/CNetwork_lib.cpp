@@ -9,23 +9,6 @@
 #include <list>
 #include <thread>
 
-st_WSAData::st_WSAData()
-{
-    WSAData wsa;
-    DWORD wsaStartRetval;
-
-    wsaStartRetval = WSAStartup(MAKEWORD(2, 2), &wsa);
-    if (wsaStartRetval != 0)
-    {
-        ERROR_FILE_LOG(L"WSAData_Error.txt", L"WSAStartup retval is not Zero ");
-        __debugbreak();
-    }
-}
-
-st_WSAData::~st_WSAData()
-{
-    WSACleanup();
-}
 
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
@@ -131,7 +114,6 @@ unsigned AcceptThread(void *arg)
         }
 
         {
-            stSRWLock srw = stSRWLock(&server->srw_session_idleList);
 
             if (server->m_idleIdx.empty() == true)
             {
@@ -176,10 +158,10 @@ unsigned WorkerThread(void *arg)
     CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[1]);
 
     static LONG64 s_arrTPS_idx = 0;
-    LONG64 *arrTPS_idx = reinterpret_cast<LONG64 *>(TlsGetValue(server->m_TPS_tlsidx));
+    LONG64 *arrTPS_idx = reinterpret_cast<LONG64 *>(TlsGetValue(server->m_tlsIdxForTPS));
     if (arrTPS_idx == nullptr)
     {
-        TlsSetValue(server->m_TPS_tlsidx, (void *)_interlockedincrement64(&s_arrTPS_idx));
+        TlsSetValue(server->m_tlsIdxForTPS, (void *)_interlockedincrement64(&s_arrTPS_idx));
     }
 
     DWORD transferred;
@@ -188,11 +170,11 @@ unsigned WorkerThread(void *arg)
     clsSession *session;
 
     ull local_ioCount;
-
-    thread_local int a = 0;
     Profiler profile;
 
-    while (1)
+    bool toggle = FALSE; // GQCS를 획득하고 해제하는 시간을 체크하기위한 방식.
+
+    while (server->bOn)
     {
         // 지역변수 초기화
         {
@@ -201,11 +183,13 @@ unsigned WorkerThread(void *arg)
             overlapped = nullptr;
             session = nullptr;
         }
-        if (a != 0)
-            profile.End(L"GetQueuedCompletionStatus");
+        if (toggle != TRUE)
+            toggle = TRUE;
         else
-            a++;
+            profile.End(L"GetQueuedCompletionStatus");
+
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
+        
         profile.Start(L"GetQueuedCompletionStatus");
         if (overlapped == nullptr)
         {
@@ -240,21 +224,40 @@ unsigned WorkerThread(void *arg)
                 ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
         }
     }
+    printf("WorkerThreadID : %d  return '0' \n", GetCurrentThreadId());
 
     return 0;
 }
-BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions, int ZeroByteTest)
+CLanServer::CLanServer()
 {
-    m_TPS_tlsidx = TlsAlloc();
-    if (m_TPS_tlsidx == TLS_OUT_OF_INDEXES)
-        __debugbreak();
+    m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (m_listen_sock == INVALID_SOCKET)
+    {
 
+        ERROR_FILE_LOG(L"Socket_Error.txt",
+                       L"listen_sock Create Socket Error");
+        __debugbreak();
+    }
+
+}
+CLanServer::~CLanServer()
+{
+    closesocket(m_listen_sock);
+}
+
+
+BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
+{
     linger linger;
     int buflen;
     DWORD lProcessCnt;
     DWORD bind_retval;
 
     SOCKADDR_IN serverAddr;
+
+    m_tlsIdxForTPS = TlsAlloc();
+    if (m_tlsIdxForTPS == TLS_OUT_OF_INDEXES)
+        __debugbreak();
 
     sessions_vec.resize(MaxSessions);
 
@@ -263,7 +266,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     linger.l_onoff = 1;
     linger.l_linger = 0;
-    m_ZeroByteTest = ZeroByteTest;
 
     ZeroMemory(&serverAddr, sizeof(serverAddr));
 
@@ -271,7 +273,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     serverAddr.sin_port = htons(port);
     InetPtonW(AF_INET, bindAddress, &serverAddr.sin_addr);
 
-    m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
 
     if (ZeroCopy)
     {
@@ -289,13 +290,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     if (bind_retval != 0)
         ERROR_FILE_LOG(L"Socket_Error.txt", L"Bind Failed");
 
-    if (m_listen_sock == INVALID_SOCKET)
-    {
-
-        ERROR_FILE_LOG(L"Socket_Error.txt",
-                       L"listen_sock Create Socket Error");
-        return false;
-    }
 
     if (GetLogicalProcess(lProcessCnt) == false)
         ERROR_FILE_LOG(L"GetLogicalProcessError.txt", L"GetLogicalProcess_Error");
@@ -304,17 +298,20 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     m_hThread = new HANDLE[WorkerCreateCnt];
     arrTPS = new LONG64[WorkerCreateCnt + 1];
-    ZeroMemory(arrTPS, sizeof(LONG64) * WorkerCreateCnt + 1);
+    ZeroMemory(arrTPS, sizeof(LONG64) * (WorkerCreateCnt + 1));
+
     m_WorkThreadCnt = WorkerCreateCnt;
-    Sleep(1000);
 
-    WorkerArg[0] = m_hIOCP;
-    WorkerArg[1] = this;
+    {
+        WorkerArg[0] = m_hIOCP;
+        WorkerArg[1] = this;
 
-    AcceptArg[0] = m_hIOCP;
-    AcceptArg[1] = (HANDLE)m_listen_sock;
-    AcceptArg[2] = this;
-    // TODO : 넘겨줄 매개변수를  지역변수로 ???  다른 방안 생각하기
+        AcceptArg[0] = m_hIOCP;
+        AcceptArg[1] = (HANDLE)m_listen_sock;
+        AcceptArg[2] = this;
+    }
+
+    bOn = true;
 
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
     for (int i = 0; i < WorkerCreateCnt; i++)
@@ -486,7 +483,7 @@ void CLanServer::SendPacket(clsSession *const session)
 
     useSize = session->m_sendBuffer.GetUseSize();
 
-    TPSidx = (LONG64)TlsGetValue(m_TPS_tlsidx);
+    TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
 
     if (useSize == 0)
     {
@@ -646,8 +643,4 @@ int CLanServer::getRecvMessageTPS()
 int CLanServer::getSendMessageTPS()
 {
     return 0;
-}
-CLanServer::~CLanServer()
-{
-    closesocket(m_listen_sock);
 }

@@ -7,6 +7,29 @@
 
 CDump cump;
 
+
+class st_WSAData
+{
+  public:
+    st_WSAData()
+    {
+        WSAData wsa;
+        DWORD wsaStartRetval;
+
+        wsaStartRetval = WSAStartup(MAKEWORD(2, 2), &wsa);
+        if (wsaStartRetval != 0)
+        {
+            ERROR_FILE_LOG(L"WSAData_Error.txt", L"WSAStartup retval is not Zero ");
+            __debugbreak();
+        }
+    }
+    ~st_WSAData()
+    {
+        WSACleanup();
+    }
+};
+
+
 int main()
 {
     CDump::SetHandlerDump();
@@ -36,7 +59,7 @@ int main()
 
         parser.GetValue(L"LingerOn", linger.l_onoff);
         parser.GetValue(L"ZeroCopy", iZeroCopy);
-        parser.GetValue(L"ZeroByteTest", ZeroByteTest);
+
         parser.GetValue(L"WorkerThreadCnt", WorkerThreadCnt);
         parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
         parser.GetValue(L"NoDelay", NoDelay);
@@ -52,7 +75,7 @@ int main()
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         CTestServer EchoServer;
-        EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions, ZeroByteTest);
+        EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
 
         while (1)
         {

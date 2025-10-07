@@ -68,8 +68,8 @@ unsigned MonitorThread(void *arg)
 
     arrTPS = new LONG64[server->m_WorkThreadCnt + 1];
     before_arrTPS = new LONG64[server->m_WorkThreadCnt + 1];
-    ZeroMemory(arrTPS, sizeof(LONG64) * server->m_WorkThreadCnt + 1);
-    ZeroMemory(before_arrTPS, sizeof(LONG64) * server->m_WorkThreadCnt + 1);
+    ZeroMemory(arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
+    ZeroMemory(before_arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
 
     while (1)
     {
@@ -102,7 +102,6 @@ CTestServer::CTestServer()
 
 {
     InitializeSRWLock(&srw_ContentQ);
-    InitializeSRWLock(&srw_session_idleList);
 
     m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
@@ -113,11 +112,11 @@ CTestServer::~CTestServer()
 {
 }
 
-BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions, int ZeroByteTest)
+BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
 {
     BOOL retval;
 
-    retval  = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions, ZeroByteTest);
+    retval  = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
     hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
 
@@ -179,7 +178,6 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)
 
     header._len = 8;
 
-
     currentID.SeqNumberAndIdx = SessionID;
     session = &sessions_vec[currentID.idx];
     
@@ -227,9 +225,11 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     }
     
     // TODO : disconnect에 대비해서 풀을 만들어야함.
-    // TODO : cs_sessionMap Lock 제거
+    // 
+
     {
-        stSRWLock srw(&srw_session_idleList);
+        // TODO : LockFreeStack 
+        //stSRWLock srw(&srw_session_idleList);
         CMessage **ppMsg;
         ppMsg = &message;
 
