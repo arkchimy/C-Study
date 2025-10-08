@@ -136,7 +136,7 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
     if (msg == nullptr)
     {
         SetEvent(m_ContentsEvent);
-        return double(ContentsUseSize) / double(m_ContentsQ.s_BufferSize) * 100.f;
+        return double(ContentsUseSize) / double(CTestServer::s_ContentsQsize) * 100.f;
         
     }
 
@@ -144,11 +144,6 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
         Profiler profile;
 
         profile.Start(L"ContentsQ_Enqueue");
-
-        //while (_InterlockedCompareExchange64(&visited, 1, 0) != 0)
-        //{
-        //    YieldProcessor();
-        //}
 
         // 포인터를 넣고
         CMessage **ppMsg;
@@ -165,7 +160,7 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
         SetEvent(m_ContentsEvent);
     }
 
-    return double(ContentsUseSize) / double(m_ContentsQ.s_BufferSize) * 100.f;
+    return double(ContentsUseSize) / double(CTestServer::s_ContentsQsize) * 100.f;
     
 }
 
@@ -188,24 +183,6 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)
     return true;
 }
 
-void CTestServer::RecvPostMessage(clsSession *session)
-{
-    BOOL EnQSucess;
-
-    {
-        ZeroMemory(&session->m_RecvpostOverlapped, sizeof(OVERLAPPED));
-    }
-
-    InterlockedIncrement((unsigned long long *)&session->m_ioCount);
-    InterlockedIncrement((unsigned long long *)&session->m_RcvPostCnt);
-
-    EnQSucess = PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_RecvpostOverlapped);
-    if (EnQSucess == false)
-    {
-        InterlockedDecrement(&session->m_ioCount);
-        ERROR_FILE_LOG(L"IOCP_ERROR.txt", L"PostQueuedCompletionStatus Failde");
-    }
-}
 
 void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
 {
@@ -241,14 +218,11 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
             return;
         }
     }
-    Profiler profile;
-    
+
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
     {
-        profile.Start(L"Contetns_SendPacket");
+        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
         PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
-        //SendPacket(session);
-        profile.End(L"Contetns_SendPacket");
     }
 
 }

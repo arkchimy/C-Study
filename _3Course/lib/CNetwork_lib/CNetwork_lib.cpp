@@ -138,7 +138,7 @@ unsigned AcceptThread(void *arg)
         InterlockedExchange(&session->m_sock, client_sock);
         InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
 
-        server->OnAccept(session->m_SeqID.SeqNumberAndIdx, addr);
+        //server->OnAccept(session->m_SeqID.SeqNumberAndIdx, addr);
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
 
@@ -159,6 +159,7 @@ unsigned WorkerThread(void *arg)
 
     static LONG64 s_arrTPS_idx = 0;
     LONG64 *arrTPS_idx = reinterpret_cast<LONG64 *>(TlsGetValue(server->m_tlsIdxForTPS));
+    // arrTPS 의 index 값을 셋팅함.
     if (arrTPS_idx == nullptr)
     {
         TlsSetValue(server->m_tlsIdxForTPS, (void *)_interlockedincrement64(&s_arrTPS_idx));
@@ -205,11 +206,6 @@ unsigned WorkerThread(void *arg)
             break;
         case Job_Type::Send:
             server->SendComplete(session, transferred);
-            break;
-
-        case Job_Type::PostRecv:
-            InterlockedDecrement((unsigned long long *)&session->m_RcvPostCnt);
-            server->RecvPostComplete(session, transferred);
             break;
 
         case Job_Type::MAX:
@@ -326,7 +322,7 @@ void CLanServer::Stop()
 
 int CLanServer::GetSessionCount()
 {
-
+    // AcceptThread에서 전담한다면, interlock이 필요없다.
     return 0;
 }
 
@@ -351,7 +347,8 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     qPersentage = OnRecv((ull)(session->m_SeqID.SeqNumberAndIdx), nullptr);
     if (qPersentage >= 75.f)
     {
-        RecvPostMessage(session);
+        //RecvPostMessage(session);
+        ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
         return;
     }
     // Header의 크기만큼을 확인.
@@ -360,6 +357,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         useSize = session->m_recvBuffer.GetUseSize(f, r);
         if (useSize < header._len + sizeof(stHeader))
         {
+            ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
             break;
         }
         // 메세지 생성
@@ -373,16 +371,17 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         f = session->m_recvBuffer._frontPtr;
         if (qPersentage >= 75.0)
         {
-            RecvPostMessage(session);
+            //RecvPostMessage(session);
+            ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
             return;
         }
     }
-    useSize = session->m_recvBuffer.GetUseSize();
-    if (useSize >= 10)
-    {
-        RecvPostMessage(session);
-        return;
-    }
+    //useSize = session->m_recvBuffer.GetUseSize();
+    //if (useSize >= 10)
+    //{
+    //    //RecvPostMessage(session);
+    //    return;
+    //}
 
     RecvPacket(session);
 }
@@ -421,51 +420,7 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
     session->m_SendMsg.clear();
     SendPacket(session);
 }
-void CLanServer::RecvPostComplete(class clsSession *const session, DWORD transferred)
-{
 
-    stHeader header;
-    ringBufferSize useSize;
-    double qPersentage;
-
-    char *f, *r;
-    f = session->m_recvBuffer._frontPtr;
-    r = session->m_recvBuffer._rearPtr;
-
-    // ContentsQ의 상황이 어떤지를 체크.
-    qPersentage = OnRecv((ull)(session->m_SeqID.SeqNumberAndIdx), nullptr);
-    if (qPersentage >= 75.f)
-    {
-        RecvPostMessage(session);
-        return;
-    }
-    // 
-    // Header의 크기만큼을 확인.
-    while (session->m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
-    {
-        useSize = session->m_recvBuffer.GetUseSize(f, r);
-        if (useSize < header._len + sizeof(stHeader))
-        {
-            break;
-        }
-        // 메세지 생성
-        CMessage *msg = CreateCMessage(session, header);
-        qPersentage = OnRecv(session->m_SeqID.SeqNumberAndIdx, msg);
-        f = session->m_recvBuffer._frontPtr;
-        if (qPersentage >= 75.f)
-        {
-            RecvPostMessage(session);
-            return;
-        }
-    }
-    useSize = session->m_recvBuffer.GetUseSize();
-    if (useSize >= 10)
-    {
-        RecvPostMessage(session);
-        return;
-    }
-    RecvPacket(session);
-}
 
 void CLanServer::SendPacket(clsSession *const session)
 {
@@ -485,15 +440,9 @@ void CLanServer::SendPacket(clsSession *const session)
 
     TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
 
-    if (useSize == 0)
+    if (useSize < 8)
     {
-        _InterlockedCompareExchange(&session->m_flag, 0, 1);
-        useSize = session->m_sendBuffer.GetUseSize();
-        if (useSize == 0)
-        {
-            return;
-        }
-        if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 1)
+        if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
             return;
     }
 
@@ -502,12 +451,13 @@ void CLanServer::SendPacket(clsSession *const session)
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
     }
     directDQSize = session->m_sendBuffer.DirectDequeueSize();
+
     ull msgAddr;
     CMessage *msg;
 
     bufCnt = 0;
 
-    while (useSize >= 8)
+    while (useSize != 0)
     {
         {
             deQSize = session->m_sendBuffer.Peek(&msgAddr, sizeof(size_t));
@@ -527,14 +477,8 @@ void CLanServer::SendPacket(clsSession *const session)
         bufCnt++;
         useSize -= 8;
     }
-    if (bufCnt == 0)
-    {
-        //// flag를 끄고 Recv를 받은 후에 완료통지를 왔다면
-        _InterlockedCompareExchange(&session->m_flag, 0, 1);
-        return;
-    }
-    _InterlockedIncrement(&session->m_ioCount);
 
+    _InterlockedIncrement(&session->m_ioCount);
     arrTPS[TPSidx] += bufCnt;
 
     if (bZeroCopy)
@@ -553,7 +497,6 @@ void CLanServer::SendPacket(clsSession *const session)
     }
     if (send_retval < 0)
     {
-        
         if (LastError != WSA_IO_PENDING)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");
@@ -614,9 +557,15 @@ void CLanServer::RecvPacket(clsSession *const session)
         {
         case WSA_IO_PENDING:
             StringCchPrintfW(buffer, 30, L"Socket %lld WSARecv WSA_IO_PENDING", session->m_sock);
-
             break;
+
+            // WSAENOTSOCK
+        case 10038:
+            StringCchPrintfW(buffer, 30, L"HANDLE value : %lld is not socket", session->m_sock);
+            break;
+            // WSAECONNABORTED
         case 10054:
+            // WSAECONNRESET
         case 10053:
             break;
 

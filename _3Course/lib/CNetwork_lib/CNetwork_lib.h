@@ -36,28 +36,25 @@ class CLanServer
   public:
     CLanServer();
     ~CLanServer();
+
     // 오픈 IP / 포트 / 제로카피 여부 /워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
     void Stop();
 
     bool Disconnect(class clsSession *const session);
 
-    void RecvComplete(class clsSession *const session, DWORD transferred);
     CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
 
+    void RecvComplete(class clsSession *const session, DWORD transferred);
     void SendComplete(class clsSession *const session, DWORD transferred);
-    void RecvPostComplete(class clsSession *const session, DWORD transferred);
 
     void SendPacket(class clsSession *const session);
     void RecvPacket(class clsSession *const session);
 
-
     virtual bool OnAccept(ull SessionID, SOCKADDR_IN addr) = 0;
     virtual double OnRecv(ull SessionID, CMessage *msg) = 0;
-    virtual void RecvPostMessage(clsSession *session) = 0;
 
     int GetSessionCount();
-
 
     int getAcceptTPS();
     int getRecvMessageTPS();
@@ -76,12 +73,12 @@ class CLanServer
     std::vector<class clsSession> sessions_vec;
 
     // TODO : LockFree Stack으로 대체하기
-        std::list<ull> m_idleIdx;
-        //SRWLOCK srw_session_idleList;
+    std::list<ull> m_idleIdx;
+    // SRWLOCK srw_session_idleList;
 
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
     DWORD m_tlsIdxForTPS;
-    LONG64 *arrTPS;          //  idx 0 : Contents , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
+    LONG64 *arrTPS; //  idx 0 : Contents , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
 
     HANDLE WorkerArg[2]; // WorkerThread __beginthreadex 매개변수
     HANDLE AcceptArg[3]; // AcceptThread __beginthreadex 매개변수

@@ -14,9 +14,6 @@ enum class Job_Type
 {
     Recv,
     Send,
-    PostRecv,
-    PostSend,
-
     MAX,
 };
 struct stOverlapped : public OVERLAPPED
@@ -56,7 +53,6 @@ class clsSession
 
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
     stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
-    stOverlapped m_RecvpostOverlapped = stOverlapped(Job_Type::PostRecv);
 
     CRingBuffer m_sendBuffer; // Echo에서는 미 사용
     CRingBuffer m_recvBuffer; 
