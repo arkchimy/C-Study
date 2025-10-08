@@ -135,9 +135,6 @@ unsigned AcceptThread(void *arg)
         session->m_SeqID.SeqNumberAndIdx = stsessionID.SeqNumberAndIdx;
         session->m_sock = client_sock;
 
-        InterlockedExchange(&session->m_sock, client_sock);
-        InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
-
         //server->OnAccept(session->m_SeqID.SeqNumberAndIdx, addr);
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
@@ -216,6 +213,7 @@ unsigned WorkerThread(void *arg)
 
         if (local_ioCount == 0)
         {
+            __debugbreak();
             if (InterlockedCompareExchange(&session->m_blive, false, true) == false)
                 ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
         }
@@ -440,11 +438,19 @@ void CLanServer::SendPacket(clsSession *const session)
 
     TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
 
-    if (useSize < 8)
+    if (useSize == 0)
     {
         if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
-            return;
+        {
+            useSize = session->m_sendBuffer.GetUseSize();
+            if (useSize == 0)
+                return;
+            if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 1)
+                return;
+        }
     }
+    // 다시한번 useSize를 체크.
+    useSize = session->m_sendBuffer.GetUseSize();
 
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));

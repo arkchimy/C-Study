@@ -222,6 +222,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
     {
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+        InterlockedIncrement(&session->m_ioCount);
         PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
     }
 
