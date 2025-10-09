@@ -164,22 +164,65 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
     
 }
 
-bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN addr)
+bool CTestServer::OnAccept(ull SessionID)
 {
+    static char LoginPacket[10] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
+
     stHeader header;
     clsSession *session;
     stSessionId currentID;
-    char buffer[] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
-
-    header._len = 8;
+    WSABUF wsabuf;
+    int send_retval;
+    DWORD LastError;
 
     currentID.SeqNumberAndIdx = SessionID;
     session = &sessions_vec[currentID.idx];
     
     if (currentID != session->m_SeqID)
+    {
+        ERROR_FILE_LOG(L"Critical_Error.txt", L"currentID != session->m_SeqID");
         return false;
+    }
 
-    send(session->m_sock, buffer, 10, 0);
+    
+    //send_retval = send(session->m_sock, LoginPacket, sizeof(LoginPacket), 0);
+    //if (send_retval <= 0)
+    //{
+    //    return false;
+    //}
+    CMessage *msg = CreateLoginMessage();
+    wsabuf.buf = LoginPacket;
+    wsabuf.len = sizeof(LoginPacket);
+
+    _InterlockedExchange(&session->m_flag,1);
+    _InterlockedIncrement(&session->m_ioCount);
+    {
+        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+    }
+
+    send_retval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+    LastError = GetLastError();
+
+    if (send_retval < 0)
+    {
+        if (LastError != WSA_IO_PENDING)
+        {
+            ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");
+            _InterlockedDecrement(&session->m_ioCount);
+        }
+    }
+    
+    /*CMessage **ppMsg;
+    ppMsg  = &msg;
+
+    session->m_sendBuffer.ClearBuffer();
+    if (session->m_sendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
+    {
+        session->m_blive = false;
+        ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer.Enqueue another");
+        __debugbreak();
+        return false;
+    }*/
     return true;
 }
 
@@ -209,6 +252,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
         //stSRWLock srw(&srw_session_idleList);
         CMessage **ppMsg;
         ppMsg = &message;
+ 
 
         if (session->m_sendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
         {

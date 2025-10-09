@@ -135,9 +135,10 @@ unsigned AcceptThread(void *arg)
         session->m_SeqID.SeqNumberAndIdx = stsessionID.SeqNumberAndIdx;
         session->m_sock = client_sock;
 
-        //server->OnAccept(session->m_SeqID.SeqNumberAndIdx, addr);
-
+        
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
+
+        server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
 
         server->RecvPacket(session);
     }
@@ -347,7 +348,6 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     {
         //RecvPostMessage(session);
         ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
-        return;
     }
     // Header의 크기만큼을 확인.
     while (session->m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
@@ -371,7 +371,6 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         {
             //RecvPostMessage(session);
             ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
-            return;
         }
     }
     //useSize = session->m_recvBuffer.GetUseSize();
@@ -397,6 +396,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
 
     switch (type)
     {
+        
     default:
     {
         deQsize = session->m_recvBuffer.Dequeue(msg->_begin, sizeof(header) + header._len);
@@ -406,9 +406,16 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     }
     return msg;
 }
+CMessage *CLanServer::CreateLoginMessage()
+{
+    static char LoginPacket[10] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
+    CMessage *msg = reinterpret_cast<CMessage *>(CObjectPoolManager::pool.Alloc());
+    msg->PutData(LoginPacket, sizeof(LoginPacket));
+
+    return msg;
+}
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
-    // session->m_sendBuffer.MoveFront(transferred);
     size_t m_SendMsgSize = session->m_SendMsg.size();
 
     for (CMessage *msg : session->m_SendMsg)
@@ -440,17 +447,23 @@ void CLanServer::SendPacket(clsSession *const session)
 
     if (useSize == 0)
     {
+        // flag 끄기
         if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
         {
             useSize = session->m_sendBuffer.GetUseSize();
             if (useSize == 0)
                 return;
-            if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 1)
-                return;
+            // 누군가 진입 했다면 return
+
+            if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
+            {
+                ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+                InterlockedIncrement(&session->m_ioCount);
+                PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+            }
+            return;
         }
     }
-    // 다시한번 useSize를 체크.
-    useSize = session->m_sendBuffer.GetUseSize();
 
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
@@ -467,6 +480,7 @@ void CLanServer::SendPacket(clsSession *const session)
     {
         {
             deQSize = session->m_sendBuffer.Peek(&msgAddr, sizeof(size_t));
+            // 디버깅용
             msg = reinterpret_cast<CMessage *>(msgAddr);
             wsaBuf[bufCnt].buf = msg->_frontPtr;
             wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;

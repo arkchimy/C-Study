@@ -44,6 +44,7 @@ class CLanServer
     bool Disconnect(class clsSession *const session);
 
     CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
+    CMessage *CreateLoginMessage();
 
     void RecvComplete(class clsSession *const session, DWORD transferred);
     void SendComplete(class clsSession *const session, DWORD transferred);
@@ -51,7 +52,7 @@ class CLanServer
     void SendPacket(class clsSession *const session);
     void RecvPacket(class clsSession *const session);
 
-    virtual bool OnAccept(ull SessionID, SOCKADDR_IN addr) = 0;
+    virtual bool OnAccept(ull SessionID) = 0;
     virtual double OnRecv(ull SessionID, CMessage *msg) = 0;
 
     int GetSessionCount();
