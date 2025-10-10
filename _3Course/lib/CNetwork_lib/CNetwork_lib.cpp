@@ -451,18 +451,20 @@ void CLanServer::SendPacket(clsSession *const session)
         if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
         {
             useSize = session->m_sendBuffer.GetUseSize();
-            if (useSize == 0)
-                return;
-            // 누군가 진입 했다면 return
-
-            if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
+            if (useSize != 0)
             {
-                ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-                InterlockedIncrement(&session->m_ioCount);
-                PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+                // 누군가 진입 했다면 return
+                if (_InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
+                {
+                    ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+                    InterlockedIncrement(&session->m_ioCount);
+                    PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+                }
             }
             return;
         }
+        else
+            __debugbreak();
     }
 
     {

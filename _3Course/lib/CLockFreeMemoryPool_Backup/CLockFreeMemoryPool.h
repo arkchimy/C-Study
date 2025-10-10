@@ -41,7 +41,7 @@ struct stNode
     {
         next = nullptr;
     }
-    T data;
+    T data = 0;
     stNode *next;
     DWORD ownerThreadID;
 };
@@ -61,7 +61,7 @@ class CObjectPool
     {
         // TODO : 반환되지않은 메모리가 할당 해제되지 못함.
         stNode<T> *StartNode = reinterpret_cast<stNode<T>*>(m_Top);
-        long top_idx = iNodeCnt;
+        LONG64 top_idx = iNodeCnt;
         stNode<T> *pCurrentNode = StartNode ;
 
         while (pCurrentNode != &m_Dummy)
@@ -83,7 +83,7 @@ class CObjectPool
         stNode<T> *ret_Node;
 
         DWORD iThreadID;
-        ll currentSeqNumber;
+        //ll currentSeqNumber;
 
         iThreadID = GetCurrentThreadId();
 
