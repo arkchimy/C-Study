@@ -111,6 +111,9 @@ int main()
         WaitForMultipleObjects(iWorkerThreadCnt, hThread, true, INFINITE);
         ResetEvent(hStartEvent);
 
+        for (int i = 0; i < iWorkerThreadCnt; i++)
+            CloseHandle(hThread[i]);
+
         retval = CompareTest(stack);
         if (retval == false)
             __debugbreak();
