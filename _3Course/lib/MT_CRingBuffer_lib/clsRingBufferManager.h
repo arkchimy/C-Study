@@ -9,6 +9,7 @@ class clsRingBufferManager
     char *Alloc(int iSize);
 
     char *_buffer = nullptr;
+    char *virtualMemoryEnd = nullptr;
 
   public:
     static clsRingBufferManager *GetInstance();

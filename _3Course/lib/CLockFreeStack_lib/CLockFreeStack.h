@@ -52,7 +52,7 @@ class CLockFreeStack
 
         m_pool.Release(reinterpret_cast<stNode *>((LONG64)dummy & ADDR_MASK));
     }
-    void push(T data)
+    void Push(T data)
     {
         stNode *oldTop;
         stNode *newNode = reinterpret_cast<stNode *>(m_pool.Alloc());
@@ -90,7 +90,7 @@ class CLockFreeStack
             infos[local_seqNumber % INFO_BUFFER_MAX].newTop_nextNode = reinterpret_cast<stNode *>(temp);
         }
     }
-    T pop()
+    T Pop()
     {
         stNode *newTop;
         stNode *oldTop;

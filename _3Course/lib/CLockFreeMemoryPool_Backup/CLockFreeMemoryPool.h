@@ -34,6 +34,7 @@ struct stNode
     stNode()
         : stNode(0)
     {
+        ZeroMemory(&data, sizeof(T));
     }
 
     stNode(DWORD threadID)
@@ -41,7 +42,7 @@ struct stNode
     {
         next = nullptr;
     }
-    T data = 0;
+    T data = T();
     stNode *next;
     DWORD ownerThreadID;
 };

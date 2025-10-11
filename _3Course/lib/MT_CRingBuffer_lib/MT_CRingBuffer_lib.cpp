@@ -1,8 +1,9 @@
 ﻿#include "MT_CRingBuffer_lib.h"
 #include "clsRingBufferManager.h"
+#include "../../../error_log.h"
 
 CRingBuffer::CRingBuffer()
-    : CRingBuffer(4096) {}
+    : CRingBuffer(s_BufferSize) {}
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
@@ -37,8 +38,8 @@ ringBufferSize CRingBuffer::GetUseSize()
 
 ringBufferSize CRingBuffer::GetUseSize(const char *f, const char *r)
 {
-    return f <= r ? r - f
-                  : _end - f + r - _begin;
+    return f <= r ? ringBufferSize(r - f)
+                  : ringBufferSize(_end - f + r - _begin);
 }
 
 ringBufferSize CRingBuffer::GetFreeSize()
@@ -49,9 +50,9 @@ ringBufferSize CRingBuffer::GetFreeSize()
 ringBufferSize CRingBuffer::GetFreeSize(const char *f, const char *r)
 {
     if (f == _begin && f <= r)
-        return _end - r - 1;
-    return f <= r ? (_end - r) + (f - _begin) - 1
-                  : f - r - 1;
+        return ringBufferSize(_end - r - 1);
+    return f <= r ? ringBufferSize((_end - r) + (f - _begin) - 1)
+                  : ringBufferSize(f - r - 1);
 }
 
 ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
@@ -72,7 +73,9 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
     if (freeSize < local_size)
     {
         // TODO : 링버퍼가 가득차버림의 경우
+        HEX_FILE_LOG(L"RingbufferFulled_Error.txt", _begin, s_BufferSize);
         __debugbreak();
+        
         return false;
     }
 
@@ -163,11 +166,11 @@ ringBufferSize CRingBuffer::DirectEnqueueSize(const char *f, const char *r)
 {
     if (f <= r && f == _begin)
     {
-        return _end - r - 1;
+        return ringBufferSize(_end - r - 1);
     }
 
-    return f <= r ? _end - r
-                  : f - r - 1;
+    return f <= r ? ringBufferSize(_end - r)
+                  : ringBufferSize(f - r - 1);
 }
 
 ringBufferSize CRingBuffer::DirectDequeueSize()
@@ -178,8 +181,8 @@ ringBufferSize CRingBuffer::DirectDequeueSize()
 ringBufferSize CRingBuffer::DirectDequeueSize(const char *f, const char *r)
 {
     if (f > r && r == _begin)
-        return _end - f - 1;
-    return f <= r ? r - f : _end - f;
+        return ringBufferSize(_end - f - 1);
+    return f <= r ? ringBufferSize(r - f) : ringBufferSize(_end - f);
 }
 
 void CRingBuffer::MoveRear(ringBufferSize iSize)

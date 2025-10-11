@@ -2,7 +2,7 @@
 #include <iostream>
 #include <strsafe.h>
 
-#define ERROR_BUFFER_SIZE 100
+#define ERROR_BUFFER_SIZE 1000
 // str은 const wchar_t* 문자열 상수 일 것!
 #if 0
 void ERROR_FILE_LOG(const wchar_t *LogFilename, const wchar_t *str);

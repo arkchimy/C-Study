@@ -58,7 +58,7 @@ CMessage::CMessage()
 CMessage::~CMessage()
 {
     HANDLE current_Heap;
-    BOOL bHeapDeleteRetval;
+    //BOOL bHeapDeleteRetval;
     volatile LONG64 useCnt;
 
     current_Heap = s_BufferHeap; // s_Buffer가 덮어쓸수 있기때문에 지역으로 복사.
@@ -108,7 +108,7 @@ BOOL CMessage::ReSize()
     SerializeBufferSize UseSize;
     char *swap_begin;
 
-    UseSize = _rearPtr - _frontPtr;
+    UseSize = SerializeBufferSize(_rearPtr - _frontPtr);
 
     _size = en_BufferSize::MaxSize;
     swap_begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
@@ -146,7 +146,7 @@ CObjectPoolManager::CObjectPoolManager()
         Parser parser;
         parser.LoadFile(L"Config.txt");
 
-        parser.GetValue(L"LagePageTest", g_mode);
+        //parser.GetValue(L"LagePageTest", g_mode);
         parser.GetValue(L"g_PageCnt", g_PageCnt);
         parser.GetValue(L"g_PageCnt", g_PageCnt);
     }
@@ -166,16 +166,16 @@ CObjectPoolManager::CObjectPoolManager()
     tp.Privileges[0].Luid = luid;
     tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
     OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken);
-    if (!AdjustTokenPrivileges(
-            hToken,                   // TokenHandle
-            FALSE,                    // DisableAllPrivileges: FALSE면 지정 권한만 변경
-            &tp,                      // NewState: 활성화할 권한 정보
-            sizeof(TOKEN_PRIVILEGES), // BufferLength
-            NULL,                     // PreviousState: 이전 상태 필요 없으면 NULL
-            NULL                      // ReturnLength: 필요 없으면 NULL
-            ))
-        ;
-    // AdjustTokenPrivileges(GetCurrentProcess(), FALSE, SE_PRIVILEGE_ENABLED,)
+
+    AdjustTokenPrivileges(
+        hToken,                   // TokenHandle
+        FALSE,                    // DisableAllPrivileges: FALSE면 지정 권한만 변경
+        &tp,                      // NewState: 활성화할 권한 정보
+        sizeof(TOKEN_PRIVILEGES), // BufferLength
+        NULL,                     // PreviousState: 이전 상태 필요 없으면 NULL
+        NULL                      // ReturnLength: 필요 없으면 NULL
+    );
+
     LUID PrivilegeRequired;
     BOOL bRes = FALSE;
 
@@ -201,7 +201,7 @@ CObjectPoolManager::CObjectPoolManager()
     {
         virtualMemoryBegin = (char *)VirtualAlloc(nullptr, sizeds * g_PageCnt, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
         if (virtualMemoryBegin != nullptr)
-            printf("VirtualAlloc Success  \n");
+            printf("MemoryPool VirtualAlloc Success  \n");
     }
     InterlockedExchange((ull *)&CObjectPoolManager::_buffer, (ull)virtualMemoryBegin);
 }

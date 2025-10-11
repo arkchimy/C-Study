@@ -105,6 +105,7 @@ CTestServer::CTestServer()
 
     m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
+
 }
 
 
@@ -126,7 +127,7 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 
 double CTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
-    double CurrentQ;
+    //double CurrentQ;
     static ll visited = 0;
     ringBufferSize ContentsUseSize;
 
@@ -166,19 +167,22 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
 
 bool CTestServer::OnAccept(ull SessionID)
 {
-    static char LoginPacket[10] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
 
-    stHeader header;
+
+    static  char *LoginPacket = CreateLoginMessage();
+    
+    
+    //stHeader header;
     clsSession *session;
-    stSessionId currentID;
+    stSessionId currentSessionID;
     WSABUF wsabuf;
     int send_retval;
     DWORD LastError;
 
-    currentID.SeqNumberAndIdx = SessionID;
-    session = &sessions_vec[currentID.idx];
+    currentSessionID.SeqNumberAndIdx = SessionID;
+    session = &sessions_vec[currentSessionID.idx];
     
-    if (currentID != session->m_SeqID)
+    if (currentSessionID != session->m_SeqID)
     {
         ERROR_FILE_LOG(L"Critical_Error.txt", L"currentID != session->m_SeqID");
         return false;
@@ -190,15 +194,20 @@ bool CTestServer::OnAccept(ull SessionID)
     //{
     //    return false;
     //}
-    CMessage *msg = CreateLoginMessage();
+
     wsabuf.buf = LoginPacket;
-    wsabuf.len = sizeof(LoginPacket);
+    wsabuf.len = 10;
 
     _InterlockedExchange(&session->m_flag,1);
-    _InterlockedIncrement(&session->m_ioCount);
-    {
-        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-    }
+
+    ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
+
+    wchar_t buffer[1000];
+    StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p  , sessionIdx : %lld  ,sock : %d , OnAcceptSend  ioCount %lld ", session, currentSessionID.idx,  session->m_sock, local_IoCount);
+    ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+
+    ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+    
 
     send_retval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
     LastError = GetLastError();
@@ -208,11 +217,13 @@ bool CTestServer::OnAccept(ull SessionID)
         if (LastError != WSA_IO_PENDING)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");
-            _InterlockedDecrement(&session->m_ioCount);
+            InterlockedDecrement(&session->m_ioCount);
         }
     }
     
-    /*CMessage **ppMsg;
+    /*
+    *     CMessage *msg = CreateLoginMessage();
+    CMessage **ppMsg;
     ppMsg  = &msg;
 
     session->m_sendBuffer.ClearBuffer();
@@ -266,7 +277,8 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
     {
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-        InterlockedIncrement(&session->m_ioCount);
+        ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
+
         PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
     }
 

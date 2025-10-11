@@ -57,12 +57,12 @@ class clsSession
     CRingBuffer m_sendBuffer; // Echo에서는 미 사용
     CRingBuffer m_recvBuffer; 
 
-    WSABUF m_lastRecvWSABuf[2];
+    WSABUF m_lastRecvWSABuf[2]{0};
 
 
     std::list<struct CMessage *> m_SendMsg;
 
-    stSessionId m_SeqID;
+    stSessionId m_SeqID{0};
     ull m_ioCount = 0;
     ull m_RcvPostCnt = 0;
     ull m_blive = 0;

@@ -11,6 +11,8 @@
 #include <vector>
 
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
+#include "../CLockFreeStack_lib/CLockFreeStack.h"
+
 #include "clsSession.h"
 #include "stHeader.h"
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
@@ -44,7 +46,8 @@ class CLanServer
     bool Disconnect(class clsSession *const session);
 
     CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
-    CMessage *CreateLoginMessage();
+    //CMessage *CreateLoginMessage();
+    char *CreateLoginMessage();
 
     void RecvComplete(class clsSession *const session, DWORD transferred);
     void SendComplete(class clsSession *const session, DWORD transferred);
@@ -72,15 +75,12 @@ class CLanServer
     bool bOn = false;
 
     std::vector<class clsSession> sessions_vec;
-
-    // TODO : LockFree Stack으로 대체하기
-    std::list<ull> m_idleIdx;
-    // SRWLOCK srw_session_idleList;
+    CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로 
 
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
-    DWORD m_tlsIdxForTPS;
-    LONG64 *arrTPS; //  idx 0 : Contents , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
+    DWORD m_tlsIdxForTPS = 0;
+    LONG64 *arrTPS = nullptr; //  idx 0 : Contents , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
 
-    HANDLE WorkerArg[2]; // WorkerThread __beginthreadex 매개변수
-    HANDLE AcceptArg[3]; // AcceptThread __beginthreadex 매개변수
+    HANDLE WorkerArg[2]{0}; // WorkerThread __beginthreadex 매개변수
+    HANDLE AcceptArg[3]{0};  // AcceptThread __beginthreadex 매개변수
 };

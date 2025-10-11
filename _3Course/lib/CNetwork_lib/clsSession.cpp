@@ -16,4 +16,7 @@ clsSession::~clsSession()
 void clsSession::Release()
 {
     m_blive = 0;
+    m_sendBuffer.ClearBuffer();
+    m_recvBuffer.ClearBuffer();
+
 }

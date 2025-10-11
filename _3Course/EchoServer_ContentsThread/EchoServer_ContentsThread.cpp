@@ -44,7 +44,7 @@ int main()
     int reduceThreadCount;
     int NoDelay;
     int maxSessions;
-    int ZeroByteTest;
+
     LINGER linger;
     int iRingBufferSize;
     int ContentsRingBufferSize;

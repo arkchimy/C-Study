@@ -9,7 +9,6 @@
 #include <list>
 #include <thread>
 
-
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
     ADDRINFOW *pAddrInfo;
@@ -90,7 +89,7 @@ unsigned AcceptThread(void *arg)
 
     int addrlen;
     stSessionId stsessionID;
-    wchar_t buffer[100];
+    // wchar_t buffer[100];
 
     addrlen = sizeof(addr);
     server = reinterpret_cast<CLanServer *>(arrArg[2]);
@@ -115,17 +114,15 @@ unsigned AcceptThread(void *arg)
 
         {
 
-            if (server->m_idleIdx.empty() == true)
+            if (server->m_IdxStack.m_size == 0)
             {
-                // 비어있는 세션이 없을 경우.. 대기열을 만들어야할 듯
-                // 일단은 연결을 끊고 계속 Accept  받는 방식으로 하자.
                 closesocket(client_sock);
+                // 추가적으로 구현해야되는 부분이 존재함.
+                //  DisConnect 행위
                 __debugbreak();
                 continue;
             }
-
-            idx = server->m_idleIdx.front();
-            server->m_idleIdx.pop_front();
+            idx = server->m_IdxStack.Pop();
         }
 
         stsessionID.idx = idx;
@@ -134,13 +131,33 @@ unsigned AcceptThread(void *arg)
         session = &server->sessions_vec[idx];
         session->m_SeqID.SeqNumberAndIdx = stsessionID.SeqNumberAndIdx;
         session->m_sock = client_sock;
+        session->m_blive = true;
 
-        
+
+        {
+            wchar_t buffer[1000];
+            StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p Accept sock : %llu  idx : %llu ", session,session->m_sock, stsessionID.idx);
+            ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+        }
+
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
 
+        InterlockedIncrement(&session->m_ioCount);
         server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
 
         server->RecvPacket(session);
+
+        InterlockedDecrement(&session->m_ioCount);
+
+        for (auto& element : server->sessions_vec)
+        {
+            if (element.m_blive == false && element.m_sock != 0 )
+            {
+                element.m_flag = 0;
+                closesocket(element.m_sock);
+                element.m_sock = 0;
+            }
+        }
     }
     return 0;
 }
@@ -188,7 +205,7 @@ unsigned WorkerThread(void *arg)
             profile.End(L"GetQueuedCompletionStatus");
 
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
-        
+
         profile.Start(L"GetQueuedCompletionStatus");
         if (overlapped == nullptr)
         {
@@ -214,9 +231,11 @@ unsigned WorkerThread(void *arg)
 
         if (local_ioCount == 0)
         {
-            __debugbreak();
+            session->Release();
             if (InterlockedCompareExchange(&session->m_blive, false, true) == false)
+            {
                 ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
+            }
         }
     }
     printf("WorkerThreadID : %d  return '0' \n", GetCurrentThreadId());
@@ -233,13 +252,11 @@ CLanServer::CLanServer()
                        L"listen_sock Create Socket Error");
         __debugbreak();
     }
-
 }
 CLanServer::~CLanServer()
 {
     closesocket(m_listen_sock);
 }
-
 
 BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
 {
@@ -257,7 +274,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     sessions_vec.resize(MaxSessions);
 
     for (ull idx = 0; idx < MaxSessions; idx++)
-        m_idleIdx.push_back(idx);
+        m_IdxStack.Push(idx);
 
     linger.l_onoff = 1;
     linger.l_linger = 0;
@@ -267,7 +284,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(port);
     InetPtonW(AF_INET, bindAddress, &serverAddr.sin_addr);
-
 
     if (ZeroCopy)
     {
@@ -284,7 +300,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     bind_retval = bind(m_listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
     if (bind_retval != 0)
         ERROR_FILE_LOG(L"Socket_Error.txt", L"Bind Failed");
-
 
     if (GetLogicalProcess(lProcessCnt) == false)
         ERROR_FILE_LOG(L"GetLogicalProcessError.txt", L"GetLogicalProcess_Error");
@@ -336,7 +351,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 
     stHeader header;
     ringBufferSize useSize;
-    float qPersentage;
+    double qPersentage;
 
     char *f, *r;
     f = session->m_recvBuffer._frontPtr;
@@ -346,7 +361,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     qPersentage = OnRecv((ull)(session->m_SeqID.SeqNumberAndIdx), nullptr);
     if (qPersentage >= 75.f)
     {
-        //RecvPostMessage(session);
+        // RecvPostMessage(session);
         ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
     }
     // Header의 크기만큼을 확인.
@@ -369,16 +384,16 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         f = session->m_recvBuffer._frontPtr;
         if (qPersentage >= 75.0)
         {
-            //RecvPostMessage(session);
+            // RecvPostMessage(session);
             ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
         }
     }
-    //useSize = session->m_recvBuffer.GetUseSize();
-    //if (useSize >= 10)
+    // useSize = session->m_recvBuffer.GetUseSize();
+    // if (useSize >= 10)
     //{
-    //    //RecvPostMessage(session);
-    //    return;
-    //}
+    //     //RecvPostMessage(session);
+    //     return;
+    // }
 
     RecvPacket(session);
 }
@@ -396,7 +411,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
 
     switch (type)
     {
-        
+
     default:
     {
         deQsize = session->m_recvBuffer.Dequeue(msg->_begin, sizeof(header) + header._len);
@@ -406,14 +421,31 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
     }
     return msg;
 }
-CMessage *CLanServer::CreateLoginMessage()
+char *CLanServer::CreateLoginMessage()
 {
-    static char LoginPacket[10] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
-    CMessage *msg = reinterpret_cast<CMessage *>(CObjectPoolManager::pool.Alloc());
-    msg->PutData(LoginPacket, sizeof(LoginPacket));
+    static short header = 0x0008;
+    static ull PayLoad = 0x7fffffffffffffff;
+    static char msg[10];
+
+    memcpy(msg, &header, sizeof(header));
+    memcpy(msg + sizeof(header), &PayLoad, sizeof(PayLoad));
 
     return msg;
 }
+// CMessage *CLanServer::CreateLoginMessage()
+//{
+//     static short header = 0x0008;
+//     static ull PayLoad = 0x7fffffffffffffff;
+//
+//     // 현재 이 기능 사용안함.
+//     CMessage *msg = nullptr;
+//     //static char LoginPacket[10] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
+//     //CMessage *msg = reinterpret_cast<CMessage *>(CObjectPoolManager::pool.Alloc());
+//     //msg->PutData(LoginPacket, sizeof(LoginPacket));
+//
+//     return msg;
+// }
+
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
     size_t m_SendMsgSize = session->m_SendMsg.size();
@@ -426,7 +458,6 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
     SendPacket(session);
 }
 
-
 void CLanServer::SendPacket(clsSession *const session)
 {
 
@@ -438,7 +469,7 @@ void CLanServer::SendPacket(clsSession *const session)
 
     WSABUF wsaBuf[500];
     DWORD LastError;
-    LONG64 beforeTPS;
+    // LONG64 beforeTPS;
     LONG64 TPSidx;
 
     useSize = session->m_sendBuffer.GetUseSize();
@@ -461,10 +492,9 @@ void CLanServer::SendPacket(clsSession *const session)
                     PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
                 }
             }
-            return;
+    
         }
-        else
-            __debugbreak();
+        return;
     }
 
     {
@@ -480,13 +510,14 @@ void CLanServer::SendPacket(clsSession *const session)
 
     while (useSize != 0)
     {
-        {
-            deQSize = session->m_sendBuffer.Peek(&msgAddr, sizeof(size_t));
-            // 디버깅용
-            msg = reinterpret_cast<CMessage *>(msgAddr);
-            wsaBuf[bufCnt].buf = msg->_frontPtr;
-            wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
-        }
+      
+        //{
+        //    디버깅용
+        //    deQSize = session->m_sendBuffer.Peek(&msgAddr, sizeof(size_t));
+        //    msg = reinterpret_cast<CMessage *>(msgAddr);
+        //    wsaBuf[bufCnt].buf = msg->_frontPtr;
+        //    wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
+        //}
         deQSize = session->m_sendBuffer.Dequeue(&msgAddr, sizeof(size_t));
         if (deQSize != sizeof(size_t))
             __debugbreak();
@@ -495,12 +526,12 @@ void CLanServer::SendPacket(clsSession *const session)
         session->m_SendMsg.push_back(msg);
 
         wsaBuf[bufCnt].buf = msg->_frontPtr;
-        wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
+        wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
         bufCnt++;
         useSize -= 8;
     }
-
     _InterlockedIncrement(&session->m_ioCount);
+
     arrTPS[TPSidx] += bufCnt;
 
     if (bZeroCopy)
@@ -536,7 +567,7 @@ void CLanServer::RecvPacket(clsSession *const session)
     DWORD LastError;
     DWORD flag = 0;
     DWORD bufCnt;
-    wchar_t buffer[100];
+    wchar_t buffer[1000];
 
     // WSABUF wsaBuf[2];
 
@@ -569,7 +600,7 @@ void CLanServer::RecvPacket(clsSession *const session)
         bufCnt = 2;
     }
 
-    _InterlockedIncrement(&session->m_ioCount);
+    ull local_IoCount = _InterlockedIncrement(&session->m_ioCount);
 
     wsaRecv_retval = WSARecv(session->m_sock, session->m_lastRecvWSABuf, bufCnt, nullptr, &flag, &session->m_recvOverlapped, nullptr);
     if (wsaRecv_retval < 0)
@@ -578,29 +609,27 @@ void CLanServer::RecvPacket(clsSession *const session)
         switch (LastError)
         {
         case WSA_IO_PENDING:
-            StringCchPrintfW(buffer, 30, L"Socket %lld WSARecv WSA_IO_PENDING", session->m_sock);
             break;
 
             // WSAENOTSOCK
         case 10038:
             StringCchPrintfW(buffer, 30, L"HANDLE value : %lld is not socket", session->m_sock);
+            ERROR_FILE_LOG(L"Socket_Error.txt", buffer);
             break;
             // WSAECONNABORTED
         case 10054:
-            // WSAECONNRESET
         case 10053:
             break;
-
         default:
-            _InterlockedDecrement(&session->m_ioCount);
-
-            StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Failed", session->m_sock);
+            local_IoCount = _InterlockedDecrement(&session->m_ioCount);
+            {
+                StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p WSARecv_failed  ioCount %llu GetLastError : %d", session, local_IoCount,LastError);
+                ERROR_FILE_LOG(L"Socket_Error.txt", buffer);
+            }
+          
         }
     }
-    else
-    {
-        StringCchPrintfW(buffer, 100, L"Socket %lld WSARecv Sync", session->m_sock);
-    }
+
 }
 
 int CLanServer::getAcceptTPS()
