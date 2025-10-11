@@ -136,7 +136,7 @@ unsigned AcceptThread(void *arg)
 
         {
             wchar_t buffer[1000];
-            StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p Accept sock : %llu  idx : %llu ", session,session->m_sock, stsessionID.idx);
+            StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"Accept idx : %llu sessionPrt : %p sock : %llu   ", stsessionID.idx , session, session->m_sock);
             ERROR_FILE_LOG(L"SystemLog.txt", buffer);
         }
 
@@ -155,7 +155,13 @@ unsigned AcceptThread(void *arg)
             {
                 element.m_flag = 0;
                 closesocket(element.m_sock);
+                server->m_IdxStack.Push(element.m_SeqID.idx);
                 element.m_sock = 0;
+                {
+                    wchar_t buffer[1000];
+                    StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"CloseSock idx : %llu  sessionPrt : %p sock : %llu  ", element.m_SeqID.idx, session, session->m_sock);
+                    ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+                }
             }
         }
     }
@@ -548,11 +554,29 @@ void CLanServer::SendPacket(clsSession *const session)
         LastError = GetLastError();
         Profiler::End(L"WSASend");
     }
+    wchar_t buffer[1000];
     if (send_retval < 0)
     {
-        if (LastError != WSA_IO_PENDING)
+        switch (LastError)
         {
-            ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");
+        case WSA_IO_PENDING:
+            break;
+
+            // WSAENOTSOCK
+        case 10038:
+            StringCchPrintfW(buffer, 30, L"HANDLE value : %lld is not socket", session->m_sock);
+            ERROR_FILE_LOG(L"Socket_Error.txt", buffer);
+            break;
+            // WSAECONNABORTED
+        case 10054:
+        case 10053:
+            _InterlockedDecrement(&session->m_ioCount);
+            break;
+        default:
+
+
+            StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" WSASend_failed  sessionPrt : %p  GetLastError : %d", session, LastError);
+            ERROR_FILE_LOG(L"Socket_Error.txt", buffer);
             _InterlockedDecrement(&session->m_ioCount);
         }
     }
@@ -619,6 +643,7 @@ void CLanServer::RecvPacket(clsSession *const session)
             // WSAECONNABORTED
         case 10054:
         case 10053:
+            _InterlockedDecrement(&session->m_ioCount);
             break;
         default:
             local_IoCount = _InterlockedDecrement(&session->m_ioCount);

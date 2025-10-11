@@ -82,7 +82,13 @@ unsigned MonitorThread(void *arg)
                 arrTPS[i] = server->arrTPS[i] - before_arrTPS[i];
                 before_arrTPS[i] = server->arrTPS[i];
             }
-
+            int sessionCnt = 0;
+            for (auto& element : server->sessions_vec)
+            {
+                if (element.m_blive)
+                    sessionCnt++;
+            }
+            printf(" Total Sessions: %d\n", sessionCnt);
             for (int i = 0; i <= server->m_WorkThreadCnt; i++)
             {
                 if (i == 0)
@@ -116,6 +122,8 @@ CTestServer::~CTestServer()
 BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
 {
     BOOL retval;
+
+    m_maxSessions = maxSessions;
 
     retval  = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
