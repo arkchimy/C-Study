@@ -1,10 +1,10 @@
 #include "stdafx.h"
-#include "../lib/CNetwork_lib/CNetwork_lib.h"
 #include "CTestServer.h"
+#include "../lib/CNetwork_lib/CNetwork_lib.h"
 #include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
+
 #include <thread>
 extern SRWLOCK srw_Log;
-
 
 unsigned ContentsThread(void *arg)
 {
@@ -31,7 +31,6 @@ unsigned ContentsThread(void *arg)
         // ID + msg  크기 메세지 하나에 16Byte
         while (useSize >= 16)
         {
-  
 
             DeQSisze = server->m_ContentsQ.Dequeue(&l_sessionID, sizeof(ull));
             if (DeQSisze != sizeof(ull))
@@ -46,7 +45,7 @@ unsigned ContentsThread(void *arg)
                 __debugbreak();
             message = (CMessage *)addr;
             // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            server->EchoProcedure(l_sessionID,message);
+            server->EchoProcedure(l_sessionID, message);
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
         }
@@ -74,7 +73,7 @@ unsigned MonitorThread(void *arg)
     while (1)
     {
         wait_retval = WaitForSingleObject(hWaitHandle, 1000);
-        
+
         if (wait_retval != WAIT_OBJECT_0)
         {
             for (int i = 0; i <= server->m_WorkThreadCnt; i++)
@@ -83,7 +82,7 @@ unsigned MonitorThread(void *arg)
                 before_arrTPS[i] = server->arrTPS[i];
             }
             int sessionCnt = 0;
-            for (auto& element : server->sessions_vec)
+            for (auto &element : server->sessions_vec)
             {
                 if (element.m_blive)
                     sessionCnt++;
@@ -92,12 +91,10 @@ unsigned MonitorThread(void *arg)
             for (int i = 0; i <= server->m_WorkThreadCnt; i++)
             {
                 if (i == 0)
-                 printf(" Conetents Send TPS : %lld\n", arrTPS[i]);
+                    printf(" Conetents Send TPS : %lld\n", arrTPS[i]);
                 else
-                 printf(" Send TPS : %lld\n", arrTPS[i]);
-
+                    printf(" Send TPS : %lld\n", arrTPS[i]);
             }
-            
         }
     }
 
@@ -111,9 +108,7 @@ CTestServer::CTestServer()
 
     m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
-
 }
-
 
 CTestServer::~CTestServer()
 {
@@ -125,17 +120,16 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 
     m_maxSessions = maxSessions;
 
-    retval  = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
+    retval = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
     hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
 
     return retval;
-
 }
 
 double CTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
-    //double CurrentQ;
+    // double CurrentQ;
     static ll visited = 0;
     ringBufferSize ContentsUseSize;
 
@@ -146,7 +140,6 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
     {
         SetEvent(m_ContentsEvent);
         return double(ContentsUseSize) / double(CTestServer::s_ContentsQsize) * 100.f;
-        
     }
 
     {
@@ -164,23 +157,19 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
         if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
             __debugbreak();
 
- 
         profile.End(L"ContentsQ_Enqueue");
         SetEvent(m_ContentsEvent);
     }
 
     return double(ContentsUseSize) / double(CTestServer::s_ContentsQsize) * 100.f;
-    
 }
 
 bool CTestServer::OnAccept(ull SessionID)
 {
 
+    static char *LoginPacket = CreateLoginMessage();
 
-    static  char *LoginPacket = CreateLoginMessage();
-    
-    
-    //stHeader header;
+    // stHeader header;
     clsSession *session;
     stSessionId currentSessionID;
     WSABUF wsabuf;
@@ -189,33 +178,31 @@ bool CTestServer::OnAccept(ull SessionID)
 
     currentSessionID.SeqNumberAndIdx = SessionID;
     session = &sessions_vec[currentSessionID.idx];
-    
+
     if (currentSessionID != session->m_SeqID)
     {
         ERROR_FILE_LOG(L"Critical_Error.txt", L"currentID != session->m_SeqID");
         return false;
     }
 
-    
-    //send_retval = send(session->m_sock, LoginPacket, sizeof(LoginPacket), 0);
-    //if (send_retval <= 0)
+    // send_retval = send(session->m_sock, LoginPacket, sizeof(LoginPacket), 0);
+    // if (send_retval <= 0)
     //{
-    //    return false;
-    //}
+    //     return false;
+    // }
 
     wsabuf.buf = LoginPacket;
     wsabuf.len = 10;
 
-    _InterlockedExchange(&session->m_flag,1);
+    _InterlockedExchange(&session->m_flag, 1);
 
     ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
 
-    //wchar_t buffer[1000];
-    //StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p  , sessionIdx : %lld  ,sock : %llu , OnAcceptSend  ioCount %llu ", session, currentSessionID.idx,  session->m_sock, local_IoCount);
-    //ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+    // wchar_t buffer[1000];
+    // StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p  , sessionIdx : %lld  ,sock : %llu , OnAcceptSend  ioCount %llu ", session, currentSessionID.idx,  session->m_sock, local_IoCount);
+    // ERROR_FILE_LOG(L"SystemLog.txt", buffer);
 
     ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-    
 
     send_retval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
     LastError = GetLastError();
@@ -228,7 +215,7 @@ bool CTestServer::OnAccept(ull SessionID)
             InterlockedDecrement(&session->m_ioCount);
         }
     }
-    
+
     /*
     *     CMessage *msg = CreateLoginMessage();
     CMessage **ppMsg;
@@ -245,26 +232,20 @@ bool CTestServer::OnAccept(ull SessionID)
     return true;
 }
 
-
-void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
+void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
 {
-    stSessionId stMsgSessionID,currentSessionID;
     clsSession *session;
 
-    stMsgSessionID.SeqNumberAndIdx = sessionID;
-
-    session = &sessions_vec[stMsgSessionID.idx];
-    currentSessionID = session->m_SeqID;
-
-    //TODO : 인덱스만 같은 다른 Session
-    if (currentSessionID != stMsgSessionID)
+    session = &sessions_vec[sessionID & 0xffff];
+    // TODO : 인덱스만 같은 다른 Session
+    if (sessionID != session->m_SeqID.SeqNumberAndIdx)
     {
         CObjectPoolManager::pool.Release(message);
         return;
     }
-    
+
     // TODO : disconnect에 대비해서 풀을 만들어야함.
-    // 
+    //
     if (InterlockedExchange(&session->m_Useflag, 1) != 0)
         return;
     if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
@@ -273,11 +254,17 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
         return;
     }
 
+    if ((session->m_ioCount & (ull)1 << 47) != 0)
+    {
+        // Release Flag가 켜져있다면,
+        session->Release();
+        return;
+    }
+
     {
 
         CMessage **ppMsg;
         ppMsg = &message;
- 
 
         if (session->m_sendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
         {
@@ -286,12 +273,6 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
             __debugbreak();
             return;
         }
-    }
-    if ((session->m_ioCount & (ull)1 << 47) != 0)
-    {
-        //Release Flag가 켜져있다면, 
-        session->Release();
-        return;
     }
 
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
@@ -305,5 +286,4 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     {
         session->Release();
     }
-
 }

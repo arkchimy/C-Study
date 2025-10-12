@@ -81,7 +81,7 @@ unsigned AcceptThread(void *arg)
 
     DWORD flag;
 
-    ull session_id = 10;
+    ull session_id = 0;
     ull idx;
 
     clsSession *session;
@@ -133,18 +133,19 @@ unsigned AcceptThread(void *arg)
         session->m_sock = client_sock;
         session->m_blive = true;
 
+        session->m_ioCount = 0;
 
-        {
-            wchar_t buffer[1000];
-            StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"Accept idx : %llu sessionPrt : %p sock : %llu   ", stsessionID.idx , session, session->m_sock);
-            ERROR_FILE_LOG(L"SystemLog.txt", buffer);
-        }
+        //{
+        //    wchar_t buffer[1000];
+        //    StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"Accept idx : %llu sessionPrt : %p sock : %llu   ", stsessionID.idx , session, session->m_sock);
+        //    ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+        //}
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
 
-        InterlockedIncrement(&session->m_ioCount);
-        server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
+        InterlockedIncrement(&session->m_ioCount); //Login의 완료통지가 Recv전에 도착하면 IO_Count가 0이 되버리는 상황 방지.
 
+        server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
         server->RecvPacket(session);
 
         InterlockedDecrement(&session->m_ioCount);
@@ -153,18 +154,19 @@ unsigned AcceptThread(void *arg)
         {
             if (element.m_blive == false && element.m_sock != 0 )
             {
-                element.m_flag = 0;
                 closesocket(element.m_sock);
-                server->m_IdxStack.Push(element.m_SeqID.idx);
                 element.m_sock = 0;
                 element.m_Useflag = 0;
-                element.m_ioCount = 0;
+                element.m_flag = 0;
+                server->m_IdxStack.Push(element.m_SeqID.idx);
 
-                {
+                //element.m_ioCount = 0;  IO_Count가 ContentsThread에서 안전장치 역할을 하고있으므로 Accept되었을떄 초기화.
+
+         /*       {
                     wchar_t buffer[1000];
                     StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"CloseSock idx : %llu  sessionPrt : %p sock : %llu  ", element.m_SeqID.idx, session, session->m_sock);
                     ERROR_FILE_LOG(L"SystemLog.txt", buffer);
-                }
+                }*/
             }
         }
     }
@@ -240,14 +242,12 @@ unsigned WorkerThread(void *arg)
 
         if (local_ioCount == 0)
         {
-            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
-            {
-                if (InterlockedExchange(&session->m_Useflag, 2) != 0)
-                    return 0;
-                session->Release();
-   
-            }
-         
+            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
+                return 0;
+            
+            if (InterlockedExchange(&session->m_Useflag, 2) != 0)
+                return 0;
+            session->Release();
         }
     }
     printf("WorkerThreadID : %d  return '0' \n", GetCurrentThreadId());
