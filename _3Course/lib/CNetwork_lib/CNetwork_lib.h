@@ -12,6 +12,7 @@
 
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "../CLockFreeStack_lib/CLockFreeStack.h"
+#include "../CLockFreeQueue_lib/CLockFreeQueue_lib.h"
 
 #include "clsSession.h"
 #include "stHeader.h"
@@ -43,7 +44,7 @@ class CLanServer
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
     void Stop();
 
-    bool Disconnect(class clsSession *const session);
+    bool Disconnect(const ull SessionID);
 
     CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
     //CMessage *CreateLoginMessage();
@@ -74,8 +75,12 @@ class CLanServer
     bool bZeroCopy = false;
     bool bOn = false;
 
+    int m_SessionCount = 0;
+    ull m_DisConnectCount = 0;
+
     std::vector<class clsSession> sessions_vec;
     CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로 
+    CLockFreeQueue<clsSession *> m_ReleaseSessions;
 
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
     DWORD m_tlsIdxForTPS = 0;

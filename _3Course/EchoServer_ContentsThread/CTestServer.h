@@ -21,5 +21,5 @@ class CTestServer : public CLanServer
 
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
-    int m_maxSessions;
+    int m_maxSessions = 0;
 };

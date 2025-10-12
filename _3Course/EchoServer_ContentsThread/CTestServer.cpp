@@ -70,6 +70,7 @@ unsigned MonitorThread(void *arg)
     ZeroMemory(arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
     ZeroMemory(before_arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
 
+
     while (1)
     {
         wait_retval = WaitForSingleObject(hWaitHandle, 1000);
@@ -87,7 +88,9 @@ unsigned MonitorThread(void *arg)
                 if (element.m_blive)
                     sessionCnt++;
             }
-            printf(" Total Sessions: %d\n", sessionCnt);
+            printf(" Total Sessions: %d\n", server->GetSessionCount());
+            printf(" DisConnectCount Sessions: %llu\n", server->m_DisConnectCount);
+
             for (int i = 0; i <= server->m_WorkThreadCnt; i++)
             {
                 if (i == 0)
@@ -96,6 +99,8 @@ unsigned MonitorThread(void *arg)
                     printf(" Send TPS : %lld\n", arrTPS[i]);
             }
         }
+
+        Sleep(rand() % 500);
     }
 
     return 0;
@@ -251,6 +256,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
     {
         session->Release();
+        m_ReleaseSessions.Push(session);
         return;
     }
 
@@ -258,6 +264,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     {
         // Release Flag가 켜져있다면,
         session->Release();
+        m_ReleaseSessions.Push(session);
         return;
     }
 
@@ -285,5 +292,6 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     if (InterlockedExchange(&session->m_Useflag, 0) == 2)
     {
         session->Release();
+        m_ReleaseSessions.Push(session);
     }
 }

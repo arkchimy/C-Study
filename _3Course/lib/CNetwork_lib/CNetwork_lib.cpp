@@ -134,6 +134,7 @@ unsigned AcceptThread(void *arg)
         session->m_blive = true;
 
         session->m_ioCount = 0;
+        server->m_SessionCount++;
 
         //{
         //    wchar_t buffer[1000];
@@ -150,25 +151,27 @@ unsigned AcceptThread(void *arg)
 
         InterlockedDecrement(&session->m_ioCount);
 
-        for (auto& element : server->sessions_vec)
+        clsSession *releaseSession;
+        while (server->m_ReleaseSessions.Pop(releaseSession))
         {
-            if (element.m_blive == false && element.m_sock != 0 )
-            {
-                closesocket(element.m_sock);
-                element.m_sock = 0;
-                element.m_Useflag = 0;
-                element.m_flag = 0;
-                server->m_IdxStack.Push(element.m_SeqID.idx);
+            closesocket(releaseSession->m_sock);
+            releaseSession->m_sock = 0;
+            releaseSession->m_Useflag = 0;
+            releaseSession->m_flag = 0;
 
-                //element.m_ioCount = 0;  IO_Count가 ContentsThread에서 안전장치 역할을 하고있으므로 Accept되었을떄 초기화.
+            server->m_IdxStack.Push(releaseSession->m_SeqID.idx);
+            server->m_SessionCount--;
 
-         /*       {
-                    wchar_t buffer[1000];
-                    StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"CloseSock idx : %llu  sessionPrt : %p sock : %llu  ", element.m_SeqID.idx, session, session->m_sock);
-                    ERROR_FILE_LOG(L"SystemLog.txt", buffer);
-                }*/
-            }
         }
+ 
+        /* 
+        {
+            wchar_t buffer[1000];
+            StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"CloseSock idx : %llu  sessionPrt : %p sock : %llu  ", element.m_SeqID.idx, session, session->m_sock);
+            ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+        }*/
+            
+        
     }
     return 0;
 }
@@ -228,6 +231,9 @@ unsigned WorkerThread(void *arg)
         switch (reinterpret_cast<stOverlapped *>(overlapped)->_mode)
         {
         case Job_Type::Recv:
+            //FIN 의 경우에 
+            if (transferred == 0)
+                break;
             server->RecvComplete(session, transferred);
             break;
         case Job_Type::Send:
@@ -248,6 +254,7 @@ unsigned WorkerThread(void *arg)
             if (InterlockedExchange(&session->m_Useflag, 2) != 0)
                 return 0;
             session->Release();
+            server->m_ReleaseSessions.Push(session);
         }
     }
     printf("WorkerThreadID : %d  return '0' \n", GetCurrentThreadId());
@@ -346,16 +353,25 @@ void CLanServer::Stop()
 {
 }
 
+bool CLanServer::Disconnect(const ull SessionID)
+{
+    clsSession &session = sessions_vec[SessionID & 0xffff];
+    InterlockedExchange(&session.m_blive, 0);
+
+    CancelIoEx(m_hIOCP, &session.m_recvOverlapped);
+    CancelIoEx(m_hIOCP, &session.m_sendOverlapped);
+    
+    InterlockedIncrement(&m_DisConnectCount);
+    return true;
+}
+
 int CLanServer::GetSessionCount()
 {
     // AcceptThread에서 전담한다면, interlock이 필요없다.
-    return 0;
+    return m_SessionCount;
 }
 
-bool CLanServer::Disconnect(clsSession *const session)
-{
-    return false;
-}
+
 
 void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
 {
@@ -375,6 +391,8 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     {
         // RecvPostMessage(session);
         ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
+        Disconnect(session->m_SeqID.SeqNumberAndIdx);
+        return;
     }
     // Header의 크기만큼을 확인.
     while (session->m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
@@ -383,7 +401,8 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         if (useSize < header._len + sizeof(stHeader))
         {
             ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
-            break;
+            Disconnect(session->m_SeqID.SeqNumberAndIdx);
+            return;
         }
         // 메세지 생성
         CMessage *msg = CreateCMessage(session, header);
@@ -398,16 +417,13 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         {
             // RecvPostMessage(session);
             ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
+            Disconnect(session->m_SeqID.SeqNumberAndIdx);
+            return;
         }
     }
-    // useSize = session->m_recvBuffer.GetUseSize();
-    // if (useSize >= 10)
-    //{
-    //     //RecvPostMessage(session);
-    //     return;
-    // }
 
-    RecvPacket(session);
+    if (session->m_blive)
+        RecvPacket(session);
 }
 
 CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &header)
@@ -423,7 +439,7 @@ CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &
 
     switch (type)
     {
-
+    case 0:
     default:
     {
         deQsize = session->m_recvBuffer.Dequeue(msg->_begin, sizeof(header) + header._len);
@@ -650,6 +666,7 @@ void CLanServer::RecvPacket(clsSession *const session)
         case 10054:
         case 10053:
             _InterlockedDecrement(&session->m_ioCount);
+            InterlockedExchange(&session->m_blive, 0);
             break;
         default:
             local_IoCount = _InterlockedDecrement(&session->m_ioCount);
@@ -657,6 +674,7 @@ void CLanServer::RecvPacket(clsSession *const session)
                 StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p WSARecv_failed  ioCount %llu GetLastError : %d", session, local_IoCount,LastError);
                 ERROR_FILE_LOG(L"Socket_Error.txt", buffer);
             }
+            InterlockedExchange(&session->m_blive, 0);
           
         }
     }

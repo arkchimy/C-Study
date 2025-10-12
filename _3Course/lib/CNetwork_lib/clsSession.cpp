@@ -15,11 +15,11 @@ clsSession::~clsSession()
 
 void clsSession::Release()
 {
-    if (InterlockedCompareExchange(&m_blive, false, true) == false)
+    if (m_blive == 1)
     {
         ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
     }
-
+    
     m_sendBuffer.ClearBuffer();
     m_recvBuffer.ClearBuffer();
 
