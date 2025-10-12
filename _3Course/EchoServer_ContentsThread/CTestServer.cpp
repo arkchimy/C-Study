@@ -210,9 +210,9 @@ bool CTestServer::OnAccept(ull SessionID)
 
     ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
 
-    wchar_t buffer[1000];
-    StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p  , sessionIdx : %lld  ,sock : %d , OnAcceptSend  ioCount %lld ", session, currentSessionID.idx,  session->m_sock, local_IoCount);
-    ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+    //wchar_t buffer[1000];
+    //StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p  , sessionIdx : %lld  ,sock : %llu , OnAcceptSend  ioCount %llu ", session, currentSessionID.idx,  session->m_sock, local_IoCount);
+    //ERROR_FILE_LOG(L"SystemLog.txt", buffer);
 
     ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
     
@@ -265,10 +265,16 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     // 
+    if (InterlockedExchange(&session->m_Useflag, 1) != 0)
+        return;
+    if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
+    {
+        session->Release();
+        return;
+    }
 
     {
-        // TODO : LockFreeStack 
-        //stSRWLock srw(&srw_session_idleList);
+
         CMessage **ppMsg;
         ppMsg = &message;
  
@@ -281,13 +287,23 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
             return;
         }
     }
+    if ((session->m_ioCount & (ull)1 << 47) != 0)
+    {
+        //Release Flag가 켜져있다면, 
+        session->Release();
+        return;
+    }
 
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
-    {                b       
+    {
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
         ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
 
         PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+    }
+    if (InterlockedExchange(&session->m_Useflag, 0) == 2)
+    {
+        session->Release();
     }
 
 }

@@ -157,6 +157,9 @@ unsigned AcceptThread(void *arg)
                 closesocket(element.m_sock);
                 server->m_IdxStack.Push(element.m_SeqID.idx);
                 element.m_sock = 0;
+                element.m_Useflag = 0;
+                element.m_ioCount = 0;
+
                 {
                     wchar_t buffer[1000];
                     StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L"CloseSock idx : %llu  sessionPrt : %p sock : %llu  ", element.m_SeqID.idx, session, session->m_sock);
@@ -237,11 +240,14 @@ unsigned WorkerThread(void *arg)
 
         if (local_ioCount == 0)
         {
-            session->Release();
-            if (InterlockedCompareExchange(&session->m_blive, false, true) == false)
+            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
             {
-                ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
+                if (InterlockedExchange(&session->m_Useflag, 2) != 0)
+                    return 0;
+                session->Release();
+   
             }
+         
         }
     }
     printf("WorkerThreadID : %d  return '0' \n", GetCurrentThreadId());

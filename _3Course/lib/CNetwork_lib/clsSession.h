@@ -64,10 +64,9 @@ class clsSession
 
     stSessionId m_SeqID{0};
     ull m_ioCount = 0;
-    ull m_RcvPostCnt = 0;
     ull m_blive = 0;
     ull m_flag = 0;
-    ull m_Recvflag = 1;
+    ull m_Useflag = 0; // RelaseFlag юс
 
 
 };
