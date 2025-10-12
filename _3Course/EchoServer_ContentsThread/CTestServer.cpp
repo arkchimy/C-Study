@@ -283,7 +283,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage * message)
     }
 
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
-    {
+    {                b       
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
         ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
 
