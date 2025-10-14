@@ -2,10 +2,15 @@
 //
 
 #include <iostream>
+#include "CSystemLog.h"
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
+    wchar_t buf[] = L"%s";
+    wchar_t type[] = L"Battle";
+    CSystemLog::GetInstance()->Log(type, en_LOG_LEVEL::SYSTEM_Mode, buf, L"짐이니라");
+
 }
 
 // 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴
