@@ -82,12 +82,9 @@ unsigned MonitorThread(void *arg)
                 arrTPS[i] = server->arrTPS[i] - before_arrTPS[i];
                 before_arrTPS[i] = server->arrTPS[i];
             }
-            int sessionCnt = 0;
-            for (auto &element : server->sessions_vec)
-            {
-                if (element.m_blive)
-                    sessionCnt++;
-            }
+
+            if (server->GetSessionCount() == 0)
+                continue;
             printf(" Total Sessions: %d\n", server->GetSessionCount());
             printf(" DisConnectCount Sessions: %llu\n", server->m_DisConnectCount);
 
@@ -100,7 +97,6 @@ unsigned MonitorThread(void *arg)
             }
         }
 
-        Sleep(rand() % 500);
     }
 
     return 0;

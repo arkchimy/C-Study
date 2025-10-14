@@ -3,13 +3,28 @@
 
 #include <iostream>
 #include "CSystemLog.h"
+#include <thread>
 
+unsigned WorkerThread(void *arg) 
+{
+    while (1)
+    {
+        wchar_t buf[] = L"%s";
+        wchar_t type[] = L"Battle";
+        CSystemLog::GetInstance()->Log(type, en_LOG_LEVEL::SYSTEM_Mode, buf, L"짐이니라\n");
+    }
+    
+    return 0;
+}
+#define THREAD_CNT 10
 int main()
 {
     CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
-    wchar_t buf[] = L"%s";
-    wchar_t type[] = L"Battle";
-    CSystemLog::GetInstance()->Log(type, en_LOG_LEVEL::SYSTEM_Mode, buf, L"짐이니라");
+
+    for (int i = 0; i < THREAD_CNT ; i++)
+        _beginthreadex(nullptr, 0, WorkerThread, nullptr, 0, nullptr);
+    Sleep(INFINITE);
+
 
 }
 

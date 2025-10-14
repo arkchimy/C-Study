@@ -1,6 +1,8 @@
 //#include "pch.h"
 #include "clsSession.h"
 #include "../../../error_log.h"
+#include "../CSystemLog_lib/CSystemLog_lib.h"
+
 clsSession::clsSession(SOCKET sock)
     : m_sock(sock)
 {
@@ -15,9 +17,12 @@ clsSession::~clsSession()
 
 void clsSession::Release()
 {
-    if (m_blive == 1)
+    if (InterlockedExchange(&m_blive,0) == 1)
     {
-        ERROR_FILE_LOG(L"Critical_Error.txt", L"socket_live Change Failed");
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"Release_socket_live  HANDLE value : %lld  seqID :%llu  seqIndx : %llu\n",
+                                       m_sock, m_SeqID.SeqNumberAndIdx, m_SeqID.idx);
+        return;
     }
     
     m_sendBuffer.ClearBuffer();

@@ -1,28 +1,25 @@
 #include "CSystemLog.h"
+#include "../../error_log.h"
 #include <strsafe.h>
 
-// 에러 발생 시 이중으로 Log를 작성하여 에러상황을 알려보는 시도.
-BOOL CSystemLog::CreateLogFile(const wchar_t *filename, SYSTEMTIME &stNowTime)
+CSystemLog::CSystemLog()
 {
-    wchar_t LogFileName[FILENAME_MAX];
+    InitializeSRWLock(&srw_lock);
+}
+
+// 에러 발생 시 이중으로 Log를 작성하여 에러상황을 알려보는 시도.
+BOOL CSystemLog::GetLogFileName(const wchar_t *const filename, size_t strlen, SYSTEMTIME &stNowTime, __out wchar_t *const out)
+{
+
     HRESULT cch_retval;
 
-    cch_retval = StringCchPrintfW(LogFileName, FILENAME_MAX, L"%d_%d_%s.txt", stNowTime.wYear, stNowTime.wMonth, filename);
+    cch_retval = StringCchPrintfW(out, strlen, L"%d%d_%s.txt", stNowTime.wYear, stNowTime.wMonth, filename);
     if (cch_retval != S_OK)
     {
-        // ERROR_FILE_LOG(L"StringCchPrintf_Error.txt", L"StringCchPrintfW Error");
+        ERROR_FILE_LOG(L"StringCchPrintf_Error.txt", L"StringCchPrintfW Error");
+        __debugbreak();
         return false;
     }
-    m_LogFileName = LogFileName;
-
-    _wfopen_s(&LogFile, m_LogFileName, L"a+");
-
-    if (LogFile == nullptr)
-    {
-        // ERROR_FILE_LOG(L"FileOpen_Error.txt", L"_wfopen_s Error");
-        return false;
-    }
-    fclose(LogFile);
 
     return true;
 }
@@ -30,6 +27,11 @@ BOOL CSystemLog::CreateLogFile(const wchar_t *filename, SYSTEMTIME &stNowTime)
 BOOL CSystemLog::SetDirectory(const wchar_t *directoryFileRoute)
 {
     return SetCurrentDirectoryW(directoryFileRoute);
+}
+
+void CSystemLog::SetLogLevel(const en_LOG_LEVEL &Log_Level)
+{
+    m_Log_Level = Log_Level;
 }
 
 CSystemLog *CSystemLog::GetInstance()
@@ -44,14 +46,25 @@ void CSystemLog::Log(WCHAR *szType, en_LOG_LEVEL LogLevel, WCHAR *szStringFormat
     // szStringFormat 는 Log 시점에 남기고싶은 정보를 남기기 위함.
     // 고정적으로  [szType] [2015-09-11 19:00:00 / LogLevel / 0000seqNumber] 로그문자열.
 
-    static WCHAR format[] = L"[%s] [%d-%d-%d %d:%d:%d / %s / %08lld]";
-    WCHAR LogBuffer[FILENAME_MAX];
+    static WCHAR format[] = L"[ %-12s] [ %04d-%02d-%02d %02d:%02d:%03d  /%-8s/%08lld] \t";
+    static const WCHAR *Logformat[(DWORD)en_LOG_LEVEL::MAX] =
+        {
+            L"DEBUG",
+            L"ERROR",
+            L"SYSTEM"};
+
+    WCHAR LogHeaderBuffer[FILENAME_MAX * 2];
+    WCHAR LogPayLoadBuffer[FILENAME_MAX];
+    WCHAR LogFileName[FILENAME_MAX];
 
     HRESULT cchRetval;
 
     va_list va;
     SYSTEMTIME stNowTime;
     LONG64 local_SeqNumber;
+
+    FILE *LogFile;
+
     if (LogLevel > m_Log_Level)
         return;
 
@@ -59,46 +72,43 @@ void CSystemLog::Log(WCHAR *szType, en_LOG_LEVEL LogLevel, WCHAR *szStringFormat
 
     GetLocalTime(&stNowTime);
 
-    StringCchPrintfW(LogBuffer, FILENAME_MAX, format,
-        szType, stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay,
+    if (GetLogFileName(szType, FILENAME_MAX, stNowTime, LogFileName) == false)
+    {
+        __debugbreak();
+        return;
+    }
+
+    StringCchPrintfW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), format,
+                     szType, stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay,
                      stNowTime.wHour, stNowTime.wMinute, stNowTime.wMilliseconds,
-                     LogLevel, local_SeqNumber);
-
-    wprintf(L"%s\n", LogBuffer);
-
-    StringCchCatW(LogBuffer, FILENAME_MAX, szStringFormat);
-    // TODO : 육안으로 확인후 제거 코드.
-    wprintf(L"%s\n", LogBuffer);
-
+                     Logformat[(DWORD)LogLevel], local_SeqNumber);
 
     //[Battle] [2015-09-11 19:00:00 / DEBUG / 000000001] 로그문자열.
-    va_start(va, szStringFormat);
-    if (CreateLogFile(szType, stNowTime) == false)
-        __debugbreak();
 
-    cchRetval = StringCchVPrintfW(LogBuffer, FILENAME_MAX, LogBuffer, va);
-    // TODO : 육안으로 확인후 제거 코드.
-    wprintf(L"%s\n", LogBuffer);
-    __debugbreak();
+    va_start(va, szStringFormat);
+    cchRetval = StringCchVPrintfW(LogPayLoadBuffer, sizeof(LogPayLoadBuffer) / sizeof(wchar_t), szStringFormat, va);
     va_end(va);
 
     if (cchRetval != S_OK)
     {
-        // ERROR_FILE_LOG(L"StringCchVPrintfW.txt", L"StringCchVPrintfW Error");
+        ERROR_FILE_LOG(L"StringCchVPrintfW.txt", L"StringCchVPrintfW Error");
     }
 
-    __assume(LogFile != nullptr);
+    StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogPayLoadBuffer);
 
-    switch (LogLevel)
+    AcquireSRWLockExclusive(&srw_lock);
+    _wfopen_s(&LogFile, LogFileName, L"a+ , ccs = UTF-16LE");
+
+    if (LogFile == nullptr)
     {
-    //[Battle] [2015-09-11 19:00:00 / DEBUG / 000000001] 로그문자열.
-    case en_LOG_LEVEL::DEBUG_Mode:
-    case en_LOG_LEVEL::ERROR_Mode:
-    case en_LOG_LEVEL::SYSTEM_Mode:
-        _wfopen_s(&LogFile, m_LogFileName, L"a+");
-        fwrite(LogBuffer, 2, FILENAME_MAX / sizeof(wchar_t), LogFile);
-        fclose(LogFile);
+        ERROR_FILE_LOG(L"FileOpen_Error.txt", L"_wfopen_s Error");
+        ReleaseSRWLockExclusive(&srw_lock);
+        return;
     }
+
+    fwrite(LogHeaderBuffer, 2, wcslen(LogHeaderBuffer), LogFile);
+    fclose(LogFile);
+    ReleaseSRWLockExclusive(&srw_lock);
 }
 
 void CSystemLog::LogHex(WCHAR *szType, en_LOG_LEVEL LogLevel, WCHAR *szLog, BYTE *pByte, int iByteLen)

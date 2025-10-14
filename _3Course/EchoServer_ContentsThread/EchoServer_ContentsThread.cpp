@@ -67,15 +67,18 @@ int main()
 
         parser.GetValue(L"RingBufferSize", iRingBufferSize);
         parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
+ 
         CRingBuffer::s_BufferSize = iRingBufferSize;
     }
     wchar_t buffer[100];
 
      StringCchPrintfW(buffer, 100, L"Profiler_%hs.txt", __DATE__);
+   
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         CTestServer EchoServer;
         EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+        CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
 
         while (1)
         {
@@ -83,12 +86,24 @@ int main()
             {
                 SetEvent(EchoServer.m_ServerOffEvent);
             }
-            else if (GetAsyncKeyState('A') || GetAsyncKeyState('A'))
+            else if (GetAsyncKeyState('A') || GetAsyncKeyState('a'))
                 Profiler::SaveAsLog(buffer);
             else if (GetAsyncKeyState('D') || GetAsyncKeyState('d'))
             {
                 Profiler::Reset();
             }
+            else if (GetAsyncKeyState(VK_UP))
+            {
+                CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
+                printf("DEBUG_Mode\n");
+            }
+                
+            else if (GetAsyncKeyState(VK_DOWN))
+            {
+                CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
+                printf("ERROR_Mode\n");
+            }
+            
         
         }
     }

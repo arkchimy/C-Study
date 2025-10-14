@@ -13,6 +13,8 @@
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "../CLockFreeStack_lib/CLockFreeStack.h"
 #include "../CLockFreeQueue_lib/CLockFreeQueue_lib.h"
+#include "../CSystemLog_lib/CSystemLog_lib.h"
+
 
 #include "clsSession.h"
 #include "stHeader.h"
@@ -75,7 +77,7 @@ class CLanServer
     bool bZeroCopy = false;
     bool bOn = false;
 
-    int m_SessionCount = 0;
+    LONG64 m_SessionCount = 0;
     ull m_DisConnectCount = 0;
 
     std::vector<class clsSession> sessions_vec;
@@ -88,4 +90,6 @@ class CLanServer
 
     HANDLE WorkerArg[2]{0}; // WorkerThread __beginthreadex 매개변수
     HANDLE AcceptArg[3]{0};  // AcceptThread __beginthreadex 매개변수
+
+    static CSystemLog *systemLog;
 };
