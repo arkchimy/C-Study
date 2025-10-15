@@ -507,9 +507,7 @@ void CLanServer::SendPacket(clsSession *const session)
     // LONG64 beforeTPS;
     LONG64 TPSidx;
 
-    //useSize = session->m_sendBuffer.m_size;
-    useSize = session->m_sendBuffer.GetUseSize();
-
+    useSize = session->m_sendBuffer.m_size;
     TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
 
     if (useSize == 0)
@@ -517,8 +515,7 @@ void CLanServer::SendPacket(clsSession *const session)
         // flag 끄기
         if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
         {
-            //useSize = session->m_sendBuffer.m_size;
-            useSize = session->m_sendBuffer.GetUseSize();
+            useSize = session->m_sendBuffer.m_size;
             if (useSize != 0)
             {
                 // 누군가 진입 했다면 return
@@ -543,32 +540,12 @@ void CLanServer::SendPacket(clsSession *const session)
 
     bufCnt = 0;
 
-    //{
-    //    Profiler profile;
-    //    profile.Start(L"LFQ_Pop");
-    //    while (session->m_sendBuffer.Pop(msg))
-    //    {
-
-    //        session->m_SendMsg.push_back(msg);
-
-    //        wsaBuf[bufCnt].buf = msg->_frontPtr;
-    //        wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
-    //        bufCnt++;
-    //        useSize -= 8;
-    //    }
-    //    profile.End(L"LFQ_Pop");
-    //}
-    //
     {
         Profiler profile;
-        profile.Start(L"Ring_Pop");
-        while (useSize != 0)
+        profile.Start(L"LFQ_Pop");
+        while (session->m_sendBuffer.Pop(msg))
         {
-            deQSize = session->m_sendBuffer.Dequeue(&msgAddr, sizeof(size_t));
-            if (deQSize != sizeof(size_t))
-                __debugbreak();
 
-            msg = reinterpret_cast<CMessage *>(msgAddr);
             session->m_SendMsg.push_back(msg);
 
             wsaBuf[bufCnt].buf = msg->_frontPtr;
@@ -576,7 +553,7 @@ void CLanServer::SendPacket(clsSession *const session)
             bufCnt++;
             useSize -= 8;
         }
-        profile.End(L"Ring_Pop");
+        profile.End(L"LFQ_Pop");
     }
     _InterlockedIncrement(&session->m_ioCount);
 
