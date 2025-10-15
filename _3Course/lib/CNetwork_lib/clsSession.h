@@ -56,7 +56,8 @@ class clsSession
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
     stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
 
-    CLockFreeQueue<class CMessage*> m_sendBuffer;
+    //CLockFreeQueue<class CMessage*> m_sendBuffer;
+    CRingBuffer m_sendBuffer; 
     CRingBuffer m_recvBuffer; 
 
     WSABUF m_lastRecvWSABuf[2]{0};

@@ -264,30 +264,30 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         return;
     }
     CMessage **ppMsg;
+    ppMsg = &message;
     {
         //TODO : 아래 대신
 
-        {
-            Profiler profile;
-            profile.Start(L"LFQ_Push");
-
-            ppMsg = &message;
-            session->m_sendBuffer.Push(*ppMsg);
-            profile.End(L"LFQ_Push");
-        }
- 
         //{
         //    Profiler profile;
-        //    profile.Start(L"m_sendBuffer_EnQ");
-        //    if (session->m_RingsendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
-        //    {
-        //        session->m_blive = false;
-        //        ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_RingsendBuffer.Enqueue another");
-        //        __debugbreak();
-        //        return;
-        //    }
-        //    profile.End(L"m_sendBuffer_EnQ");
+        //    profile.Start(L"LFQ_Push");
+
+        //    session->m_sendBuffer.Push(*ppMsg);
+        //    profile.End(L"LFQ_Push");
         //}
+ 
+        {
+            Profiler profile;
+            profile.Start(L"m_sendBuffer_EnQ");
+            if (session->m_sendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
+            {
+                session->m_blive = false;
+                ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_RingsendBuffer.Enqueue another");
+                __debugbreak();
+                return;
+            }
+            profile.End(L"m_sendBuffer_EnQ");
+        }
         
     }
 

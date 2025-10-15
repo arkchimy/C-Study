@@ -24,11 +24,12 @@ void clsSession::Release()
                                        m_sock, m_SeqID.SeqNumberAndIdx, m_SeqID.idx);
         return;
     }
-    CMessage *msg;
-    while (m_sendBuffer.Pop(msg))
-    {
-        delete msg;
-    }
-    
+    //CMessage *msg;
+    //while (m_sendBuffer.Pop(msg))
+    //{
+    //    delete msg;
+    //}
+    //
     m_recvBuffer.ClearBuffer();
+    m_sendBuffer.ClearBuffer();
 }

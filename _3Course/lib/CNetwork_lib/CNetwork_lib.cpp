@@ -194,7 +194,6 @@ unsigned WorkerThread(void *arg)
     ull local_ioCount;
     Profiler profile;
 
-    bool toggle = FALSE; // GQCS를 획득하고 해제하는 시간을 체크하기위한 방식.
 
     while (server->bOn)
     {
@@ -205,14 +204,9 @@ unsigned WorkerThread(void *arg)
             overlapped = nullptr;
             session = nullptr;
         }
-        if (toggle != TRUE)
-            toggle = TRUE;
-        else
-            profile.End(L"GetQueuedCompletionStatus");
 
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
 
-        profile.Start(L"GetQueuedCompletionStatus");
         if (overlapped == nullptr)
         {
             ERROR_FILE_LOG(L"Socket_Error.txt", L"GetQueuedCompletionStatus Overlapped is nullptr");
@@ -513,8 +507,8 @@ void CLanServer::SendPacket(clsSession *const session)
     // LONG64 beforeTPS;
     LONG64 TPSidx;
 
-    useSize = session->m_sendBuffer.m_size;
-    //useSize = session->m_sendBuffer.GetUseSize();
+    //useSize = session->m_sendBuffer.m_size;
+    useSize = session->m_sendBuffer.GetUseSize();
 
     TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
 
@@ -523,8 +517,8 @@ void CLanServer::SendPacket(clsSession *const session)
         // flag 끄기
         if (_InterlockedCompareExchange(&session->m_flag, 0, 1) == 1)
         {
-            useSize = session->m_sendBuffer.m_size;
-            // useSize = session->m_sendBuffer.GetUseSize();
+            //useSize = session->m_sendBuffer.m_size;
+            useSize = session->m_sendBuffer.GetUseSize();
             if (useSize != 0)
             {
                 // 누군가 진입 했다면 return
@@ -549,32 +543,12 @@ void CLanServer::SendPacket(clsSession *const session)
 
     bufCnt = 0;
 
-    {
-        Profiler profile;
-        profile.Start(L"LFQ_Pop");
-        while (session->m_sendBuffer.Pop(msg))
-        {
-
-            session->m_SendMsg.push_back(msg);
-
-            wsaBuf[bufCnt].buf = msg->_frontPtr;
-            wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
-            bufCnt++;
-            useSize -= 8;
-        }
-        profile.End(L"LFQ_Pop");
-    }
-    
     //{
     //    Profiler profile;
-    //    profile.Start(L"Ring_P");
-    //    while (useSize != 0)
+    //    profile.Start(L"LFQ_Pop");
+    //    while (session->m_sendBuffer.Pop(msg))
     //    {
-    //        deQSize = session->m_RingsendBuffer.Dequeue(&msgAddr, sizeof(size_t));
-    //        if (deQSize != sizeof(size_t))
-    //            __debugbreak();
 
-    //        msg = reinterpret_cast<CMessage *>(msgAddr);
     //        session->m_SendMsg.push_back(msg);
 
     //        wsaBuf[bufCnt].buf = msg->_frontPtr;
@@ -584,6 +558,26 @@ void CLanServer::SendPacket(clsSession *const session)
     //    }
     //    profile.End(L"LFQ_Pop");
     //}
+    //
+    {
+        Profiler profile;
+        profile.Start(L"Ring_Pop");
+        while (useSize != 0)
+        {
+            deQSize = session->m_sendBuffer.Dequeue(&msgAddr, sizeof(size_t));
+            if (deQSize != sizeof(size_t))
+                __debugbreak();
+
+            msg = reinterpret_cast<CMessage *>(msgAddr);
+            session->m_SendMsg.push_back(msg);
+
+            wsaBuf[bufCnt].buf = msg->_frontPtr;
+            wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
+            bufCnt++;
+            useSize -= 8;
+        }
+        profile.End(L"Ring_Pop");
+    }
     _InterlockedIncrement(&session->m_ioCount);
 
     arrTPS[TPSidx] += bufCnt;
