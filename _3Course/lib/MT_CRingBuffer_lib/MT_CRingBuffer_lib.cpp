@@ -198,8 +198,9 @@ void CRingBuffer::MoveRear(ringBufferSize iSize)
     {
         pChk = _begin + long long(distance);
     }
+    _rearPtr = pChk;
 
-    InterlockedExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk);
+    //InterlockedExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk);
     // do
     //{
     //     oldRear = _rearPtr;
@@ -226,8 +227,8 @@ void CRingBuffer::MoveFront(ringBufferSize iSize)
     {
         pChk = _begin + long long(distance);
     }
-
-    InterlockedExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk);
+    _frontPtr = pChk;
+    //InterlockedExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk);
     /* do
      {
          oldFront = _frontPtr;

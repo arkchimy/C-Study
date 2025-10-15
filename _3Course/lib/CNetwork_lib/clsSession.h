@@ -8,6 +8,8 @@
 #pragma comment(lib, "ws2_32")
 
 #include "../../lib/MT_CRingBuffer_lib/MT_CRingBuffer_lib.h"
+#include "../../lib/CLockFreeQueue_lib/CLockFreeQueue_lib.h"
+
 using ull = unsigned long long;
 
 enum class Job_Type
@@ -54,7 +56,7 @@ class clsSession
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
     stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
 
-    CRingBuffer m_sendBuffer; // Echo에서는 미 사용
+    CLockFreeQueue<class CMessage*> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
 
     WSABUF m_lastRecvWSABuf[2]{0};
