@@ -23,7 +23,7 @@ enum
     FORMAT_NO_AVG_RECORD = 4,
     FORMAT_VALID_RECORD = 5,
 
-    CCH_RECORD_CAPACITY = 154,
+    CCH_RECORD_CAPACITY = 204,
 
 };
 struct stRecord

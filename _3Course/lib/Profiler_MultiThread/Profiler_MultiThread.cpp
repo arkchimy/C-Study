@@ -33,8 +33,8 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
         return;
     }
 
-    fwrite(PRINT_FORMATS[FORMAT_HEADER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
-    fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
+    fwrite(PRINT_FORMATS[FORMAT_HEADER], sizeof(wchar_t), wcslen(PRINT_FORMATS[FORMAT_HEADER]), pFileLog);
+    fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), wcslen(PRINT_FORMATS[FORMAT_BORDER]), pFileLog);
     HRESULT cchRetval;
 
     for (threadIndex = 0; threadIndex < sThreadCount; ++threadIndex)
@@ -107,7 +107,7 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
                 __debugbreak();
             fwrite(recordString, sizeof(wchar_t), wcslen(recordString), pFileLog);
         }
-        fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), wcslen(recordString), pFileLog);
+        fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), wcslen(PRINT_FORMATS[FORMAT_BORDER]), pFileLog);
     }
 
     fclose(pFileLog);
