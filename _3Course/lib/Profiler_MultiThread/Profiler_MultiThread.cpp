@@ -35,6 +35,7 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
 
     fwrite(PRINT_FORMATS[FORMAT_HEADER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
     fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
+    HRESULT cchRetval;
 
     for (threadIndex = 0; threadIndex < sThreadCount; ++threadIndex)
     {
@@ -47,7 +48,7 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
             switch (refProfileRecord.CountOfCall)
             {
             case 0:
-                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_NO_RECORD],
+                cchRetval = StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_NO_RECORD],
                                  pTlsRecordInfo->ThreadId,
                                  recordIndex,
                                  refProfileRecord.Tag.Name,
@@ -60,7 +61,7 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
                 break;
 
             case 1:
-                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_ONCE_RECORD],
+                cchRetval = StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_ONCE_RECORD],
                                  pTlsRecordInfo->ThreadId,
                                  recordIndex,
                                  refProfileRecord.Tag.Name,
@@ -77,7 +78,7 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
             case 3:
                 __fallthrough;
             case 4:
-                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_NO_AVG_RECORD],
+                cchRetval = StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_NO_AVG_RECORD],
                                  pTlsRecordInfo->ThreadId,
                                  recordIndex,
                                  refProfileRecord.Tag.Name,
@@ -90,7 +91,7 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
                 break;
 
             default:
-                StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_VALID_RECORD],
+                cchRetval = StringCchPrintfW(recordString, CCH_RECORD_CAPACITY, PRINT_FORMATS[FORMAT_VALID_RECORD],
                                  pTlsRecordInfo->ThreadId,
                                  recordIndex,
                                  refProfileRecord.Tag.Name,
@@ -102,7 +103,8 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
                                  ConvertFrequencyToMicroseconds(refProfileRecord.MinAbnormal[NOISE_2ND]));
                 break;
             }
-
+            if (cchRetval != S_OK)
+                __debugbreak();
             fwrite(recordString, sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
         }
         fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
