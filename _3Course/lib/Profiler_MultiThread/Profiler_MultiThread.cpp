@@ -105,9 +105,9 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
             }
             if (cchRetval != S_OK)
                 __debugbreak();
-            fwrite(recordString, sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
+            fwrite(recordString, sizeof(wchar_t), wcslen(recordString), pFileLog);
         }
-        fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), CCH_RECORD_CAPACITY - 1, pFileLog);
+        fwrite(PRINT_FORMATS[FORMAT_BORDER], sizeof(wchar_t), wcslen(recordString), pFileLog);
     }
 
     fclose(pFileLog);
@@ -161,7 +161,7 @@ void Profiler::Reset(void)
         }
         pTlsRecordInfoOrNull->Reset();
     }
-    SaveAsLog(s_FileName);
+    //SaveAsLog(s_FileName);
 }
 
 void Profiler::Start(const wchar_t *const lpTagName)
