@@ -1,12 +1,12 @@
-﻿// CLockFreesStack_TestProgram.cpp : 이 파일에는 'main' 함수가 포함됩니다. 거기서 프로그램 실행이 시작되고 종료됩니다.
-//
-
-#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
-#include "../../_3Course/lib/CLockFreeStack_lib/CLockFreeStack.h"
+﻿#include "../_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
+#include "../_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
+
 #include <iostream>
-#include <list>
 #include <thread>
+#include <list>
+
 
 std::list<int> inputData;
 std::list<int> compareData;
@@ -21,12 +21,13 @@ LONG64 readyThreadChkCount;
 CDump dump;
 
 void InputData_Initalization();
-bool CompareTest(CLockFreeStack<int> &stack);
+
+bool CompareTest(CTlsLockFreeStack<int> &stack);
 
 unsigned WorkerThread(void *arg)
 {
-    CLockFreeStack<int> *stack;
-    stack = reinterpret_cast<CLockFreeStack<int> *>(arg);
+    CTlsLockFreeStack<int> *stack;
+    stack = reinterpret_cast<CTlsLockFreeStack<int> *>(arg);
     std::list<int> local_list;
 
     WaitForSingleObject(hInitalizeEvent, INFINITE);
@@ -45,7 +46,6 @@ unsigned WorkerThread(void *arg)
 
         ReleaseSRWLockExclusive(&srw_inputDataLock);
         Sleep(0);
-
     }
     _interlockedincrement64(&readyThreadChkCount);
 
@@ -65,8 +65,6 @@ unsigned WorkerThread(void *arg)
 
     return 0;
 }
-
-
 
 int main()
 {
@@ -92,12 +90,13 @@ int main()
 
     while (1)
     {
-        CLockFreeStack<int> stack;
+        CTlsLockFreeStack<int> stack;
         InputData_Initalization();
 
         for (int i = 0; i < iWorkerThreadCnt; i++)
             hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &stack, 0, nullptr);
         SetEvent(hInitalizeEvent);
+
         printf("ToTal list size : %lld \n", inputData.size());
 
         while (readyThreadChkCount != iWorkerThreadCnt)
@@ -117,20 +116,19 @@ int main()
         retval = CompareTest(stack);
         if (retval == false)
             __debugbreak();
-
     }
 }
 
 void InputData_Initalization()
 {
-    int size = rand() % 10000;
+    int size = INIT_CAPACITY;
 
     for (int i = 0; i < size; i++)
         inputData.push_back(rand() % 1000);
     compareData = inputData;
 }
 
-bool CompareTest(CLockFreeStack<int>& stack)
+bool CompareTest(CTlsLockFreeStack<int> &stack)
 {
     int outPutData;
 
@@ -140,9 +138,8 @@ bool CompareTest(CLockFreeStack<int>& stack)
             return false;
 
         outPutData = stack.Pop();
-        auto iter  = std::find(compareData.begin(), compareData.end(), outPutData);
+        auto iter = std::find(compareData.begin(), compareData.end(), outPutData);
         compareData.erase(iter);
-
     }
     if (compareData.size() != 0)
         return false;

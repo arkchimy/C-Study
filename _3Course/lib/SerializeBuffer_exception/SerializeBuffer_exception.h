@@ -103,14 +103,14 @@ struct CMessage
 
     inline static LONG64 s_UseCnt = 0;
 
-    friend struct CObjectPoolManager;
+    friend struct CMessagePoolManager;
     inline static HANDLE s_BufferHeap;
 };
-struct CObjectPoolManager
+struct CMessagePoolManager
 {
     inline static class CObjectPool<CMessage> pool;
     inline static char *_buffer;
     inline static int cnt = 0;
-    CObjectPoolManager();
+    CMessagePoolManager();
     static char* Alloc();
 };

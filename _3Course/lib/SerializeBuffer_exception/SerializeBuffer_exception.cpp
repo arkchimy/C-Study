@@ -7,7 +7,7 @@
 
 #define ERROR_BUFFER_SIZE 100
 
-static CObjectPoolManager instance;
+static CMessagePoolManager instance;
 static int g_mode = 0;
 
 CMessage::CMessage()
@@ -31,7 +31,7 @@ CMessage::CMessage()
         }
         else
         {
-            _begin = CObjectPoolManager::Alloc();
+            _begin = CMessagePoolManager::Alloc();
         }
         _end = _begin + _size;
 
@@ -137,7 +137,7 @@ void CMessage::Peek(char *out, SerializeBufferSize size)
     memcpy(out, f, size);
 }
 
-CObjectPoolManager::CObjectPoolManager()
+CMessagePoolManager::CMessagePoolManager()
 {
     char *virtualMemoryBegin;
 
@@ -203,9 +203,9 @@ CObjectPoolManager::CObjectPoolManager()
         if (virtualMemoryBegin != nullptr)
             printf("MemoryPool VirtualAlloc Success  \n");
     }
-    InterlockedExchange((ull *)&CObjectPoolManager::_buffer, (ull)virtualMemoryBegin);
+    InterlockedExchange((ull *)&CMessagePoolManager::_buffer, (ull)virtualMemoryBegin);
 }
-char *CObjectPoolManager::Alloc()
+char *CMessagePoolManager::Alloc()
 {
 
 
