@@ -84,7 +84,7 @@ int main()
         parser.GetValue(L"iWorkerThreadCnt", iWorkerThreadCnt);
     }
     CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
-    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
+    //CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
 
     srand(3);
     hStartEvent = CreateEvent(nullptr, 1, 0, nullptr);
