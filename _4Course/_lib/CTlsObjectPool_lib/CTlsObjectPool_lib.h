@@ -1,11 +1,11 @@
 ﻿#pragma once
 
-#define WIN32_LEAN_AND_MEAN             // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
+#define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 
 #include "../../../_3Course/lib/CLockFreeQueue_lib/CLockFreeQueue_lib.h"
 #include "../../../_3Course/lib/CLockFreeStack_lib/CLockFreeStack.h"
 #include "../../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
-
+#include "../../../_1Course/lib/Parser_lib/Parser_lib.h"
 
 #define RT_ASSERT(x) \
     if (!(x))        \
@@ -13,12 +13,20 @@
 
 #define assert RT_ASSERT
 
-#define INIT_CAPACITY 500
+int tlsPool_init_Capacity;
 
 template <typename T>
 struct stTlsObjectPoolManager
 {
+    stTlsObjectPoolManager()
+    {
+        Parser parser;
+        if (parser.LoadFile(L"Config.txt") == false)
+            __debugbreak();
 
+        if (parser.GetValue(L"tlsPool_init_Capacity", tlsPool_init_Capacity) == false)
+            __debugbreak();
+    }
     struct stNode
     {
         T data;
@@ -31,67 +39,63 @@ struct stTlsObjectPoolManager
     ObjectPoolType *GetFullPool(ObjectPoolType *emptyStack)
     {
         ObjectPoolType *retval;
-        if (emptyStack == nullptr)
-        {
-            retval = new ObjectPoolType;
-            retval->Initalize(INIT_CAPACITY);
-       
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"GetFullPool Called emptyStack is nullptr  ,"
-                                                                                       L"retval  :  %p , %lld ",
-                                           retval, retval->m_size);
-            return retval;
-        }
+
         emptyPools.Push(emptyStack);
- 
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"emptyPools.Push %p  , emptyPools.Size %lld",
-                                       emptyStack, emptyPools.m_size);
+
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s Size :%lld \t InputData  : %p  Data Size : %lld",
+                                       L"[ emptyPools Push ]",emptyPools.m_size, emptyStack, emptyStack->m_size);
+
         if (fullPools.m_size == 0)
         {
             retval = new ObjectPoolType;
-            retval->Initalize(INIT_CAPACITY);
+            retval->Initalize(tlsPool_init_Capacity);
 
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"GetFullPool Called emptyStack is %p  m_size %lld  retval  :  %p , %lld ",
-                                           emptyStack, emptyStack->m_size,retval, retval->m_size);
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p ",
+                                            L"[ Create New FullPool ]",retval);
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s :  %p  => %p ",
+                                           L"[ fullPool Change ] ",emptyStack, retval);
             return retval;
         }
-        retval = fullPools.Pop();
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"fullPools.Pop %p  , fullPools.Size %lld",
-                                       retval, fullPools.m_size);
+        else
+            retval = fullPools.Pop();
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s Size :%lld \t OutData  : %p  Data Size : %lld",
+                                       L"[ fullPools Pop ]",fullPools.m_size, retval, retval->m_size);
+
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s :  %p  => %p ",
+                                       L"[ fullPool Change ]",emptyStack, retval);
+
         return retval;
     }
     ObjectPoolType *GetEmptyPool(ObjectPoolType *fullStack)
     {
         ObjectPoolType *retval;
-        if (fullStack == nullptr)
-        {
-            retval = new ObjectPoolType();
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"GetEmptyPool Called fullStack is nullptr  ,"
-                                                                                       L"retval  :  %p , %lld ",
-                                           retval, retval->m_size);
-            return retval;
-        }
 
         fullPools.Push(fullStack);
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"fullPools.Push %p  , fullPools.Size %lld",
-                                       fullStack, fullPools.m_size);
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s Size :%lld \t InputData  : %p  Data Size : %lld",
+                                       L"[fullPools Push]", fullPools.m_size, fullStack, fullStack->m_size);
 
         if (emptyPools.m_size == 0)
         {
             retval = new ObjectPoolType();
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"GetEmptyPool Called emptyPools size : 0  ,"
-                                                                                        L"new Create retval  :  %p , %lld ",
-                                           retval, retval->m_size);
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p ",
+                                           L"[ Create New EmptyPool ]",retval);
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  :  %p  => %p ",
+                                           L"[ emptyPool Change ]",fullStack, retval);
+            return retval;
         }
         else
             retval = emptyPools.Pop();
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"GetEmptyPool Called emptyPools Size : %lld  retval  :  %p , %lld ",
-                                       emptyPools.m_size,retval, retval->m_size);
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t OutData  : %p  Data Size : %lld",
+                                       L"[ emptyPools Pop ]",emptyPools.m_size, retval, retval->m_size);
+
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  :  %p  => %p ",
+                                       L"[ emptyPool Change ]",fullStack, retval);
+
         return retval;
     }
 
     ManagerPool fullPools;
     ManagerPool emptyPools;
-
 };
 
 /*
@@ -114,18 +118,20 @@ struct stTlsObjectPool
 
     stTlsObjectPool()
     {
-        allocPool = instance.GetFullPool(nullptr);
+        allocPool = new ObjectPoolType;
+        allocPool->Initalize(tlsPool_init_Capacity);
         assert(allocPool != nullptr);
 
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"New GetFullPool Called "
-                                                                                   L"Current allocPool : %p Current allocPool size : %lld",
-                                       allocPool, allocPool->m_size);
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p ",
+                                       L"[ Create New FullPool ]",allocPool);
 
-        releasePool = instance.GetEmptyPool(nullptr);
+        releasePool = new ObjectPoolType;
+        releasePool->Initalize(0);
+
         assert(releasePool != nullptr);
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"New GetEmptyPool Called "
-                                                                                   L"Current releasePool : %p Current releasePool size : %lld",
-                                       releasePool, releasePool->m_size);
+
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p ",
+                                        L"[ Create New EmptyPool ]",releasePool);
     }
     ~stTlsObjectPool()
     {
@@ -133,32 +139,28 @@ struct stTlsObjectPool
         {
 
             instance.fullPools.Push(allocPool);
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"fullPools.Push Called "
-                                                                                       L"allocPool : %p allocPool size : %lld",
-                                           allocPool, allocPool->m_size);
+
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t InputData  : %p  Data Size : %lld",
+                                           L"[ fullPools Push ]",instance.fullPools.m_size, allocPool, allocPool->m_size);
         }
         else
         {
             instance.emptyPools.Push(allocPool);
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"emptyPools.Push Called "
-                                                                                       L"allocPool : %p allocPool size : %lld",
-                                           allocPool, allocPool->m_size);
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t InputData  : %p  Data Size : %lld",
+                                           L"[ emptyPools Push ]",instance.emptyPools.m_size, allocPool, allocPool->m_size);
         }
-        if (releasePool->m_size != INIT_CAPACITY)
+        if (releasePool->m_size != tlsPool_init_Capacity)
         {
             instance.emptyPools.Push(releasePool);
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"emptyPools.Push Called "
-                                                                                       L"releasePool : %p releasePool size : %lld",
-                                           releasePool, releasePool->m_size);
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t InputData  : %p  Data Size : %lld",
+                                           L"[ emptyPools Push ]",instance.emptyPools.m_size, releasePool, releasePool->m_size);
         }
         else
         {
             instance.fullPools.Push(releasePool);
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"fullPools.Push Called "
-                                                                                       L"releasePool : %p releasePool size : %lld",
-                                           releasePool, releasePool->m_size);
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t InputData  : %p  Data Size : %lld",
+                                           L"[ fullPools Push ]",instance.fullPools.m_size, releasePool, releasePool->m_size);
         }
-
     }
     PVOID Alloc()
     {
@@ -166,30 +168,19 @@ struct stTlsObjectPool
         {
             ObjectPoolType *swap = allocPool;
             allocPool = instance.GetFullPool(swap);
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"GetFullPool Called "
-                                                                                       L"before allocPool : %p\t Current allocPool : %p Current allocPool size : %lld",
-                                           swap, allocPool, allocPool->m_size);
+
         }
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"Alloc Called  allocPool : size %lld",
-                                       allocPool->m_size);
         return allocPool->Alloc();
     }
     void Release(PVOID node)
     {
         releasePool->Release(node);
 
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"Release Called "
-                                                                                   L"Release : size %lld",
-                                       releasePool->m_size);
 
-        if (releasePool->m_size == INIT_CAPACITY)
+        if (releasePool->m_size == tlsPool_init_Capacity)
         {
             ObjectPoolType *swap = releasePool;
             releasePool = instance.GetEmptyPool(swap);
-
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"GetEmptyPool Called "
-                                                                                       L"before releasePool : %p\t Current releasePool : %p Current releasePool size : %lld",
-                                           swap, releasePool, releasePool->m_size);
         }
     }
 

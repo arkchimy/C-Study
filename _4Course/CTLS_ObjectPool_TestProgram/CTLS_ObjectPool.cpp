@@ -84,7 +84,7 @@ int main()
         parser.GetValue(L"iWorkerThreadCnt", iWorkerThreadCnt);
     }
     CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
-    //CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
+    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::SYSTEM_Mode);
 
     srand(3);
     hStartEvent = CreateEvent(nullptr, 1, 0, nullptr);
@@ -127,13 +127,22 @@ int main()
         retval = CompareTest(stack);
         if (retval == false)
             __debugbreak();
-
+        if(GetAsyncKeyState(VK_UP))
+        {
+            printf(" ========================== SYSTEM_Mode =========================================== \n");
+            CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::SYSTEM_Mode);
+        }
+        else if (GetAsyncKeyState(VK_DOWN))
+        {
+            printf(" ========================== DEBUF_MODE =========================================== \n");
+            CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
+        }
     }
 }
 
 void InputData_Initalization()
 {
-    int size = INIT_CAPACITY;
+    int size = tlsPool_init_Capacity;
 
     for (int i = 0; i < size; i++)
         inputData.push_back(rand() % 1000);
