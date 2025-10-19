@@ -1,8 +1,9 @@
 ﻿#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
 #include "../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
-#include "../_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
-#include "../_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
+
+#include "../../_4Course/_lib/CTlsLockFreeQueue/CTlsLockFreeQueue.h"
+#include "../../_4Course/_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
 
 #include <iostream>
 #include <list>
@@ -22,12 +23,12 @@ CDump dump;
 
 void InputData_Initalization();
 
-bool CompareTest(CTlsLockFreeStack<int> &stack);
+bool CompareTest(CTlsLockFreeQueue<int> &stack);
 
 unsigned WorkerThread(void *arg)
 {
-    CTlsLockFreeStack<int> *stack;
-    stack = reinterpret_cast<CTlsLockFreeStack<int> *>(arg);
+    CTlsLockFreeQueue<int> *queue;
+    queue = reinterpret_cast<CTlsLockFreeQueue<int> *>(arg);
     std::list<int> local_list;
 retry:
     WaitForSingleObject(hInitalizeEvent, INFINITE);
@@ -54,12 +55,12 @@ retry:
     int outPutData;
     while (local_list.empty() == false)
     {
-        stack->Push(local_list.front());
+        queue->Push(local_list.front());
         local_list.pop_front();
         if (rand() % 10 > 2)
         {
-            outPutData = stack->Pop();
-            stack->Push(outPutData);
+            queue->Pop(outPutData);
+            queue->Push(outPutData);
         }
     }
     _interlockedincrement64(&readyThreadChkCount);
@@ -98,7 +99,7 @@ int main()
 
     bool retval;
 
-    CTlsLockFreeStack<int> stack;
+    CTlsLockFreeQueue<int> stack;
     for (int i = 0; i < iWorkerThreadCnt; i++)
         hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &stack, 0, nullptr);
 
@@ -135,7 +136,7 @@ int main()
         else if (GetAsyncKeyState(VK_DOWN))
         {
             printf(" ========================== SYSTEM_Mode =========================================== \n");
-
+   
             CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::SYSTEM_Mode);
         }
         if (CSystemLog::GetInstance()->m_Log_Level == en_LOG_LEVEL::DEBUG_Mode)
@@ -152,16 +153,16 @@ void InputData_Initalization()
     compareData = inputData;
 }
 
-bool CompareTest(CTlsLockFreeStack<int> &stack)
+bool CompareTest(CTlsLockFreeQueue<int> &queue)
 {
     int outPutData;
 
-    while (stack.m_size != 0)
+    while (queue.m_size != 0)
     {
         if (compareData.size() == 0)
             return false;
 
-        outPutData = stack.Pop();
+        queue.Pop(outPutData);
         auto iter = std::find(compareData.begin(), compareData.end(), outPutData);
         compareData.erase(iter);
     }

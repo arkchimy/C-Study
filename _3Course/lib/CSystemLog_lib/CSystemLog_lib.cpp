@@ -50,7 +50,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
     // szStringFormat 는 Log 시점에 남기고싶은 정보를 남기기 위함.
     // 고정적으로  [szType] [2015-09-11 19:00:00 / LogLevel / 0000seqNumber] 로그문자열.
 
-    static WCHAR format[] = L"[ %-12s] [ %04d-%02d-%02d %02d:%02d:%03d  /%-8s/%08lld] \t[Thread ID : %05d] \t";
+    static WCHAR format[] = L"[ %-12s] [ %04d-%02d-%02d %02d:%02d:%03d  /%-8s/%08lld] \t[Thread ID : %06d] \t";
     static const WCHAR *Logformat[(DWORD)en_LOG_LEVEL::MAX] =
         {
             L"SYSTEM",
