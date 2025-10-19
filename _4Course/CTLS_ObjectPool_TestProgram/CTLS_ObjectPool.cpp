@@ -1,12 +1,12 @@
-﻿#include "../_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
-#include "../_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
+﻿#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
+#include "../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
-#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
+#include "../_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
+#include "../_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
 
 #include <iostream>
-#include <thread>
 #include <list>
-
+#include <thread>
 
 std::list<int> inputData;
 std::list<int> compareData;
@@ -29,7 +29,7 @@ unsigned WorkerThread(void *arg)
     CTlsLockFreeStack<int> *stack;
     stack = reinterpret_cast<CTlsLockFreeStack<int> *>(arg);
     std::list<int> local_list;
-
+retry:
     WaitForSingleObject(hInitalizeEvent, INFINITE);
 
     while (1)
@@ -62,6 +62,10 @@ unsigned WorkerThread(void *arg)
             stack->Push(outPutData);
         }
     }
+    _interlockedincrement64(&readyThreadChkCount);
+    WaitForSingleObject(hInitalizeEvent, INFINITE);
+
+    goto retry;
 
     return 0;
 }
@@ -79,6 +83,9 @@ int main()
         parser.LoadFile(L"Config.txt");
         parser.GetValue(L"iWorkerThreadCnt", iWorkerThreadCnt);
     }
+    CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
+    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
+
     srand(3);
     hStartEvent = CreateEvent(nullptr, 1, 0, nullptr);
     hInitalizeEvent = CreateEvent(nullptr, 1, 0, nullptr);
@@ -86,36 +93,41 @@ int main()
         __debugbreak();
 
     hThread = new HANDLE[iWorkerThreadCnt];
+    if (hThread == nullptr)
+        __debugbreak();
+
     bool retval;
+
+    CTlsLockFreeStack<int> stack;
+    for (int i = 0; i < iWorkerThreadCnt; i++)
+        hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &stack, 0, nullptr);
 
     while (1)
     {
-        CTlsLockFreeStack<int> stack;
+ 
         InputData_Initalization();
-
-        for (int i = 0; i < iWorkerThreadCnt; i++)
-            hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &stack, 0, nullptr);
         SetEvent(hInitalizeEvent);
 
         printf("ToTal list size : %lld \n", inputData.size());
 
-        while (readyThreadChkCount != iWorkerThreadCnt)
+        while (InterlockedCompareExchange((ull*) & readyThreadChkCount, 0, iWorkerThreadCnt) != iWorkerThreadCnt)
         {
             YieldProcessor();
         }
         ResetEvent(hInitalizeEvent);
-        InterlockedExchange64(&readyThreadChkCount, 0);
-
         SetEvent(hStartEvent);
-        WaitForMultipleObjects(iWorkerThreadCnt, hThread, true, INFINITE);
-        ResetEvent(hStartEvent);
 
-        for (int i = 0; i < iWorkerThreadCnt; i++)
-            CloseHandle(hThread[i]);
+        while (InterlockedCompareExchange((ull *)&readyThreadChkCount, 0, iWorkerThreadCnt) != iWorkerThreadCnt)
+        {
+            YieldProcessor();
+        }
+
+        ResetEvent(hStartEvent);
 
         retval = CompareTest(stack);
         if (retval == false)
             __debugbreak();
+
     }
 }
 

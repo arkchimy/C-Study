@@ -50,7 +50,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
     // szStringFormat 는 Log 시점에 남기고싶은 정보를 남기기 위함.
     // 고정적으로  [szType] [2015-09-11 19:00:00 / LogLevel / 0000seqNumber] 로그문자열.
 
-    static WCHAR format[] = L"[ %-12s] [ %04d-%02d-%02d %02d:%02d:%03d  /%-8s/%08lld] \t";
+    static WCHAR format[] = L"[ %-12s] [ %04d-%02d-%02d %02d:%02d:%03d  /%-8s/%08lld] \t[Thread ID : %d] \t";
     static const WCHAR *Logformat[(DWORD)en_LOG_LEVEL::MAX] =
         {
             L"SYSTEM",
@@ -86,7 +86,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
     StringCchPrintfW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), format,
                      szType, stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay,
                      stNowTime.wHour, stNowTime.wMinute, stNowTime.wMilliseconds,
-                     Logformat[(DWORD)LogLevel], local_SeqNumber);
+                     Logformat[(DWORD)LogLevel], local_SeqNumber,GetCurrentThreadId());
 
     //[Battle] [2015-09-11 19:00:00 / DEBUG / 000000001] 로그문자열.
 
@@ -100,6 +100,10 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
     }
 
     StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogPayLoadBuffer);
+
+    DWORD idx = wcslen(LogHeaderBuffer);
+    LogHeaderBuffer[idx] = L'\n';
+    LogHeaderBuffer[idx + 1] = 0;
 
     AcquireSRWLockExclusive(&srw_lock);
     _wfopen_s(&LogFile, LogFileName, L"a+ , ccs = UTF-16LE");

@@ -140,6 +140,9 @@
     <ProjectReference Include="..\..\_3Course\lib\CrushDump_lib\CrushDump_lib\CrushDump_lib.vcxproj">
       <Project>{b5035720-6cd1-4206-a4d5-c190fab6cdde}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\..\_3Course\lib\CSystemLog_lib\CSystemLog_lib.vcxproj">
+      <Project>{aa6f5a62-72b2-42bc-b005-a02cc7f109c7}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\_lib\CTlsLockFreeStack\CTlsLockFreeStack.vcxproj">
       <Project>{e65b7f03-2c2c-4de0-b0d0-9610035396fc}</Project>
     </ProjectReference>
