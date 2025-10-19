@@ -50,7 +50,7 @@ struct stTlsObjectPoolManager
             retval = new ObjectPoolType;
             retval->Initalize(tlsPool_init_Capacity);
 
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p ",
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
                                             L"[ Create New FullPool ]",retval);
             CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s :  %p  => %p ",
                                            L"[ fullPool Change ] ",emptyStack, retval);
@@ -77,7 +77,7 @@ struct stTlsObjectPoolManager
         if (emptyPools.m_size == 0)
         {
             retval = new ObjectPoolType();
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p ",
+            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - emptyPools.m_size == 0 ",
                                            L"[ Create New EmptyPool ]",retval);
             CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  :  %p  => %p ",
                                            L"[ emptyPool Change ]",fullStack, retval);
@@ -122,7 +122,7 @@ struct stTlsObjectPool
         allocPool->Initalize(tlsPool_init_Capacity);
         assert(allocPool != nullptr);
 
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p ",
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p -  TLSAlloc",
                                        L"[ Create New FullPool ]",allocPool);
 
         releasePool = new ObjectPoolType;
@@ -130,7 +130,7 @@ struct stTlsObjectPool
 
         assert(releasePool != nullptr);
 
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p ",
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p -  TLSAlloc",
                                         L"[ Create New EmptyPool ]",releasePool);
     }
     ~stTlsObjectPool()
