@@ -7,6 +7,7 @@
 #include "../../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
 #include "../../../_1Course/lib/Parser_lib/Parser_lib.h"
 
+
 #define RT_ASSERT(x) \
     if (!(x))        \
         __debugbreak();

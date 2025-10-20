@@ -1,6 +1,7 @@
 ﻿#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
 #include "../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+#include "../../_3Course/lib/Profiler_MultiThread/Profiler_MultiThread.h"
 #include "../_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
 #include "../_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
 
@@ -54,7 +55,12 @@ retry:
     int outPutData;
     while (local_list.empty() == false)
     {
-        stack->Push(local_list.front());
+        Profiler profile;
+        {
+            profile.Start(L"tlsPush");
+            stack->Push(local_list.front());
+            profile.End(L"tlsPush");
+        }
         local_list.pop_front();
         if (rand() % 10 > 2)
         {
@@ -137,6 +143,14 @@ int main()
             printf(" ========================== SYSTEM_Mode =========================================== \n");
 
             CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::SYSTEM_Mode);
+        }
+        else if (GetAsyncKeyState('A') || GetAsyncKeyState('a'))
+        {
+            Profiler::SaveAsLog(L"Profiler.txt");
+        }
+        else if (GetAsyncKeyState('D') || GetAsyncKeyState('d'))
+        {
+            Profiler::Reset();
         }
         if (CSystemLog::GetInstance()->m_Log_Level == en_LOG_LEVEL::DEBUG_Mode)
             system("pause");

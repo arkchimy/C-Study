@@ -4,6 +4,8 @@
 #include "../../_1Course/lib/Parser_lib/Parser_lib.h"
 #include "../../_3Course/lib/CLockFreeStack_lib/CLockFreeStack.h"
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+#include "../../_3Course/lib/Profiler_MultiThread/Profiler_MultiThread.h"
+
 #include <iostream>
 #include <list>
 #include <thread>
@@ -28,7 +30,7 @@ unsigned WorkerThread(void *arg)
     CLockFreeStack<int> *stack;
     stack = reinterpret_cast<CLockFreeStack<int> *>(arg);
     std::list<int> local_list;
-
+retry:
     WaitForSingleObject(hInitalizeEvent, INFINITE);
 
     while (1)
@@ -45,7 +47,6 @@ unsigned WorkerThread(void *arg)
 
         ReleaseSRWLockExclusive(&srw_inputDataLock);
         Sleep(0);
-
     }
     _interlockedincrement64(&readyThreadChkCount);
 
@@ -54,7 +55,12 @@ unsigned WorkerThread(void *arg)
     int outPutData;
     while (local_list.empty() == false)
     {
-        stack->Push(local_list.front());
+        Profiler profile;
+        {
+            profile.Start(L"NormalPush");
+            stack->Push(local_list.front());
+            profile.End(L"NormalPush");
+        }
         local_list.pop_front();
         if (rand() % 10 > 2)
         {
@@ -62,6 +68,10 @@ unsigned WorkerThread(void *arg)
             stack->Push(outPutData);
         }
     }
+    _interlockedincrement64(&readyThreadChkCount);
+    WaitForSingleObject(hInitalizeEvent, INFINITE);
+
+    goto retry;
 
     return 0;
 }
@@ -90,40 +100,51 @@ int main()
     hThread = new HANDLE[iWorkerThreadCnt];
     bool retval;
 
+    CLockFreeStack<int> stack;
+    for (int i = 0; i < iWorkerThreadCnt; i++)
+        hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &stack, 0, nullptr);
+    SetEvent(hInitalizeEvent);
+
     while (1)
     {
-        CLockFreeStack<int> stack;
-        InputData_Initalization();
 
-        for (int i = 0; i < iWorkerThreadCnt; i++)
-            hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &stack, 0, nullptr);
+        InputData_Initalization();
         SetEvent(hInitalizeEvent);
+
         printf("ToTal list size : %lld \n", inputData.size());
 
-        while (readyThreadChkCount != iWorkerThreadCnt)
+        while (InterlockedCompareExchange((ull *)&readyThreadChkCount, 0, iWorkerThreadCnt) != iWorkerThreadCnt)
         {
             YieldProcessor();
         }
         ResetEvent(hInitalizeEvent);
-        InterlockedExchange64(&readyThreadChkCount, 0);
-
         SetEvent(hStartEvent);
-        WaitForMultipleObjects(iWorkerThreadCnt, hThread, true, INFINITE);
-        ResetEvent(hStartEvent);
 
-        for (int i = 0; i < iWorkerThreadCnt; i++)
-            CloseHandle(hThread[i]);
+        while (InterlockedCompareExchange((ull *)&readyThreadChkCount, 0, iWorkerThreadCnt) != iWorkerThreadCnt)
+        {
+            YieldProcessor();
+        }
+
+        ResetEvent(hStartEvent);
 
         retval = CompareTest(stack);
         if (retval == false)
             __debugbreak();
 
+        if (GetAsyncKeyState('A') || GetAsyncKeyState('a'))
+        {
+            Profiler::SaveAsLog(L"Profiler.txt");
+        }
+        else if (GetAsyncKeyState('D') || GetAsyncKeyState('d'))
+        {
+            Profiler::Reset();
+        }
     }
 }
 
 void InputData_Initalization()
 {
-    int size = rand() % 10000;
+    int size = 500;
 
     for (int i = 0; i < size; i++)
         inputData.push_back(rand() % 1000);

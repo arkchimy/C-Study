@@ -143,6 +143,9 @@
     <ProjectReference Include="..\..\_3Course\lib\CrushDump_lib\CrushDump_lib\CrushDump_lib.vcxproj">
       <Project>{b5035720-6cd1-4206-a4d5-c190fab6cdde}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\..\_3Course\lib\Profiler_MultiThread\Profiler_MultiThread.vcxproj">
+      <Project>{5e8f90bb-3fc5-47bc-85e9-363129ba3713}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Config.txt" />
