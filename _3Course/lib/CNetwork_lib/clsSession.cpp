@@ -19,10 +19,21 @@ void clsSession::Release()
 {
     if (InterlockedExchange(&m_blive,0) == 1)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"Release_socket_live  HANDLE value : %lld  seqID :%llu  seqIndx : %llu\n",
-                                       m_sock, m_SeqID.SeqNumberAndIdx, m_SeqID.idx);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"Release ",
+                                       L"HANDLE : ", m_sock, L"seqID :", m_SeqID.SeqNumberAndIdx, L"seqIndx : ", m_SeqID.idx,
+                                       L"IO_Count", m_ioCount);
+
         return;
+    }
+    else
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"Release Fail",
+                                       L"HANDLE : ", m_sock, L"seqID :", m_SeqID.SeqNumberAndIdx, L"seqIndx : ", m_SeqID.idx,
+                                       L"IO_Count", m_ioCount);
     }
     CMessage *msg;
     while (m_sendBuffer.Pop(msg))

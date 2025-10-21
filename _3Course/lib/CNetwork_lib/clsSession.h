@@ -12,6 +12,9 @@
 
 using ull = unsigned long long;
 
+#define SESSION_IDX_MASK 0xFFFF800000000000
+#define SESSION_SEQ_MASK 0x00007FFFFFFFFFFF
+
 enum class Job_Type
 {
     Recv,
@@ -34,8 +37,8 @@ typedef struct stSessionId
     {
         struct
         {
-            ull idx : 16;
-            ull seqNumber : 48;
+            ull seqNumber : 47;
+            ull idx : 17;
         };
         ull SeqNumberAndIdx = 0;
     };

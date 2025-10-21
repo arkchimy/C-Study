@@ -4,6 +4,7 @@
 #include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
 
 #include <thread>
+
 extern SRWLOCK srw_Log;
 
 unsigned ContentsThread(void *arg)
@@ -70,7 +71,6 @@ unsigned MonitorThread(void *arg)
     ZeroMemory(arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
     ZeroMemory(before_arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
 
-
     while (1)
     {
         wait_retval = WaitForSingleObject(hWaitHandle, 1000);
@@ -86,7 +86,6 @@ unsigned MonitorThread(void *arg)
             if (server->GetSessionCount() == 0)
                 continue;
             printf(" Total Sessions: %d\n", server->GetSessionCount());
-            printf(" DisConnectCount Sessions: %llu\n", server->m_DisConnectCount);
 
             for (int i = 0; i <= server->m_WorkThreadCnt; i++)
             {
@@ -96,7 +95,6 @@ unsigned MonitorThread(void *arg)
                     printf(" Send TPS : %lld\n", arrTPS[i]);
             }
         }
-
     }
 
     return 0;
@@ -170,66 +168,41 @@ bool CTestServer::OnAccept(ull SessionID)
 
     static char *LoginPacket = CreateLoginMessage();
 
-    // stHeader header;
-    clsSession *session;
-    stSessionId currentSessionID;
     WSABUF wsabuf;
     int send_retval;
     DWORD LastError;
+    ull local_IoCount;
 
-    currentSessionID.SeqNumberAndIdx = SessionID;
-    session = &sessions_vec[currentSessionID.idx];
-
-    if (currentSessionID != session->m_SeqID)
-    {
-        ERROR_FILE_LOG(L"Critical_Error.txt", L"currentID != session->m_SeqID");
-        return false;
-    }
-
-    // send_retval = send(session->m_sock, LoginPacket, sizeof(LoginPacket), 0);
-    // if (send_retval <= 0)
-    //{
-    //     return false;
-    // }
-
+    clsSession &session = sessions_vec[(SessionID & SESSION_IDX_MASK) >> 47];
+    ull idx = (SessionID & SESSION_IDX_MASK) >> 47;
     wsabuf.buf = LoginPacket;
     wsabuf.len = 10;
 
-    _InterlockedExchange(&session->m_flag, 1);
+    _InterlockedExchange(&session.m_flag, 1);
 
-    ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
+    local_IoCount = InterlockedIncrement(&session.m_ioCount);
 
-    // wchar_t buffer[1000];
-    // StringCchPrintfW(buffer, sizeof(buffer) / sizeof(wchar_t), L" sessionPrt : %p  , sessionIdx : %lld  ,sock : %llu , OnAcceptSend  ioCount %llu ", session, currentSessionID.idx,  session->m_sock, local_IoCount);
-    // ERROR_FILE_LOG(L"SystemLog.txt", buffer);
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                   L"OnAccept",
+                                   L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                   L"IO_Count", local_IoCount);
 
-    ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
+    ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
 
-    send_retval = WSASend(session->m_sock, &wsabuf, 1, nullptr, 0, (OVERLAPPED *)&session->m_sendOverlapped, nullptr);
+    send_retval = WSASend(session.m_sock, &wsabuf, 1, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                   L"WSASend",
+                                   L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                   L"IO_Count", local_IoCount);
     LastError = GetLastError();
 
     if (send_retval < 0)
     {
-        if (LastError != WSA_IO_PENDING)
-        {
-            ERROR_FILE_LOG(L"Socket_Error.txt", L"WSASend Error ");
-            InterlockedDecrement(&session->m_ioCount);
-        }
+        WSASendError(LastError,SessionID);
     }
 
-    /*
-    *     CMessage *msg = CreateLoginMessage();
-    CMessage **ppMsg;
-    ppMsg  = &msg;
-
-    session->m_sendBuffer.ClearBuffer();
-    if (session->m_sendBuffer.Enqueue(ppMsg, sizeof(size_t)) != sizeof(size_t))
-    {
-        session->m_blive = false;
-        ERROR_FILE_LOG(L"session_Error.txt", L"(session->m_sendBuffer.Enqueue another");
-        __debugbreak();
-        return false;
-    }*/
     return true;
 }
 
@@ -237,11 +210,11 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
 {
     clsSession *session;
 
-    session = &sessions_vec[sessionID & 0xffff];
+    session = &sessions_vec[(sessionID & SESSION_IDX_MASK) >> 47];
     // TODO : 인덱스만 같은 다른 Session
     if (sessionID != session->m_SeqID.SeqNumberAndIdx)
     {
-        CObjectPoolManager::pool.Release(message);
+        CMessagePoolManager::pool.Release(message);
         return;
     }
 
@@ -251,16 +224,24 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         return;
     if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
     {
-        session->Release();
-        m_ReleaseSessions.Push(session);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"ContentsRelease1",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"IO_Count", session->m_ioCount);
+        ReleaseSession(sessionID);
         return;
     }
 
     if ((session->m_ioCount & (ull)1 << 47) != 0)
     {
         // Release Flag가 켜져있다면,
-        session->Release();
-        m_ReleaseSessions.Push(session);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"ContentsRelease2",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"IO_Count", session->m_ioCount);
+        ReleaseSession(sessionID);
         return;
     }
     CMessage **ppMsg;
@@ -273,7 +254,6 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
             session->m_sendBuffer.Push(*ppMsg);
             profile.End(L"LFQ_Push");
         }
-        
     }
 
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
@@ -285,7 +265,11 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     }
     if (InterlockedExchange(&session->m_Useflag, 0) == 2)
     {
-        session->Release();
-        m_ReleaseSessions.Push(session);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"ContentsRelease3",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"IO_Count", session->m_ioCount);
+        ReleaseSession(sessionID);
     }
 }

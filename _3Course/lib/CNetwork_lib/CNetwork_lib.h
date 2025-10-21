@@ -36,6 +36,7 @@ struct stSRWLock
     SRWLOCK *m_srw;
 };
 
+
 class CLanServer
 {
   public:
@@ -67,6 +68,10 @@ class CLanServer
     int getRecvMessageTPS();
     int getSendMessageTPS();
 
+    void WSASendError(const DWORD LastError, const ull SessionID);
+    void WSARecvError(const DWORD LastError, const ull SessionID);
+    void ReleaseSession(ull SessionID);
+
   public:
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
@@ -78,7 +83,7 @@ class CLanServer
     bool bOn = false;
 
     LONG64 m_SessionCount = 0;
-    ull m_DisConnectCount = 0;
+
 
     std::vector<class clsSession> sessions_vec;
     CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로 
