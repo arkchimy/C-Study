@@ -383,6 +383,7 @@ bool CLanServer::Disconnect(const ull SessionID)
                                        session.m_sock, session.m_SeqID.SeqNumberAndIdx, session.m_SeqID.idx);
         return false;
     }
+    _interlockedincrement64((LONG64*)&iDisCounnectCount);
     CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-10s %10s %05lld  %10s %012llu  %10s %4llu ",
                                    L"Disconnect",

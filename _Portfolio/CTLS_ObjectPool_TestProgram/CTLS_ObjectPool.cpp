@@ -2,8 +2,8 @@
 #include "../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
 #include "../../_3Course/lib/Profiler_MultiThread/Profiler_MultiThread.h"
-#include "../_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
-#include "../_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
+#include "../../_4Course/_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
+#include "../../_4Course/_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
 
 #include <iostream>
 #include <list>

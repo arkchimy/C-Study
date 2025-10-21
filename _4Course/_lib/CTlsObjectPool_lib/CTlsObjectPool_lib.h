@@ -6,6 +6,7 @@
 #include "../../../_3Course/lib/CLockFreeStack_lib/CLockFreeStack.h"
 #include "../../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
 #include "../../../_1Course/lib/Parser_lib/Parser_lib.h"
+#include "CObjectPool_UnSafeMT.h"
 
 
 #define RT_ASSERT(x) \
@@ -34,7 +35,7 @@ struct stTlsObjectPoolManager
         stNode *next;
     };
 
-    using ObjectPoolType = CObjectPool<T>;
+    using ObjectPoolType = CObjectPool_UnSafeMT<T>;
     using ManagerPool = CLockFreeStack<ObjectPoolType *>;
 
     ObjectPoolType *GetFullPool(ObjectPoolType *emptyStack)
@@ -110,7 +111,7 @@ struct stTlsObjectPoolManager
 template <typename T>
 struct stTlsObjectPool
 {
-    using ObjectPoolType = CObjectPool<T>;
+    using ObjectPoolType = CObjectPool_UnSafeMT<T>;
     struct stNode
     {
         T data;

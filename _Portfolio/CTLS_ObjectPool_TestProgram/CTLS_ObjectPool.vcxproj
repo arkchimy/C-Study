@@ -146,12 +146,6 @@
     <ProjectReference Include="..\..\_3Course\lib\Profiler_MultiThread\Profiler_MultiThread.vcxproj">
       <Project>{5e8f90bb-3fc5-47bc-85e9-363129ba3713}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\_lib\CTlsLockFreeStack\CTlsLockFreeStack.vcxproj">
-      <Project>{e65b7f03-2c2c-4de0-b0d0-9610035396fc}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\_lib\CTlsObjectPool_lib\CTlsObjectPool_lib.vcxproj">
-      <Project>{eceb3595-a0b3-4a4c-9326-3d35b5f42cc7}</Project>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Config.txt" />

@@ -85,7 +85,7 @@ class CLanServer
     bool bOn = false;
 
     LONG64 m_SessionCount = 0;
-
+    ull iDisCounnectCount = 0;
 
     std::vector<class clsSession> sessions_vec;
     CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로 
