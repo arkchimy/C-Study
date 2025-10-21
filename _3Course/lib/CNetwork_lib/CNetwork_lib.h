@@ -63,6 +63,8 @@ class CLanServer
     virtual double OnRecv(ull SessionID, CMessage *msg) = 0;
 
     int GetSessionCount();
+    LONG64 GetReleaseSessions();
+    LONG64 Get_IdxStack();
 
     int getAcceptTPS();
     int getRecvMessageTPS();

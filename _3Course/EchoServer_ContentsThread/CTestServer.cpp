@@ -86,13 +86,12 @@ unsigned MonitorThread(void *arg)
             if (server->GetSessionCount() == 0)
                 continue;
             printf(" Total Sessions: %d\n", server->GetSessionCount());
+            printf(" IdxStack Size: %lld\n", server->Get_IdxStack());
+            printf(" ReleaseSessions Size: %lld\n", server->GetReleaseSessions());
 
-            for (int i = 0; i <= server->m_WorkThreadCnt; i++)
+            for (int i = 1; i <= server->m_WorkThreadCnt; i++)
             {
-                if (i == 0)
-                    printf(" Conetents Send TPS : %lld\n", arrTPS[i]);
-                else
-                    printf(" Send TPS : %lld\n", arrTPS[i]);
+                printf(" Send TPS : %lld\n", arrTPS[i]);
             }
         }
     }
