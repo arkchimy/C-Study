@@ -9,5 +9,8 @@
 
 // 여기에 미리 컴파일하려는 헤더 추가
 #include "CTlsObjectPool_lib.h"
-
+#include <Windows.h>
+#include <algorithm>
+#include <iostream>
+#include <vector>
 #endif //PCH_H

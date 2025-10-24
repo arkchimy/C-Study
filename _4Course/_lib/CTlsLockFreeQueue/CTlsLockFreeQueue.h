@@ -35,9 +35,15 @@ class CTlsLockFreeQueue
 template <typename T>
 CTlsLockFreeQueue<T>::CTlsLockFreeQueue()
 {
-    m_NullptrNode = (stNode*)_interlockedincrement64(&s_NullptrSeqNumber);
+    stNode *Dummy = nullptr;
 
-    stNode *Dummy = reinterpret_cast<stNode *>(pool.Alloc());
+    m_NullptrNode = reinterpret_cast<stNode *>(stTlsObjectPool<T>::Alloc());
+    Dummy = reinterpret_cast<stNode *>(stTlsObjectPool<T>::Alloc());
+    if (m_NullptrNode == nullptr)
+        __debugbreak();
+    if (Dummy == nullptr)
+        __debugbreak();
+    m_NullptrNode->next = nullptr;
     Dummy->next = m_NullptrNode;
 
     _head = Dummy;
@@ -48,8 +54,22 @@ CTlsLockFreeQueue<T>::CTlsLockFreeQueue()
 template <typename T>
 inline CTlsLockFreeQueue<T>::~CTlsLockFreeQueue()
 {
-    void *ptr = reinterpret_cast<void *>(LONG64(_head) & ADDR_MASK);
-    pool.Release(ptr);
+    stNode *ptr = reinterpret_cast<stNode *>(LONG64(_head) & ADDR_MASK);
+    T data;
+    while (m_size != 0)
+    {
+        Pop(data);
+    }
+    ptr = reinterpret_cast<stNode *>(LONG64(_head) & ADDR_MASK);
+
+    if (m_NullptrNode != ptr->next)
+    {
+        CSystemLog::GetInstance()->Log(L"TlsQueue_Error", en_LOG_LEVEL::ERROR_Mode, L"10%s %p : %p ptr : %p",
+                                       L"m_NullptrNode != ptr->next", m_NullptrNode, ptr->next, ptr);
+        __debugbreak();
+    }
+
+    stTlsObjectPool<T>::Release(ptr);
 }
 
 template <typename T>
@@ -63,7 +83,7 @@ void CTlsLockFreeQueue<T>::Push(T data)
 
     stNode *tailNext;
 
-    newNode = reinterpret_cast<stNode *>(pool.Alloc());
+    newNode = reinterpret_cast<stNode *>(stTlsObjectPool<T>::Alloc());
     newNode->next = m_NullptrNode;
     newNode->data = data;
 
@@ -136,7 +156,7 @@ bool CTlsLockFreeQueue<T>::Pop(__out T &outData)
 
     } while (1);
 
-    pool.Release(headAddr);
+    stTlsObjectPool<T>::Release(headAddr);
 
     return true;
 }

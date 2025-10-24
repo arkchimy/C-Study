@@ -4,6 +4,7 @@
 #include "../../_3Course/lib/Profiler_MultiThread/Profiler_MultiThread.h"
 #include "../_lib/CTlsLockFreeStack/CTlsLockFreeStack.h"
 #include "../_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
+#include "../_lib/CTlsLockFreeQueue/CTlsLockFreeQueue.h"
 
 #include <iostream>
 #include <list>
@@ -23,12 +24,15 @@ CDump dump;
 
 void InputData_Initalization();
 
-bool CompareTest(CTlsLockFreeStack<int> &stack);
+using TestType = CTlsLockFreeQueue<int>;
+
+bool CompareTest(TestType &stack);
+
 
 unsigned WorkerThread(void *arg)
 {
-    CTlsLockFreeStack<int> *stack;
-    stack = reinterpret_cast<CTlsLockFreeStack<int> *>(arg);
+    TestType *stack;
+    stack = reinterpret_cast<TestType *>(arg);
     std::list<int> local_list;
 retry:
     WaitForSingleObject(hInitalizeEvent, INFINITE);
@@ -64,7 +68,7 @@ retry:
         local_list.pop_front();
         if (rand() % 10 > 2)
         {
-            outPutData = stack->Pop();
+            stack->Pop(outPutData);
             stack->Push(outPutData);
         }
     }
@@ -104,7 +108,7 @@ int main()
 
     bool retval;
 
-    CTlsLockFreeStack<int> stack;
+    TestType stack;
     for (int i = 0; i < iWorkerThreadCnt; i++)
         hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &stack, 0, nullptr);
 
@@ -166,7 +170,7 @@ void InputData_Initalization()
     compareData = inputData;
 }
 
-bool CompareTest(CTlsLockFreeStack<int> &stack)
+bool CompareTest(TestType &stack)
 {
     int outPutData;
 
@@ -175,7 +179,7 @@ bool CompareTest(CTlsLockFreeStack<int> &stack)
         if (compareData.size() == 0)
             return false;
 
-        outPutData = stack.Pop();
+        stack.Pop(outPutData);
         auto iter = std::find(compareData.begin(), compareData.end(), outPutData);
         compareData.erase(iter);
     }
