@@ -89,8 +89,8 @@ class CLanServer
 
     std::vector<class clsSession> sessions_vec;
     CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로 
-    CLockFreeQueue<clsSession *> m_ReleaseSessions;
-
+    //CLockFreeQueue<clsSession *> m_ReleaseSessions;
+    CLockFreeStack<clsSession *> m_ReleaseSessions;
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
     DWORD m_tlsIdxForTPS = 0;
     LONG64 *arrTPS = nullptr; //  idx 0 : Contents , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열

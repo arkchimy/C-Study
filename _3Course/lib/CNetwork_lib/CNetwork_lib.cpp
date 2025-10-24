@@ -122,23 +122,24 @@ unsigned AcceptThread(void *arg)
                 __debugbreak();
                 continue;
             }
-            idx = server->m_IdxStack.Pop();
+            server->m_IdxStack.Pop(idx);
         }
 
         stsessionID.idx = idx;
         stsessionID.seqNumber = session_id++;
 
         session = &server->sessions_vec[idx];
-        session->m_SeqID.SeqNumberAndIdx = stsessionID.SeqNumberAndIdx;
-        session->m_sock = client_sock;
-        session->m_blive = true;
+  
+        InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+        InterlockedExchange(&session->m_sock, client_sock);
+        InterlockedExchange(&session->m_blive, 1);
+        InterlockedExchange(&session->m_Useflag, 0);
+        InterlockedExchange(&session->m_flag, 0);
+        InterlockedExchange(&session->m_ioCount, 0);
 
-        session->m_Useflag = 0;
-        session->m_flag = 0;
-        session->m_ioCount = 0;
 
 
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
                                        L"Accept", L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
 
@@ -251,19 +252,6 @@ unsigned WorkerThread(void *arg)
             server->ReleaseSession(session->m_SeqID.SeqNumberAndIdx);
         }
 
-        /*   clsSession *releaseSession;
-        while (server->m_ReleaseSessions.Pop(releaseSession))
-        {
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                           L"Closesocket",
-                                           L"HANDLE : ", releaseSession->m_sock, L"seqID :", releaseSession->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", releaseSession->m_SeqID.idx,
-                                           L"IO_Count", releaseSession->m_ioCount);
-            closesocket(releaseSession->m_sock);
-
-            server->m_IdxStack.Push(releaseSession->m_SeqID.idx);
-            _interlockeddecrement64(&server->m_SessionCount);
-        }*/
     }
     printf("WorkerThreadID : %d  return '0' \n", GetCurrentThreadId());
 
@@ -529,19 +517,7 @@ char *CLanServer::CreateLoginMessage()
 
     return msg;
 }
-// CMessage *CLanServer::CreateLoginMessage()
-//{
-//     static short header = 0x0008;
-//     static ull PayLoad = 0x7fffffffffffffff;
-//
-//     // 현재 이 기능 사용안함.
-//     CMessage *msg = nullptr;
-//     //static char LoginPacket[10] = {0x08, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f};
-//     //CMessage *msg = reinterpret_cast<CMessage *>(CMessagePoolManager::pool.Alloc());
-//     //msg->PutData(LoginPacket, sizeof(LoginPacket));
-//
-//     return msg;
-// }
+
 
 void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 {
@@ -754,7 +730,7 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
         // WSAENOTSOCK
     case 10038:
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"WSASendError",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
@@ -764,7 +740,7 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"ServerRST",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
@@ -791,7 +767,7 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"ClientRST",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
@@ -875,7 +851,7 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
         // WSAENOTSOCK
     case 10038:
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"WSARecvError",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
@@ -885,14 +861,14 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"ServerRST",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
         if (InterlockedExchange(&session.m_blive, 0) == 1)
         {
             CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3d",
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                            L"m_blive => 0",
                                            L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                            L"m_blive", 0);
@@ -912,7 +888,7 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"ClientRST",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
@@ -980,13 +956,16 @@ void CLanServer::ReleaseSession(ull SessionID)
     clsSession *releaseSession;
     while (m_ReleaseSessions.Pop(releaseSession) == true)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"Closesocket",
                                        L"HANDLE : ", releaseSession->m_sock, L"seqID :", releaseSession->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", releaseSession->m_SeqID.idx,
                                        L"IO_Count", releaseSession->m_ioCount);
         closesocket(releaseSession->m_sock);
-        m_IdxStack.Push(releaseSession->m_SeqID.idx);
+        releaseSession->m_sock = 0;
+        ull idx = (releaseSession->m_SeqID.SeqNumberAndIdx & SESSION_IDX_MASK) >> 47;
+        releaseSession->m_SeqID.SeqNumberAndIdx = 0;
+        m_IdxStack.Push(idx);
         _interlockeddecrement64(&m_SessionCount);
     }
 }

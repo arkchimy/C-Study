@@ -212,17 +212,20 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     clsSession *session;
 
     session = &sessions_vec[(sessionID & SESSION_IDX_MASK) >> 47];
-    // TODO : 인덱스만 같은 다른 Session
-    if (sessionID != session->m_SeqID.SeqNumberAndIdx)
-    {
-        CMessagePoolManager::pool.Release(message);
-        return;
-    }
+
 
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     //
     if (InterlockedExchange(&session->m_Useflag, 1) != 0)
         return;
+
+    // TODO : 인덱스만 같은 다른 Session
+    if (sessionID != session->m_SeqID.SeqNumberAndIdx)
+    {
+        CMessagePoolManager::pool.Release(message);
+        InterlockedExchange(&session->m_Useflag, 0);
+        return;
+    }
     if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,

@@ -90,15 +90,19 @@ class CLockFreeStack
             infos[local_seqNumber % INFO_BUFFER_MAX].newTop_nextNode = reinterpret_cast<stNode *>(temp);
         }
     }
-    T Pop()
+    bool Pop(T& outData)
     {
         stNode *newTop;
         stNode *oldTop;
-        T outData;
+  
         LONG64 local_seqNumber;
         do
         {
             oldTop = m_top;
+            if (oldTop == dummy)
+            {
+                return false;
+            }
             newTop = reinterpret_cast<stNode *>((LONG64)oldTop & ADDR_MASK)->next;
             outData = reinterpret_cast<stNode *>((LONG64)oldTop & ADDR_MASK)->data;
 
@@ -129,7 +133,7 @@ class CLockFreeStack
         }
 
         m_pool.Release(reinterpret_cast<stNode *>((LONG64)oldTop & ADDR_MASK));
-        return outData;
+        return true;
     }
 
     LONG64 m_debugSeqNumber = -1;
