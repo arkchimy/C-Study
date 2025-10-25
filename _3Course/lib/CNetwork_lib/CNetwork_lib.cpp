@@ -127,17 +127,22 @@ unsigned AcceptThread(void *arg)
             server->m_IdxStack.Pop(idx);
         }
 
-        stsessionID.idx = idx;
-        stsessionID.seqNumber = session_id++;
-
         session = &server->sessions_vec[idx];
   
-        InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
-        InterlockedExchange(&session->m_sock, client_sock);
-        InterlockedExchange(&session->m_blive, 1);
+        //InterlockedExchange(&session->m_ioCount, 0);
+        //InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+        //InterlockedExchange(&session->m_sock, client_sock);
+        //InterlockedExchange(&session->m_blive, 1);
+        //InterlockedExchange(&session->m_flag, 0);
+
+        session->m_ioCount = 0;
+        session->m_sock = client_sock;
+        session->m_blive = 1;
+        session->m_flag = 0;
+        session->m_SeqID.SeqNumberAndIdx = (idx << 47 | session_id);
+        session_id++;
+       
         InterlockedExchange(&session->m_Useflag, 0);
-        InterlockedExchange(&session->m_flag, 0);
-        InterlockedExchange(&session->m_ioCount, 0);
 
 
 
@@ -958,6 +963,7 @@ void CLanServer::ReleaseSession(ull SessionID)
     m_ReleaseSessions.Push(session);
 
     clsSession *releaseSession;
+    ull idx;
     while (m_ReleaseSessions.Pop(releaseSession) == true)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
@@ -966,9 +972,9 @@ void CLanServer::ReleaseSession(ull SessionID)
                                        L"HANDLE : ", releaseSession->m_sock, L"seqID :", releaseSession->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", releaseSession->m_SeqID.idx,
                                        L"IO_Count", releaseSession->m_ioCount);
         closesocket(releaseSession->m_sock);
-        releaseSession->m_sock = 0;
-        ull idx = (releaseSession->m_SeqID.SeqNumberAndIdx & SESSION_IDX_MASK) >> 47;
-        releaseSession->m_SeqID.SeqNumberAndIdx = 0;
+        //releaseSession->m_sock = 0;
+        idx = (releaseSession->m_SeqID.SeqNumberAndIdx & SESSION_IDX_MASK) >> 47;
+        //releaseSession->m_SeqID.SeqNumberAndIdx = 0;
         m_IdxStack.Push(idx);
         _interlockeddecrement64(&m_SessionCount);
     }

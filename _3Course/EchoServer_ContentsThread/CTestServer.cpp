@@ -223,6 +223,13 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     if (sessionID != session->m_SeqID.SeqNumberAndIdx)
     {
         CMessagePoolManager::pool.Release(message);
+        CSystemLog::GetInstance()->Log(L"Idx", en_LOG_LEVEL::ERROR_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %4llu ",
+                                       L"idxCompareDiff",
+                                       L"HANDLE : ", session->m_sock,
+                                       L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"Current_seqID :", sessionID);
+
         InterlockedExchange(&session->m_Useflag, 0);
         return;
     }
@@ -236,7 +243,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         ReleaseSession(sessionID);
         return;
     }
-
+    //_interlockedbittestandreset64
     if ((session->m_ioCount & (ull)1 << 47) != 0)
     {
         // Release Flag가 켜져있다면,
@@ -249,6 +256,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         return;
     }
     CMessage **ppMsg;
+    ull local_IoCount;
     ppMsg = &message;
     {
         {
@@ -263,9 +271,12 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
     {
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-        ull local_IoCount = InterlockedIncrement(&session->m_ioCount);
-
-        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+        local_IoCount = InterlockedIncrement(&session->m_ioCount);
+        if ((local_IoCount & (ull)1 << 47) == 0)
+        {
+            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+        }
+        
     }
     if (InterlockedExchange(&session->m_Useflag, 0) == 2)
     {
