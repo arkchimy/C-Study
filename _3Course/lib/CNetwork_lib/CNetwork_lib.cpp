@@ -128,20 +128,24 @@ unsigned AcceptThread(void *arg)
         }
 
         session = &server->sessions_vec[idx];
-  
-        //InterlockedExchange(&session->m_ioCount, 0);
-        //InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
-        //InterlockedExchange(&session->m_sock, client_sock);
-        //InterlockedExchange(&session->m_blive, 1);
-        //InterlockedExchange(&session->m_flag, 0);
+        stsessionID.idx = idx;
+        stsessionID.seqNumber = session_id++;
 
-        session->m_ioCount = 0;
+        
+        InterlockedExchange(&session->m_sock, client_sock);
+        InterlockedExchange(&session->m_blive, 1);
+        InterlockedExchange(&session->m_flag, 0);
+        InterlockedExchange(&session->m_ioCount, 0);
+        InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+        
+       
+
+ /*       session->m_ioCount = 0;
         session->m_sock = client_sock;
         session->m_blive = 1;
         session->m_flag = 0;
         session->m_SeqID.SeqNumberAndIdx = (idx << 47 | session_id);
-        session_id++;
-       
+       */
         InterlockedExchange(&session->m_Useflag, 0);
 
 
@@ -453,8 +457,6 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
     qPersentage = OnRecv((ull)(session->m_SeqID.SeqNumberAndIdx), nullptr);
     if (qPersentage >= 75.f)
     {
-        // RecvPostMessage(session);
-        ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
         Disconnect(session->m_SeqID.SeqNumberAndIdx);
         return;
     }
@@ -464,7 +466,6 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         useSize = session->m_recvBuffer.GetUseSize(f, r);
         if (useSize < header._len + sizeof(stHeader))
         {
-            ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
             Disconnect(session->m_SeqID.SeqNumberAndIdx);
             return;
         }
@@ -479,8 +480,6 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         f = session->m_recvBuffer._frontPtr;
         if (qPersentage >= 75.0)
         {
-            // RecvPostMessage(session);
-            ERROR_FILE_LOG(L"ContentsQ_Full.txt", L"ContentsQ_Full");
             Disconnect(session->m_SeqID.SeqNumberAndIdx);
             return;
         }
@@ -974,7 +973,9 @@ void CLanServer::ReleaseSession(ull SessionID)
         closesocket(releaseSession->m_sock);
         //releaseSession->m_sock = 0;
         idx = (releaseSession->m_SeqID.SeqNumberAndIdx & SESSION_IDX_MASK) >> 47;
+        InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, 0);
         //releaseSession->m_SeqID.SeqNumberAndIdx = 0;
+
         m_IdxStack.Push(idx);
         _interlockeddecrement64(&m_SessionCount);
     }

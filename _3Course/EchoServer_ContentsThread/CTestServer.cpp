@@ -222,6 +222,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     // TODO : 인덱스만 같은 다른 Session
     if (sessionID != session->m_SeqID.SeqNumberAndIdx)
     {
+        //★
         CMessagePoolManager::pool.Release(message);
         CSystemLog::GetInstance()->Log(L"Idx", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %4llu ",
@@ -272,11 +273,12 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     {
         ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
         local_IoCount = InterlockedIncrement(&session->m_ioCount);
-        if ((local_IoCount & (ull)1 << 47) == 0)
+        if ((local_IoCount & (ull)1 << 47) == 0 && local_IoCount != 1)
         {
             PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
         }
-        
+        else
+            local_IoCount = InterlockedDecrement(&session->m_ioCount);
     }
     if (InterlockedExchange(&session->m_Useflag, 0) == 2)
     {
