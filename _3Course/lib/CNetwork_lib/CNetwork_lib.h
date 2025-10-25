@@ -49,7 +49,7 @@ class CLanServer
 
     bool Disconnect(const ull SessionID);
 
-    CMessage *CreateCMessage(class clsSession *const session, class stHeader &header);
+    CMessage *CreateMessage(class clsSession *const session, class stHeader &header);
     //CMessage *CreateLoginMessage();
     char *CreateLoginMessage();
 

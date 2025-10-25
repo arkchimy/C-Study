@@ -14,7 +14,7 @@
 
 #define assert RT_ASSERT
 
-int tlsPool_init_Capacity;
+extern int tlsPool_init_Capacity;
 
 template <typename T>
 using ObjectPoolType = CObjectPool_UnSafeMT<T>;

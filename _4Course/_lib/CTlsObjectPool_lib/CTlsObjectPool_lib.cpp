@@ -3,3 +3,5 @@
 
 #include "pch.h"
 #include "CTlsObjectPool_lib.h"
+
+int tlsPool_init_Capacity;

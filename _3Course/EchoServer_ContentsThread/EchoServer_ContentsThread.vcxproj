@@ -151,6 +151,9 @@
     <ProjectReference Include="..\..\_1Course\lib\Parser_lib\Parser_lib.vcxproj">
       <Project>{aeaec43e-1516-4224-889b-858c678ce028}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\..\_4Course\_lib\CTlsObjectPool_lib\CTlsObjectPool_lib.vcxproj">
+      <Project>{eceb3595-a0b3-4a4c-9326-3d35b5f42cc7}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\lib\CNetwork_lib\CNetwork_lib.vcxproj">
       <Project>{0eb45f67-f762-4bf9-9525-0d4ec658b32d}</Project>
     </ProjectReference>

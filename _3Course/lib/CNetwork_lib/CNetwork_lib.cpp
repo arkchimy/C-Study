@@ -1,6 +1,8 @@
 ﻿#include "CNetwork_lib.h"
 
 #include "../Profiler_MultiThread/Profiler_MultiThread.h"
+#include "../../../_4Course/_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
+
 #include "stHeader.h"
 
 #include <list>
@@ -462,7 +464,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
             return;
         }
         // 메세지 생성
-        CMessage *msg = CreateCMessage(session, header);
+        CMessage *msg = CreateMessage(session, header);
         {
             Profiler profile;
             profile.Start(L"OnRecv");
@@ -483,15 +485,17 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         RecvPacket(session);
 }
 
-CMessage *CLanServer::CreateCMessage(clsSession *const session, class stHeader &header)
+CMessage *CLanServer::CreateMessage(clsSession *const session, class stHeader &header)
 {
+    unsigned short type = 0;
     Profiler profile;
 
     profile.Start(L"PoolAlloc");
     CMessage *msg = reinterpret_cast<CMessage *>(CMessagePoolManager::pool.Alloc());
     profile.End(L"PoolAlloc");
 
-    unsigned short type = 0;
+  
+
     ringBufferSize deQsize;
 
     switch (type)

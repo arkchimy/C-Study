@@ -10,6 +10,8 @@
 #include "../../lib/MT_CRingBuffer_lib/MT_CRingBuffer_lib.h"
 #include "../../lib/CLockFreeQueue_lib/CLockFreeQueue_lib.h"
 
+#include "../../../_4Course/_lib/CTlsLockFreeQueue/CTlsLockFreeQueue.h"
+
 using ull = unsigned long long;
 
 #define SESSION_IDX_MASK 0xFFFF800000000000
@@ -59,7 +61,8 @@ class clsSession
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
     stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
 
-    CLockFreeQueue<class CMessage*> m_sendBuffer;
+    //CLockFreeQueue<class CMessage*> m_sendBuffer;
+    CTlsLockFreeQueue<class CMessage *> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
 
     WSABUF m_lastRecvWSABuf[2]{0};
