@@ -150,7 +150,7 @@ unsigned AcceptThread(void *arg)
 
 
 
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
                                        L"Accept", L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
 
@@ -495,7 +495,8 @@ CMessage *CLanServer::CreateMessage(clsSession *const session, class stHeader &h
     Profiler profile;
 
     profile.Start(L"PoolAlloc");
-    CMessage *msg = reinterpret_cast<CMessage *>(CMessagePoolManager::pool.Alloc());
+    //CMessage *msg = reinterpret_cast<CMessage *>(CMessagePoolManager::pool.Alloc());
+    CMessage *msg = reinterpret_cast<CMessage *> (stTlsObjectPool<CMessage>::Alloc());
     profile.End(L"PoolAlloc");
 
   
@@ -533,7 +534,8 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
 
     for (CMessage *msg : session->m_SendMsg)
     {
-        CMessagePoolManager::pool.Release(msg);
+        //CMessagePoolManager::pool.Release(msg);
+        stTlsObjectPool<CMessage>::Release(msg);
     }
     session->m_SendMsg.clear();
     SendPacket(session);
@@ -965,7 +967,7 @@ void CLanServer::ReleaseSession(ull SessionID)
     ull idx;
     while (m_ReleaseSessions.Pop(releaseSession) == true)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"Closesocket",
                                        L"HANDLE : ", releaseSession->m_sock, L"seqID :", releaseSession->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", releaseSession->m_SeqID.idx,

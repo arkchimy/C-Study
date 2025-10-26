@@ -223,7 +223,9 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     if (sessionID != session->m_SeqID.SeqNumberAndIdx)
     {
         //★
-        CMessagePoolManager::pool.Release(message);
+        //CMessagePoolManager::pool.Release(message);
+        stTlsObjectPool<CMessage>::Release(message);
+
         CSystemLog::GetInstance()->Log(L"Idx", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %4llu ",
                                        L"idxCompareDiff",
@@ -236,7 +238,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     }
     if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContentsRelease1",
                                        L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -248,7 +250,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     if ((session->m_ioCount & (ull)1 << 47) != 0)
     {
         // Release Flag가 켜져있다면,
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContentsRelease2",
                                        L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -275,6 +277,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         local_IoCount = InterlockedIncrement(&session->m_ioCount);
         if ((local_IoCount & (ull)1 << 47) == 0 && local_IoCount != 1)
         {
+            InterlockedExchange(&session->m_Useflag, 0);
             PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
         }
         else
@@ -282,7 +285,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     }
     if (InterlockedExchange(&session->m_Useflag, 0) == 2)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContentsRelease3",
                                        L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
