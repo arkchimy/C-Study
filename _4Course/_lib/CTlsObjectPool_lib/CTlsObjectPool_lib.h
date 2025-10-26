@@ -167,6 +167,7 @@ struct stTlsObjectPool
     static PVOID Alloc()
     {
         stTlsObjectPool *pool = nullptr;
+        ObjectPoolType<T> *swap;
         if (s_tlsIdx == TLS_OUT_OF_INDEXES)
         {
             CSystemLog::GetInstance()->Log(L"TLS", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s ",
@@ -192,8 +193,14 @@ struct stTlsObjectPool
 
         if (pool->allocPool->m_size == 0)
         {
-            ObjectPoolType<T> *swap = pool->allocPool;
-            pool->allocPool = instance.GetFullPool(swap);
+            swap = pool->allocPool;
+            if (pool->releasePool->m_size == 0)
+            {
+                pool->allocPool = instance.GetFullPool(swap);
+                return pool->allocPool->Alloc();
+            }
+            pool->allocPool = pool->releasePool;
+            pool->releasePool = swap;
         }
 
         return pool->allocPool->Alloc();
@@ -201,7 +208,7 @@ struct stTlsObjectPool
     static void Release(PVOID node)
     {
         stTlsObjectPool *pool = nullptr;
-
+        ObjectPoolType<T> *swap;
         if (s_tlsIdx == TLS_OUT_OF_INDEXES)
         {
             CSystemLog::GetInstance()->Log(L"TLS", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s ",
@@ -229,8 +236,14 @@ struct stTlsObjectPool
 
         if (pool->releasePool->m_size == tlsPool_init_Capacity)
         {
-            ObjectPoolType<T> *swap = pool->releasePool;
-            pool->releasePool = instance.GetEmptyPool(swap);
+            swap = pool->releasePool;
+            if (pool->allocPool->m_size == tlsPool_init_Capacity)
+            {
+                pool->releasePool = instance.GetEmptyPool(swap);
+                return;
+            }
+            pool->releasePool = pool->allocPool;
+            pool->allocPool = swap;
         }
     }
 

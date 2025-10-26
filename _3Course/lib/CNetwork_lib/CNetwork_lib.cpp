@@ -378,13 +378,13 @@ bool CLanServer::Disconnect(const ull SessionID)
                                        L"Overlapped", &session.m_recvOverlapped);
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"DisconnectFailed_HANDLE value : %lld   seqID :%llu  seqIndx : %llu\n",
+                                       L"DisconnectFailed_HANDLE value : %lld   seqID :%018llu  seqIndx : %llu\n",
                                        session.m_sock, session.m_SeqID.SeqNumberAndIdx, session.m_SeqID.idx);
         return false;
     }
     _interlockedincrement64((LONG64*)&iDisCounnectCount);
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu ",
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                   L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
                                    L"Disconnect",
                                    L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
 

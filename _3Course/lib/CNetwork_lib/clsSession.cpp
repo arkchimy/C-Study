@@ -2,7 +2,7 @@
 #include "clsSession.h"
 #include "../../../error_log.h"
 #include "../CSystemLog_lib/CSystemLog_lib.h"
-
+#include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 clsSession::clsSession(SOCKET sock)
     : m_sock(sock)
 {
@@ -38,7 +38,7 @@ void clsSession::Release()
     CMessage *msg;
     while (m_sendBuffer.Pop(msg))
     {
-        delete msg;
+        stTlsObjectPool<CMessage>::Release(msg);
     }
     
     m_recvBuffer.ClearBuffer();
