@@ -7,7 +7,8 @@ CRingBuffer::CRingBuffer()
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
-    _begin = clsRingBufferManager::GetInstance()->Alloc(iBufferSize);
+    _begin = (char*)malloc(iBufferSize);
+    //_begin = clsRingBufferManager::GetInstance()->Alloc(iBufferSize);
     if (_begin == nullptr)
     {
         __debugbreak();
@@ -28,7 +29,8 @@ CRingBuffer::CRingBuffer(ringBufferSize iBufferSize, bool ContensQBuffer)
 
 CRingBuffer::~CRingBuffer()
 {
-    _aligned_free(_begin);
+    free(_begin);
+    //_aligned_free(_begin);
 }
 
 ringBufferSize CRingBuffer::GetUseSize()
@@ -227,8 +229,8 @@ void CRingBuffer::MoveFront(ringBufferSize iSize)
     {
         pChk = _begin + long long(distance);
     }
-    _frontPtr = pChk;
-    //InterlockedExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk);
+    // _frontPtr = pChk;
+    InterlockedExchange((unsigned long long *)&_frontPtr, (unsigned long long)pChk);
     /* do
      {
          oldFront = _frontPtr;
