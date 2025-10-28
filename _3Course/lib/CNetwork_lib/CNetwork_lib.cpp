@@ -151,7 +151,7 @@ unsigned AcceptThread(void *arg)
 
 
 
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
                                        L"Accept", L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
 
@@ -166,9 +166,25 @@ unsigned AcceptThread(void *arg)
         local_IoCount = InterlockedDecrement(&session->m_ioCount);
         if (local_IoCount == 0)
         {
-            CSystemLog::GetInstance()->Log(L"IO_Zero", en_LOG_LEVEL::SYSTEM_Mode,
-                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
-                                           L"AcceptThread_IO_Zero", L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
+            if (InterlockedExchange(&session->m_Useflag, 2) != 0)
+                continue;
+
+            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
+            {
+                continue;
+            }
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                           L"WorkerThread",
+                                           L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                           L"IO_Count", session->m_ioCount);
+
+            ull seqID = session->m_SeqID.SeqNumberAndIdx;
+            server->ReleaseSession(seqID);
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu ",
+                                           L"WorkerRelease",
+                                           L"HANDLE : ", session->m_sock, L"seqID :", seqID, L"seqIndx : ", seqID >> 47);
         }
     }
     return 0;
@@ -263,7 +279,7 @@ unsigned WorkerThread(void *arg)
             {
                 continue;
             }
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"WorkerThread",
                                            L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -273,7 +289,7 @@ unsigned WorkerThread(void *arg)
                 continue;*/
             ull seqID = session->m_SeqID.SeqNumberAndIdx;
             server->ReleaseSession(seqID);
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu ",
                                            L"WorkerRelease",
                                            L"HANDLE : ", session->m_sock, L"seqID :", seqID, L"seqIndx : ", seqID >> 47
@@ -400,7 +416,7 @@ bool CLanServer::Disconnect(const ull SessionID)
         return false;
     }
     _interlockedincrement64((LONG64*)&iDisCounnectCount);
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
                                    L"Disconnect",
                                    L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
@@ -937,7 +953,7 @@ void CLanServer::ReleaseSession(ull SessionID)
         return;
     }
     session->Release();
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                    L"session->Release",
                                    L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -948,7 +964,7 @@ void CLanServer::ReleaseSession(ull SessionID)
     ull idx;
     while (m_ReleaseSessions.Pop(releaseSession) == true)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"Closesocket",
                                        L"HANDLE : ", releaseSession->m_sock, L"seqID :", releaseSession->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", releaseSession->m_SeqID.idx,
