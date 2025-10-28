@@ -50,8 +50,20 @@ unsigned ContentsThread(void *arg)
             if (DeQSisze != sizeof(size_t))
                 __debugbreak();
             message = (CMessage *)addr;
+
+            if (rand() % 1000 == 0)
+            {
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                               L"%-10s %10s %012llu ",
+                                               L"ContentsDisConnect",
+                                               L"seqID :", l_sessionID);
+                server->DisconnectForContents(l_sessionID);
+            }
             // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            server->EchoProcedure(l_sessionID, message);
+            else
+            {
+                server->EchoProcedure(l_sessionID, message);
+            }
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
         }
@@ -268,21 +280,12 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         }
         return;
     }
-    /*   if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
-       {
-           CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                          L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                          L"ContentsRelease1",
-                                          L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                          L"IO_Count", session->m_ioCount);
-           ReleaseSession(sessionID);
-           return;
-       }*/
+
     //_interlockedbittestandreset64
     if ((session->m_ioCount & (ull)1 << 47) != 0)
     {
-        // Release Flag가 켜져있다면,
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        // 뜨는 경우가 있을까?
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContentsRelease2",
                                        L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,

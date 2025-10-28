@@ -396,11 +396,8 @@ void CLanServer::Stop()
 
 bool CLanServer::Disconnect(const ull SessionID)
 {
-    //0xffff
+    //WorkerThread에서 호출하는 DisConnect이므로  IO가 '0' 이 되는 경우의 수가 없음. 
     clsSession &session = sessions_vec[(SessionID & SESSION_IDX_MASK ) >> 47];
-
-
-   
     
     if (InterlockedExchange(&session.m_blive, 0) == 0)
     {
@@ -437,6 +434,7 @@ bool CLanServer::Disconnect(const ull SessionID)
                                        L"RecvCancel",
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"Overlapped", &session.m_sendOverlapped);
+        
     }
     if (CancelIoEx(m_hIOCP, &session.m_sendOverlapped) == 0)
     {
@@ -454,7 +452,132 @@ bool CLanServer::Disconnect(const ull SessionID)
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"Overlapped", &session.m_sendOverlapped);
     }
-  
+    
+    return true;
+}
+
+bool CLanServer::DisconnectForContents(const ull SessionID)
+{
+    clsSession *session = &sessions_vec[(SessionID & SESSION_IDX_MASK) >> 47];
+    ull local_IoCount;
+    ull SeqID;
+
+    if (InterlockedExchange(&session->m_blive, 0) == 0)
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %p",
+                                       L"m_blive is Zero",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"Overlapped", &session->m_recvOverlapped);
+
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"DisconnectFailed_HANDLE value : %lld   seqID :%018llu  seqIndx : %llu  local SessionID %018llu \n",
+                                       session->m_sock, session->m_SeqID.SeqNumberAndIdx, session->m_SeqID.idx, SessionID);
+        return false;
+    }
+    //들어가기전에 Release가 WorkerThread에서 이루어진다면. 리턴
+    if (InterlockedExchange(&session->m_Useflag, 1) != 0)
+        return true;
+
+    _interlockedincrement64((LONG64 *)&iDisCounnectCount);
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
+                                   L"Disconnect",
+                                   L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
+
+    // 취소 요청을 찾을 수 없는 경우 반환 값은 0이고 GetLastError는 ERROR_NOT_FOUND를 반환
+    if (CancelIoEx(m_hIOCP, &session->m_recvOverlapped) == 0)
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %p",
+                                       L"RecvNotFoundIO",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"Overlapped", &session->m_recvOverlapped);
+    }
+    else
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %p",
+                                       L"RecvCancel",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"Overlapped", &session->m_sendOverlapped);
+
+        local_IoCount = _InterlockedDecrement(&session->m_ioCount);
+        if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
+        {
+            SeqID = session->m_SeqID.SeqNumberAndIdx;
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                           L"DisConnectForContents1",
+                                           L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                           L"IO_Count", session->m_ioCount);
+            ReleaseSession(SeqID);
+            return true;
+        }
+        if (SessionID != session->m_SeqID.SeqNumberAndIdx)
+        {
+            // 다른 세션이었지만 물고나보니 Release가 시도 됬을때
+            if (InterlockedExchange(&session->m_Useflag, 0) == 2)
+            {
+                SeqID = session->m_SeqID.SeqNumberAndIdx;
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                               L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                               L"DisConnectForContents2",
+                                               L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                               L"IO_Count", session->m_ioCount);
+                ReleaseSession(SeqID);
+            }
+            return true;
+        }
+
+    }
+    if (CancelIoEx(m_hIOCP, &session->m_sendOverlapped) == 0)
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %p",
+                                       L"SendNotFoundIO",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"Overlapped", &session->m_sendOverlapped);
+    }
+    else
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %p",
+                                       L"SendCancel",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"Overlapped", &session->m_sendOverlapped);
+        local_IoCount = _InterlockedDecrement(&session->m_ioCount);
+        if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
+        {
+            SeqID = session->m_SeqID.SeqNumberAndIdx;
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                           L"DisConnectForContents3",
+                                           L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                           L"IO_Count", session->m_ioCount);
+            ReleaseSession(SeqID);
+            return true;
+        }
+        if (SessionID != session->m_SeqID.SeqNumberAndIdx)
+        {
+            // 다른 세션이었지만 물고나보니 Release가 시도 됬을때
+            if (InterlockedExchange(&session->m_Useflag, 0) == 2)
+            {
+                SeqID = session->m_SeqID.SeqNumberAndIdx;
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                               L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                               L"DisConnectForContents4",
+                                               L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                               L"IO_Count", session->m_ioCount);
+                ReleaseSession(SeqID);
+            }
+            return true;
+        }
+    }
+    if (InterlockedExchange(&session->m_Useflag, 0) == 2)
+    {
+        ReleaseSession(SessionID);
+    }
     return true;
 }
 

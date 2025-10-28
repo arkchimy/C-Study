@@ -48,6 +48,7 @@ class CLanServer
     void Stop();
 
     bool Disconnect(const ull SessionID);
+    bool DisconnectForContents(const ull SessionID);
 
     CMessage *CreateMessage(class clsSession *const session, class stHeader &header);
     //CMessage *CreateLoginMessage();
