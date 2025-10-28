@@ -256,7 +256,16 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                        L"Current_seqID :", sessionID,
                                        L"IO_Count", session->m_ioCount);
 
-        InterlockedExchange(&session->m_Useflag, 0);
+        if (InterlockedExchange(&session->m_Useflag, 0) == 2)
+        {
+            SeqID = session->m_SeqID.SeqNumberAndIdx;
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                           L"ContentsRelease5",
+                                           L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                           L"IO_Count", session->m_ioCount);
+            ReleaseSession(SeqID);
+        }
         return;
     }
     /*   if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)

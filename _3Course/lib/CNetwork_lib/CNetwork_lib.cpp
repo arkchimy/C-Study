@@ -256,18 +256,21 @@ unsigned WorkerThread(void *arg)
 
         if (local_IoCount == 0)
         {
-            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
-            {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                               L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                               L"WorkerThread",
-                                               L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                               L"IO_Count", session->m_ioCount);
-                continue;
-            }
-
             if (InterlockedExchange(&session->m_Useflag, 2) != 0)
                 continue;
+
+            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
+            {
+                continue;
+            }
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                           L"WorkerThread",
+                                           L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                           L"IO_Count", session->m_ioCount);
+            //TODO :  왜 순서를 다르게 했는지?
+         /*  if (InterlockedExchange(&session->m_Useflag, 2) != 0)
+                continue;*/
             ull seqID = session->m_SeqID.SeqNumberAndIdx;
             server->ReleaseSession(seqID);
             CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
