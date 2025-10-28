@@ -48,7 +48,8 @@ class CLanServer
     void Stop();
 
     bool Disconnect(const ull SessionID);
-    bool DisconnectForContents(const ull SessionID);
+    bool DisconnectForContents(const ull SessionID); 
+    void CancelIO_Routine(const ull SessionID); //Session에 대한 안정성은  외부에서 보장해주세요.
 
     CMessage *CreateMessage(class clsSession *const session, class stHeader &header);
     //CMessage *CreateLoginMessage();

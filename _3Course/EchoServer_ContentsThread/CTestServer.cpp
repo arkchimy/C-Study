@@ -226,35 +226,34 @@ bool CTestServer::OnAccept(ull SessionID)
 
 void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
 {
-    clsSession *session;
     ull SeqID;
-    session = &sessions_vec[(sessionID & SESSION_IDX_MASK) >> 47];
+    clsSession &session = sessions_vec[ sessionID >> 47];
 
     // TODO : disconnect에 대비해서 풀을 만들어야함.
     //
-    if (InterlockedExchange(&session->m_Useflag, 1) != 0)
+    if (InterlockedCompareExchange(&session.m_Useflag, 1, 0) != 0)
         return;
 
-    if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContetnsThread",
-                                       L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                       L"IO_Count", session->m_ioCount);
+                                       L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", session.m_ioCount);
 
         //여기서는 현재 session이 IO가 0이므로 현재 session을 끊어야한다.
-        SeqID = session->m_SeqID.SeqNumberAndIdx;
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        SeqID = session.m_SeqID.SeqNumberAndIdx;
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContentsRelease1",
-                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                       L"IO_Count", session->m_ioCount);
+                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", session.m_ioCount);
         ReleaseSession(SeqID);
         return;
     }
     // TODO : 인덱스만 같은 다른 Session
-    if (sessionID != session->m_SeqID.SeqNumberAndIdx)
+    if (sessionID != session.m_SeqID.SeqNumberAndIdx)
     {
         // ★
         // CMessagePoolManager::pool.Release(message);
@@ -263,33 +262,33 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %4llu  %10s %3llu",
                                        L"idxCompareDiff",
-                                       L"HANDLE : ", session->m_sock,
-                                       L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"HANDLE : ", session.m_sock,
+                                       L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"Current_seqID :", sessionID,
-                                       L"IO_Count", session->m_ioCount);
+                                       L"IO_Count", session.m_ioCount);
 
-        if (InterlockedExchange(&session->m_Useflag, 0) == 2)
+        if (InterlockedExchange(&session.m_Useflag, 0) == 2)
         {
-            SeqID = session->m_SeqID.SeqNumberAndIdx;
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            SeqID = session.m_SeqID.SeqNumberAndIdx;
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"ContentsRelease5",
-                                           L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                           L"IO_Count", session->m_ioCount);
+                                           L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                           L"IO_Count", session.m_ioCount);
             ReleaseSession(SeqID);
         }
         return;
     }
 
     //_interlockedbittestandreset64
-    if ((session->m_ioCount & (ull)1 << 47) != 0)
+    if ((session.m_ioCount & (ull)1 << 47) != 0)
     {
         // 뜨는 경우가 있을까?
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContentsRelease2",
-                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                       L"IO_Count", session->m_ioCount);
+                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", session.m_ioCount);
         ReleaseSession(sessionID);
         return;
     }
@@ -301,42 +300,42 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
             Profiler profile;
             profile.Start(L"LFQ_Push");
 
-            session->m_sendBuffer.Push(*ppMsg);
+            session.m_sendBuffer.Push(*ppMsg);
             profile.End(L"LFQ_Push");
         }
     }
 
-    if (InterlockedCompareExchange(&session->m_flag, 1, 0) == 0)
+    if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
     {
-        ZeroMemory(&session->m_sendOverlapped, sizeof(OVERLAPPED));
-        local_IoCount = InterlockedIncrement(&session->m_ioCount);
+        ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+        local_IoCount = InterlockedIncrement(&session.m_ioCount);
         if ((local_IoCount & (ull)1 << 47) == 0 && local_IoCount != 1)
         {
-            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_sendOverlapped);
+            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
         }
         else
         {
-            local_IoCount = InterlockedDecrement(&session->m_ioCount);
-            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) == 0)
+            local_IoCount = InterlockedDecrement(&session.m_ioCount);
+            if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
             {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                                L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                                L"ContentsRelease4",
-                                               L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                               L"IO_Count", session->m_ioCount);
+                                               L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                               L"IO_Count", session.m_ioCount);
                 ReleaseSession(sessionID);
                 return;
             }
         }
     }
 
-    if (InterlockedExchange(&session->m_Useflag, 0) == 2)
+    if (InterlockedExchange(&session.m_Useflag, 0) == 2)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContentsRelease3",
-                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                       L"IO_Count", session->m_ioCount);
+                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", session.m_ioCount);
         ReleaseSession(sessionID);
     }
 }
