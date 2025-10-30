@@ -2,11 +2,14 @@
 
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 
+
 #include "../../../_1Course/lib/Parser_lib/Parser_lib.h"
 #include "../../../_3Course/lib/CLockFreeQueue_lib/CLockFreeQueue_lib.h"
 #include "../../../_3Course/lib/CLockFreeStack_lib/CLockFreeStack.h"
 #include "../../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
+
 #include "CObjectPool_UnSafeMT.h"
+
 
 #define RT_ASSERT(x) \
     if (!(x))        \
@@ -44,25 +47,31 @@ struct stTlsObjectPoolManager
         ObjectPoolType<T> *retval;
 
         emptyPools.Push(emptyStack);
-
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s Size :%lld \t InputData  : %p  Data Size : %lld",
-                                       L"[ emptyPools Push ]", emptyPools.m_size, emptyStack, emptyStack->m_size);
-
-        if (fullPools.m_size == 0)
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s emptyPools.m_size :%lld \t InputData  : %p  Data Size : %lld",
+                                       L"[ emptyPools.Push ]", emptyPools.m_size, emptyPools, emptyStack->m_size);
+        if (fullPools.Pop(retval) == false)
         {
-            retval = new ObjectPoolType<T>();
-            retval->Initalize(tlsPool_init_Capacity);
+            if (emptyPools.Pop(retval))
+            {
+                retval->Initalize(tlsPool_init_Capacity);
+                CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
+                                               L"[ new tlsPool_init_Capacity => FullPool ]", retval);
+            }
+            else
+            {
+                retval = new ObjectPoolType<T>();
+                retval->Initalize(tlsPool_init_Capacity);
 
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
-                                           L"[ Create New FullPool ]", retval);
-            CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s :  %p  => %p ",
-                                           L"[ fullPool Change ] ", emptyStack, retval);
+                CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
+                                               L"[ Create New FullPool ]", retval);
+                CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s :  %p  => %p ",
+                                               L"[ fullPool Change ] ", emptyStack, retval);
+            }
             return retval;
         }
-        else
-            fullPools.Pop(retval);
+
         CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s Size :%lld \t OutData  : %p  Data Size : %lld",
-                                       L"[ fullPools Pop ]", fullPools.m_size, retval, retval->m_size);
+                                       L"fullPools.m_size", fullPools.m_size, retval, retval->m_size);
 
         CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s :  %p  => %p ",
                                        L"[ fullPool Change ]", emptyStack, retval);
@@ -74,10 +83,10 @@ struct stTlsObjectPoolManager
         ObjectPoolType<T> *retval;
 
         fullPools.Push(fullStack);
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s Size :%lld \t InputData  : %p  Data Size : %lld",
-                                       L"[fullPools Push]", fullPools.m_size, fullStack, fullStack->m_size);
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s fullPools.m_size :%lld \t InputData  : %p  Data Size : %lld",
+                                       L"[ fullPools.Push ]", fullPools.m_size, fullStack, fullStack->m_size);
 
-        if (emptyPools.m_size == 0)
+        if (emptyPools.Pop(retval) == false)
         {
             retval = new ObjectPoolType<T>();
             CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - emptyPools.m_size == 0 ",
@@ -86,8 +95,7 @@ struct stTlsObjectPoolManager
                                            L"[ emptyPool Change ]", fullStack, retval);
             return retval;
         }
-        else
-            emptyPools.Pop(retval);
+
         CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t OutData  : %p  Data Size : %lld",
                                        L"[ emptyPools Pop ]", emptyPools.m_size, retval, retval->m_size);
 
@@ -166,12 +174,12 @@ struct stTlsObjectPool
     }
     static PVOID Alloc()
     {
+
+
         stTlsObjectPool *pool = nullptr;
         ObjectPoolType<T> *swap;
         if (s_tlsIdx == TLS_OUT_OF_INDEXES)
         {
-            CSystemLog::GetInstance()->Log(L"TLS", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s ",
-                                           L"stTlsObjectPool", L"Alloc ReturnValue : TLS_OUT_OF_INDEXES ");
 
             // TODO :  TLS 가 부족한 경우의 대처는 프로그램 종료
             return nullptr;
@@ -184,8 +192,6 @@ struct stTlsObjectPool
             pool = new stTlsObjectPool();
             if (pool == nullptr)
             {
-                CSystemLog::GetInstance()->Log(L"TLS", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s %15s %05d",
-                                               L"stTlsObjectPool", L"new Return Nullptr ", L"GetLastError : ", GetLastError());
                 return nullptr;
             }
             TlsSetValue(s_tlsIdx, pool);
@@ -194,27 +200,31 @@ struct stTlsObjectPool
         if (pool->allocPool->m_size == 0)
         {
             swap = pool->allocPool;
+            pool->allocPool = instance.GetFullPool(swap);
+            return pool->allocPool->Alloc();
+
+            /*swap = pool->allocPool;
             if (pool->releasePool->m_size == 0)
             {
                 pool->allocPool = instance.GetFullPool(swap);
                 return pool->allocPool->Alloc();
             }
             pool->allocPool = pool->releasePool;
-            pool->releasePool = swap;
+            pool->releasePool = swap;*/
         }
-
-        return pool->allocPool->Alloc();
+        PVOID node = pool->allocPool->Alloc();
+        
+      
+        return node;
     }
     static void Release(PVOID node)
     {
+
         stTlsObjectPool *pool = nullptr;
         ObjectPoolType<T> *swap;
         if (s_tlsIdx == TLS_OUT_OF_INDEXES)
         {
-            CSystemLog::GetInstance()->Log(L"TLS", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s ",
-                                           L"stTlsObjectPool", L"Release ReturnValue : TLS_OUT_OF_INDEXES ");
 
-            // TODO :  TLS 가 부족한 경우의 대처는 프로그램 종료
             return;
         }
 
@@ -224,9 +234,7 @@ struct stTlsObjectPool
             pool = new stTlsObjectPool();
             if (pool == nullptr)
             {
-                CSystemLog::GetInstance()->Log(L"TLS", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s %15s %05d",
-                                               L"stTlsObjectPool", L"new Return Nullptr ", L"GetLastError : ", GetLastError());
-                // TODO : 만일 실패하면 Manager 객체에서 바로 가져오는 방안 생각하기.
+
                 return;
             }
             TlsSetValue(s_tlsIdx, pool);
@@ -234,17 +242,28 @@ struct stTlsObjectPool
 
         pool->releasePool->Release(node);
 
-        if (pool->releasePool->m_size == tlsPool_init_Capacity)
+        swap = pool->releasePool;
+        if (pool->releasePool->m_size == tlsPool_init_Capacity / 20)
         {
-            swap = pool->releasePool;
-            if (pool->allocPool->m_size == tlsPool_init_Capacity)
-            {
-                pool->releasePool = instance.GetEmptyPool(swap);
-                return;
-            }
-            pool->releasePool = pool->allocPool;
-            pool->allocPool = swap;
+
+            pool->releasePool = instance.GetEmptyPool(swap);
+
+            return;
         }
+
+        /*
+           //메모리가 계속 증가할것이다.
+        if (pool->releasePool->m_size == tlsPool_init_Capacity)
+           {
+               swap = pool->releasePool;
+               if (pool->allocPool->m_size == tlsPool_init_Capacity)
+               {
+                   pool->releasePool = instance.GetEmptyPool(swap);
+                   return;
+               }
+               pool->releasePool = pool->allocPool;
+               pool->allocPool = swap;
+           }*/
     }
 
     inline static stTlsObjectPoolManager<T> instance;

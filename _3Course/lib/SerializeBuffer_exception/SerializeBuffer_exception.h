@@ -102,15 +102,5 @@ struct CMessage
     char *_rearPtr = nullptr;
 
     inline static LONG64 s_UseCnt = 0;
-
-    friend struct CMessagePoolManager;
     inline static HANDLE s_BufferHeap;
-};
-struct CMessagePoolManager
-{
-    inline static class CObjectPool<CMessage> pool;
-    inline static char *_buffer;
-    inline static int cnt = 0;
-    CMessagePoolManager();
-    static char* Alloc();
 };

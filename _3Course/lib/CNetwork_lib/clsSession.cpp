@@ -3,6 +3,10 @@
 #include "../../../error_log.h"
 #include "../CSystemLog_lib/CSystemLog_lib.h"
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
+
+extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
+extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
+
 clsSession::clsSession(SOCKET sock)
     : m_sock(sock)
 {
@@ -17,29 +21,16 @@ clsSession::~clsSession()
 
 void clsSession::Release()
 {
-    if (InterlockedExchange(&m_blive,0) == 1)
-    {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"Release ",
-                                       L"HANDLE : ", m_sock, L"seqID :", m_SeqID.SeqNumberAndIdx, L"seqIndx : ", m_SeqID.idx,
-                                       L"IO_Count", m_ioCount);
-
-        return;
-    }
-    else
-    {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"Release Fail",
-                                       L"HANDLE : ", m_sock, L"seqID :", m_SeqID.SeqNumberAndIdx, L"seqIndx : ", m_SeqID.idx,
-                                       L"IO_Count", m_ioCount);
-    }
     CMessage *msg;
     while (m_sendBuffer.Pop(msg))
     {
         stTlsObjectPool<CMessage>::Release(msg);
     }
-    
+    while (m_SendMsg.size() != 0)
+    {
+        msg = m_SendMsg.front();
+        m_SendMsg.pop_front();
+        stTlsObjectPool<CMessage>::Release(msg);
+    }
     m_recvBuffer.ClearBuffer();
 }

@@ -96,19 +96,28 @@ class CLockFreeStack
         stNode *oldTop;
   
         LONG64 local_seqNumber;
+        long long size;
+
+        size = _interlockeddecrement64(&m_size);
+        if (size < 0)
+        {
+            _interlockedincrement64(&m_size);
+            return false;
+        }
         do
         {
             oldTop = m_top;
             if (oldTop == dummy)
             {
-                return false;
+               newTop = oldTop ;
+               continue;
             }
             newTop = reinterpret_cast<stNode *>((LONG64)oldTop & ADDR_MASK)->next;
             outData = reinterpret_cast<stNode *>((LONG64)oldTop & ADDR_MASK)->data;
 
         } while (InterlockedCompareExchangePointer((void **)&m_top, newTop, oldTop) != oldTop);
 
-        _interlockeddecrement64(&m_size);
+        
 
         LONG64 temp;
         {

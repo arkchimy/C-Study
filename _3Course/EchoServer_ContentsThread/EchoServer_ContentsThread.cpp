@@ -79,7 +79,7 @@ int main()
         CTestServer EchoServer;
         EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
         CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
-
+        CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
         while (1)
         {
             if (GetAsyncKeyState(VK_ESCAPE))

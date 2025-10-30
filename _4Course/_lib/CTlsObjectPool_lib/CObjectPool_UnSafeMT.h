@@ -86,8 +86,8 @@ class CObjectPool_UnSafeMT
         newTop = ret_Node->next;
 
         m_Top = newTop;
-
         m_size--;
+ 
         return ret_Node;
     }
     void Release(PVOID newNode)

@@ -82,6 +82,11 @@ void CTlsLockFreeQueue<T>::Push(T data)
     stNode *tailAddr;
 
     stNode *tailNext;
+    static ull PushCnt = 0;
+    
+    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-10s %05lld  ",
+                                   L"CTlsLFQ_PushCnt", InterlockedIncrement(&PushCnt));
 
     newNode = reinterpret_cast<stNode *>(stTlsObjectPool<T>::Alloc());
     newNode->next = m_NullptrNode;
@@ -111,6 +116,9 @@ void CTlsLockFreeQueue<T>::Push(T data)
     {
         InterlockedCompareExchangePointer((PVOID *)&_tail, newNode, tail);
     }
+    if (m_NullptrNode->next != nullptr)
+        __debugbreak();
+
 }
 
 template <typename T>
@@ -133,6 +141,12 @@ bool CTlsLockFreeQueue<T>::Pop(__out T &outData)
         _interlockedincrement64(&m_size);
         return false;
     }
+    static ull PopCnt = 0;
+
+    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-10s %05lld  ",
+                                   L"CTlsLFQ_PopCnt", InterlockedIncrement(&PopCnt));
+
     do
     {
         head = _head;
@@ -156,6 +170,8 @@ bool CTlsLockFreeQueue<T>::Pop(__out T &outData)
 
     } while (1);
 
+    if (m_NullptrNode->next != nullptr)
+        __debugbreak();
     stTlsObjectPool<T>::Release(headAddr);
 
     return true;

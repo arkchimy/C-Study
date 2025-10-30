@@ -7,75 +7,30 @@
 
 #define ERROR_BUFFER_SIZE 100
 
-static CMessagePoolManager instance;
 static int g_mode = 0;
 
 CMessage::CMessage()
 {
 
-    volatile LONG64 useCnt;
     DWORD exceptRetval;
     _size = en_BufferSize::bufferSize;
 
-    useCnt = InterlockedIncrement64(&s_UseCnt);
-
     static HANDLE Allcoheap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
     s_BufferHeap = Allcoheap;
-    __try
-    {
-        if (g_mode == 0)
-        {
-            _begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
-            if (_begin == nullptr)
-                __debugbreak();
-        }
-        else
-        {
-            _begin = CMessagePoolManager::Alloc();
-        }
-        _end = _begin + _size;
 
-        _rearPtr = _begin;
-        _frontPtr = _begin;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        exceptRetval = GetExceptionCode();
-        switch (exceptRetval)
-        {
-        case STATUS_NO_MEMORY:
-            ERROR_FILE_LOG(L"SerializeError.txt", L"s_BufferHeap Create Failed STATUS_NO_MEMORY \n");
-            break;
-        case STATUS_ACCESS_VIOLATION:
-            ERROR_FILE_LOG(L"SerializeError.txt", L"s_BufferHeap Create Failed STATUS_ACCESS_VIOLATION \n");
-            break;
-        default:
-            ERROR_FILE_LOG(L"SerializeError.txt", L"Not define Error \n");
-        }
-    }
+    _begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
+    if (_begin == nullptr)
+        __debugbreak();
+    _end = _begin + _size;
+    _frontPtr = _begin;
+    _rearPtr = _frontPtr;
 }
 
 CMessage::~CMessage()
 {
-    HANDLE current_Heap;
-    //BOOL bHeapDeleteRetval;
-    volatile LONG64 useCnt;
-
-    current_Heap = s_BufferHeap; // s_Buffer가 덮어쓸수 있기때문에 지역으로 복사.
-    useCnt = InterlockedDecrement64(&s_UseCnt);
-
-    HeapFree(current_Heap, 0, _begin);
+    HeapFree(s_BufferHeap, 0, _begin);
     _begin = nullptr;
-    // if (useCnt == 0)
-    //{
-    //     bHeapDeleteRetval = HeapDestroy(current_Heap);
-    //     if (bHeapDeleteRetval == 0)
-    //     {
-    //         ERROR_FILE_LOG(L"SerializeError.txt", L"s_BufferHeap Delete Failed ");
-    //     }
-    //     else
-    //         printf("heap delete");
-    // }
+
 }
 
 SSIZE_T CMessage::PutData(const char *src, SerializeBufferSize size)
@@ -135,85 +90,4 @@ void CMessage::Peek(char *out, SerializeBufferSize size)
     if (f + size > _rearPtr)
         throw MessageException(MessageException::HasNotData, "buffer has not Data\n");
     memcpy(out, f, size);
-}
-
-CMessagePoolManager::CMessagePoolManager()
-{
-    char *virtualMemoryBegin;
-
-    int g_PageCnt = 0;
-    {
-        Parser parser;
-        parser.LoadFile(L"Config.txt");
-
-        //parser.GetValue(L"LagePageTest", g_mode);
-        parser.GetValue(L"g_PageCnt", g_PageCnt);
-        parser.GetValue(L"g_PageCnt", g_PageCnt);
-    }
-
-    TOKEN_PRIVILEGES tp;
-    HANDLE hToken;
-    LUID luid;
-
-    if (!LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &luid))
-    {
-        printf("LookupPrivilegeValue error: %u\n", GetLastError());
-
-        return;
-    }
-
-    tp.PrivilegeCount = 1;
-    tp.Privileges[0].Luid = luid;
-    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-    OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken);
-
-    AdjustTokenPrivileges(
-        hToken,                   // TokenHandle
-        FALSE,                    // DisableAllPrivileges: FALSE면 지정 권한만 변경
-        &tp,                      // NewState: 활성화할 권한 정보
-        sizeof(TOKEN_PRIVILEGES), // BufferLength
-        NULL,                     // PreviousState: 이전 상태 필요 없으면 NULL
-        NULL                      // ReturnLength: 필요 없으면 NULL
-    );
-
-    LUID PrivilegeRequired;
-    BOOL bRes = FALSE;
-
-    bRes = LookupPrivilegeValue(NULL, SE_LOCK_MEMORY_NAME, &PrivilegeRequired);
-
-    size_t sizeds = GetLargePageMinimum();
-    if (g_mode == 1)
-    {
-    realloc:
-        virtualMemoryBegin = (char *)VirtualAlloc(nullptr, sizeds * g_PageCnt, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE);
-        if (GetLastError() != 0)
-        {
-            printf("VirtualAlloc Error  %d \n", GetLastError());
-            Sleep(5000);
-            goto realloc;
-        }
-        else
-        {
-            printf("LargePage VirtualAlloc Success  \n");
-        }
-    }
-    else
-    {
-        virtualMemoryBegin = (char *)VirtualAlloc(nullptr, sizeds * g_PageCnt, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-        if (virtualMemoryBegin != nullptr)
-            printf("MemoryPool VirtualAlloc Success  \n");
-    }
-    InterlockedExchange((ull *)&CMessagePoolManager::_buffer, (ull)virtualMemoryBegin);
-}
-char *CMessagePoolManager::Alloc()
-{
-
-
-    char *pRetval;
-
-    pRetval = _buffer + cnt * CMessage::en_BufferSize::bufferSize;
-    *pRetval = 0;
-    cnt++;
-
-    return pRetval;
 }
