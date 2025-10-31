@@ -23,7 +23,7 @@ unsigned ContentsThread(void *arg)
 
     // bool 이 좋아보임.
 
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                    L"%-20s ",
                                    L"This is ContentsThread");
     CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
@@ -58,7 +58,7 @@ unsigned ContentsThread(void *arg)
 
             if (rand() % 1000 == 0)
             {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                                L"%-10s %10s %012llu ",
                                                L"DisConnect_Event",
                                                L"seqID :", l_sessionID);
@@ -153,7 +153,7 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
-double CTestServer::OnRecv(ull sessionID, CMessage *msg)
+float CTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
     // double CurrentQ;
     static ll visited = 0;
@@ -164,8 +164,8 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
     ContentsUseSize = m_ContentsQ.GetUseSize();
     if (msg == nullptr)
     {
-        SetEvent(m_ContentsEvent);
-        return double(ContentsUseSize) / double(CTestServer::s_ContentsQsize) * 100.f;
+       
+        return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
     }
 
     {
@@ -187,7 +187,7 @@ double CTestServer::OnRecv(ull sessionID, CMessage *msg)
         SetEvent(m_ContentsEvent);
     }
 
-    return double(ContentsUseSize) / double(CTestServer::s_ContentsQsize) * 100.f;
+    return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
 }
 
 bool CTestServer::OnAccept(ull SessionID)
@@ -218,15 +218,19 @@ bool CTestServer::OnAccept(ull SessionID)
     ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
 
     send_retval = WSASend(session.m_sock, &wsabuf, 1, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
+    LastError = GetLastError();
+
     CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                    L"WSASend",
                                    L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                    L"IO_Count", local_IoCount);
-    LastError = GetLastError();
-
     if (send_retval < 0)
     {
+        if (LastError != ERROR_IO_PENDING)
+        {
+            __debugbreak();
+        }
         WSASendError(LastError, SessionID);
     }
 
@@ -260,7 +264,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     // 지금 막 연결된  대상은 IOCount가 '1'임  만일 다른 ID의 세션으로 오인되도 제대로 끊기가능.
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContetnsThread",
                                        L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
@@ -282,13 +286,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     {
         // ★
         // CMessagePoolManager::pool.Release(message);
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %4llu  %10s %3llu",
-                                       L"idxCompareDiff",
-                                       L"HANDLE : ", session.m_sock,
-                                       L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"Current_seqID :", sessionID,
-                                       L"IO_Count", session.m_ioCount);
+
 
         if (InterlockedCompareExchange(&session.m_Useflag, 0,1) == 2)
         {
@@ -317,7 +315,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     {
         // 뜨는 경우가 있을까?
         // 떳음.
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContetnsThread2",
                                        L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
@@ -353,7 +351,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
             local_IoCount = InterlockedDecrement(&session.m_ioCount);
             if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
             {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                                L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                                L"ContetnsThread3",
                                                L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,

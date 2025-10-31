@@ -62,7 +62,7 @@ class CLanServer
     void RecvPacket(class clsSession *const session);
 
     virtual bool OnAccept(ull SessionID) = 0;
-    virtual double OnRecv(ull SessionID, CMessage *msg) = 0;
+    virtual float OnRecv(ull SessionID, CMessage *msg) = 0;
 
     int GetSessionCount();
     LONG64 GetReleaseSessions();

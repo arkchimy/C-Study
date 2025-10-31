@@ -26,10 +26,8 @@ void clsSession::Release()
     {
         stTlsObjectPool<CMessage>::Release(msg);
     }
-    while (m_SendMsg.size() != 0)
+    while (m_SendMsg.Pop(msg))
     {
-        msg = m_SendMsg.front();
-        m_SendMsg.pop_front();
         stTlsObjectPool<CMessage>::Release(msg);
     }
     m_recvBuffer.ClearBuffer();

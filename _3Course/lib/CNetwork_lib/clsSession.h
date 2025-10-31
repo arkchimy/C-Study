@@ -68,7 +68,7 @@ class clsSession
     WSABUF m_lastRecvWSABuf[2]{0};
 
 
-    std::list<struct CMessage *> m_SendMsg;
+    CTlsLockFreeQueue<class CMessage *> m_SendMsg;
 
     stSessionId m_SeqID{0};
     ull m_ioCount = 0;
