@@ -174,7 +174,7 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
                                    L"Release ", L"Node ", node, L"PoolAddress ", pool->releasePool, L"m_size", pool->releasePool->m_size);
 
     swap = pool->releasePool;
-    if (pool->releasePool->m_size == tlsPool_init_Capacity)
+    if (pool->releasePool->m_size == tlsPool_init_Capacity / 20)
     {
 
         pool->releasePool = instance.GetEmptyPool(swap);
@@ -182,8 +182,10 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
                                        L"FullPool Push", swap, pool);
         return;
     }
-    pool->releasePool = pool->allocPool;
-    pool->allocPool = swap;
+    //10_31 제거
+    // 
+    //pool->releasePool = pool->allocPool;
+    //pool->allocPool = swap;
     /*
        //메모리가 계속 증가할것이다.
     if (pool->releasePool->m_size == tlsPool_init_Capacity)

@@ -377,7 +377,6 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                        L"ContentsRelease3",
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
-        stTlsObjectPool<CMessage>::Release(message);
         ReleaseSession(sessionID);
     }
 
