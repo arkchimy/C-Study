@@ -146,7 +146,7 @@ unsigned AcceptThread(void *arg)
         InterlockedExchange(&session->m_flag, 0);
         InterlockedExchange(&session->m_ioCount, 1);            // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
         InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
-        
+        InterlockedExchange(&session->m_Useflag, 0);
        
 
  /*       session->m_ioCount = 0;
@@ -154,8 +154,9 @@ unsigned AcceptThread(void *arg)
         session->m_blive = 1;
         session->m_flag = 0;
         session->m_SeqID.SeqNumberAndIdx = (idx << 47 | session_id);
+               InterlockedExchange(&session->m_Useflag, 0);
        */
-        InterlockedExchange(&session->m_Useflag, 0);
+
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %d",
                                        L"Accept",
@@ -174,7 +175,7 @@ unsigned AcceptThread(void *arg)
         server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
         server->RecvPacket(session);
 
-        local_IoCount = InterlockedDecrement(&session->m_ioCount);
+        local_IoCount = InterlockedDecrement(&session->m_ioCount);// Accept시 1로 초기화 시킨 것 감소
         if (local_IoCount == 0)
         {
             if (InterlockedExchange(&session->m_Useflag, 2) != 0)
@@ -468,11 +469,12 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
     ull CompareRetval;
 
     //Release 가 2로 바꾸었다는 뜻.
-    if (InterlockedCompareExchange(&session.m_Useflag, 1, 0) != 0)
+    CompareRetval = InterlockedCompareExchange(&session.m_Useflag, 1, 0);
+    if (CompareRetval != 0)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %-10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"CompareRetval : ", L"Handle",
+                                       L"%-10s %-10s %4llu %-10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"DisconnectForContents", L"m_Useflag : ", CompareRetval, L"Handle",
                                         session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
         return true;
@@ -480,7 +482,7 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
 
     if (SessionID != session.m_SeqID.SeqNumberAndIdx)
     {
-        // 다른 세션이었지만 물고나보니 Release가 시도 됬을때
+        // 다른 세션이었지만 이미 Flag를 물었고, 물고나보니 Release가 시도 됬을때
         if (InterlockedCompareExchange(&session.m_Useflag, 0,1) == 2)
         {
 
@@ -495,8 +497,7 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
         }
         return true;
     }
-    // UseFlag가 물려있기 때문에 session은 변하지않음.
-    // 이미 '0'이 될 수 잇는
+    // m_blive는 
     if (InterlockedExchange(&session.m_blive, 0) == 1)
     {
         InterlockedIncrement(&iDisCounnectCount);
@@ -518,7 +519,8 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
         return true;
     }
     CompareRetval = InterlockedCompareExchange(&session.m_Useflag, 0,1);
-    if (InterlockedCompareExchange(&session.m_Useflag, 0, 1) == 2)
+    //if (InterlockedCompareExchange(&session.m_Useflag, 0, 1) == 2)
+    if (CompareRetval == 2)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
@@ -529,7 +531,7 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
         return true;
     }
 
-    return true;
+    return false;
 }
 
 void CLanServer::CancelIO_Routine(const ull SessionID)

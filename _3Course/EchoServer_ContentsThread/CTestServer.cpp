@@ -67,6 +67,7 @@ unsigned ContentsThread(void *arg)
             }
             // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
             else
+                
                 server->EchoProcedure(l_sessionID, message);
             
             f = server->m_ContentsQ._frontPtr;
@@ -269,6 +270,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                        L"ContentsRelease1",
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
+        stTlsObjectPool<CMessage>::Release(message);
         ReleaseSession(SeqID);
         return;
     }
@@ -301,6 +303,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                            L"ContentsRelease5",
                                            L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                            L"IO_Count", session.m_ioCount);
+            stTlsObjectPool<CMessage>::Release(message);
             ReleaseSession(SeqID);
         }
         return;
@@ -318,6 +321,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                        L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
         //어차피 Use로 물고있기 때문에 다른 연결이진않을듯?
+        stTlsObjectPool<CMessage>::Release(message);
         ReleaseSession(sessionID);
         return;
     }
@@ -358,6 +362,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                                L"ContentsRelease4",
                                                L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                                L"IO_Count", session.m_ioCount);
+
                 ReleaseSession(sessionID);
                 return;
             }
@@ -372,6 +377,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                        L"ContentsRelease3",
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
+        stTlsObjectPool<CMessage>::Release(message);
         ReleaseSession(sessionID);
     }
 
