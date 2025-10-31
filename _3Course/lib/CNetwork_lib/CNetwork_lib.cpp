@@ -191,7 +191,7 @@ unsigned AcceptThread(void *arg)
             {
                 continue;
             }
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"AcceptThread",
                                            L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -310,7 +310,7 @@ unsigned WorkerThread(void *arg)
             {
                 continue;
             }
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"WorkerThread",
                                            L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -469,6 +469,8 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
     ull CompareRetval;
 
     //Release 가 2로 바꾸었다는 뜻.
+    //true면 메세지를 폐기.
+    //false면 끊기 판정 아님
     CompareRetval = InterlockedCompareExchange(&session.m_Useflag, 1, 0);
     if (CompareRetval != 0)
     {
@@ -493,7 +495,6 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
                                            L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                            L"IO_Count", session.m_ioCount);
             ReleaseSession(SeqID);
-       
         }
         return true;
     }
@@ -1011,7 +1012,7 @@ void CLanServer::ReleaseSession(ull SessionID)
         return;
     }
     session->Release();
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                    L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                    L"session->Release",
                                    L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -1022,7 +1023,7 @@ void CLanServer::ReleaseSession(ull SessionID)
     ull idx;
     while (m_ReleaseSessions.Pop(releaseSession) == true)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"Closesocket",
                                        L"HANDLE : ", releaseSession->m_sock, L"seqID :", releaseSession->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", releaseSession->m_SeqID.idx,

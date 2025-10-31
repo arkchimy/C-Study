@@ -23,7 +23,7 @@ unsigned ContentsThread(void *arg)
 
     // bool 이 좋아보임.
 
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-20s ",
                                    L"This is ContentsThread");
     CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
@@ -62,13 +62,16 @@ unsigned ContentsThread(void *arg)
                                                L"%-10s %10s %012llu ",
                                                L"DisConnect_Event",
                                                L"seqID :", l_sessionID);
-                server->DisconnectForContents(l_sessionID);
-                stTlsObjectPool<CMessage>::Release(message);
+                if(server->DisconnectForContents(l_sessionID) == true)
+                    stTlsObjectPool<CMessage>::Release(message);
+                else
+                    server->EchoProcedure(l_sessionID, message);
             }
             // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
             else
-                
+            {
                 server->EchoProcedure(l_sessionID, message);
+            }
             
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
@@ -257,7 +260,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     // 지금 막 연결된  대상은 IOCount가 '1'임  만일 다른 ID의 세션으로 오인되도 제대로 끊기가능.
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContetnsThread",
                                        L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
@@ -279,8 +282,6 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     {
         // ★
         // CMessagePoolManager::pool.Release(message);
-        stTlsObjectPool<CMessage>::Release(message);
-
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %4llu  %10s %3llu",
                                        L"idxCompareDiff",
@@ -303,9 +304,10 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
                                            L"ContentsRelease5",
                                            L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                            L"IO_Count", session.m_ioCount);
-            stTlsObjectPool<CMessage>::Release(message);
+        
             ReleaseSession(SeqID);
         }
+        stTlsObjectPool<CMessage>::Release(message);
         return;
     }
 
@@ -315,7 +317,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     {
         // 뜨는 경우가 있을까?
         // 떳음.
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"ContetnsThread2",
                                        L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
@@ -351,7 +353,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
             local_IoCount = InterlockedDecrement(&session.m_ioCount);
             if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
             {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                                L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                                L"ContetnsThread3",
                                                L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
