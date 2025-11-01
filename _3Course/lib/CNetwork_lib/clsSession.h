@@ -70,7 +70,7 @@ class clsSession
 
     CTlsLockFreeQueue<class CMessage *> m_SendMsg;
 
-    stSessionId m_SeqID{0};
+    alignas(64) stSessionId m_SeqID{0};
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0;

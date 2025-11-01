@@ -139,7 +139,7 @@ unsigned AcceptThread(void *arg)
         session = &server->sessions_vec[idx];
         stsessionID.idx = idx;
         stsessionID.seqNumber = session_id++;
-
+        
         
         InterlockedExchange(&session->m_sock, client_sock);
         InterlockedExchange(&session->m_blive, 1);
@@ -163,7 +163,7 @@ unsigned AcceptThread(void *arg)
                                        L"UseFlag : ", 0);
 
 
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
                                        L"Accept", L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
 
@@ -176,11 +176,18 @@ unsigned AcceptThread(void *arg)
         server->RecvPacket(session);
 
         local_IoCount = InterlockedDecrement(&session->m_ioCount);// Accept시 1로 초기화 시킨 것 감소
+
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld %10s %05lld  %10s %012llu  %10s %4llu",
+                                       L"Accept_Decrement",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"IO_Count", local_IoCount);
+
         if (local_IoCount == 0)
         {
             if (InterlockedExchange(&session->m_Useflag, 2) != 0)
             {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                                L"%-10s %10s %d",
                                                L"AcceptThread",
                                                L"UseFlag : ", 2);
@@ -191,7 +198,7 @@ unsigned AcceptThread(void *arg)
             {
                 continue;
             }
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"AcceptThread",
                                            L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -199,7 +206,7 @@ unsigned AcceptThread(void *arg)
 
             ull seqID = session->m_SeqID.SeqNumberAndIdx;
             server->ReleaseSession(seqID);
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu ",
                                            L"AcceptRelease",
                                            L"HANDLE : ", session->m_sock, L"seqID :", seqID, L"seqIndx : ", seqID >> 47);
@@ -215,10 +222,10 @@ unsigned WorkerThread(void *arg)
      * arg[1] 에는 Server의 인스턴스
      */
 
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                    L"%-20s ",
                                    L"This is WorkerThread");
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode,
+    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
                                    L"%-20s ",
                                    L"This is WorkerThread");
     size_t *arrArg = reinterpret_cast<size_t *>(arg);
@@ -282,14 +289,14 @@ unsigned WorkerThread(void *arg)
         switch (reinterpret_cast<stOverlapped *>(overlapped)->_mode)
         {
         case Job_Type::Recv:
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"RecvComplete",
                                            L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
                                            L"IO_Count", local_IoCount);
             break;
         case Job_Type::Send:
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"SendComplete",
                                            L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -305,12 +312,18 @@ unsigned WorkerThread(void *arg)
 
             /*if (InterlockedExchange(&session->m_Useflag, 2) != 0)
                 continue;*/
-
-            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
+            ull compareRetval = InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0);
+            if (compareRetval != 0)
             {
+              
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                                L"%-10s  %-10s  %llu %10s %05lld  %10s %018llu  %10s %4llu ",
+                                               L"1 << 47Faild", L"retval : ", compareRetval,
+                                               L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
+                
                 continue;
             }
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                            L"WorkerThread",
                                            L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -319,11 +332,22 @@ unsigned WorkerThread(void *arg)
             // 새로 연결되어 0으로 초기화된 Session을 바꾸더라... 
             // 그래서 IoCount를 먼저 확인하고 flag를 바꾸는 식.
 
-           if (InterlockedExchange(&session->m_Useflag, 2) != 0)
+
+            // 순서를 다르게하면  이 부분에서 중단을 해놓고 기다린 후에 새로운 연결에 의해 0으로 초기화 될때 통과하면 
+            // 연결끊기는거아님?
+            // => 이 논리가 되려면 ContentsThread에서 끊을때 flag와 1<<47을 하나도 확인을 안해야함.
+            compareRetval = InterlockedExchange(&session->m_Useflag, 2);
+            if (compareRetval != 0)
+            {
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                               L"%-10s  %-10s  %llu %10s %05lld  %10s %018llu  %10s %4llu ",
+                                               L"m_Useflag Faild", L"retval : ", compareRetval,
+                                               L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
                 continue;
+            }
             ull seqID = session->m_SeqID.SeqNumberAndIdx;
             server->ReleaseSession(seqID);
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu ",
                                            L"WorkerRelease",
                                            L"HANDLE : ", session->m_sock, L"seqID :", seqID, L"seqIndx : ", seqID >> 47
@@ -438,10 +462,11 @@ bool CLanServer::Disconnect(const ull SessionID)
     if (InterlockedCompareExchange(&session.m_blive, 0,1) == 1)
     {
         CancelIO_Routine(SessionID);
+        InterlockedIncrement(&iDisCounnectCount);
     }
     //Session의 ID는 변화가 없음을 의미.
 
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                    L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
                                    L"ContentsQueueFulled",
                                    L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
@@ -466,13 +491,12 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
     {
         return true;
     }
-
-    if (SessionID != session.m_SeqID.SeqNumberAndIdx)
+    if (session.m_SeqID.SeqNumberAndIdx != SessionID)
     {
         // 다른 세션이었지만 이미 Flag를 물었고, 물고나보니 Release가 시도 됬을때
         if (InterlockedCompareExchange(&session.m_Useflag, 0,1) == 2)
         {
-
+            
             SeqID = session.m_SeqID.SeqNumberAndIdx;
             CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
@@ -487,9 +511,9 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
     if (InterlockedCompareExchange(&session.m_blive, 0,1) == 1)
     {
         InterlockedIncrement(&iDisCounnectCount);
-        CancelIO_Routine(SessionID);
+        
     }
-
+    CancelIO_Routine(SessionID);
     CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-10s %-10s %4llu %-10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                    L"DisconnectForContents", L"m_Useflag : ", CompareRetval, L"Handle",
@@ -500,39 +524,71 @@ bool CLanServer::DisconnectForContents(const ull SessionID)
 
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
     {
-        SeqID = session.m_SeqID.SeqNumberAndIdx;
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+ 
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"DisConnectForContents2",
+                                       L"1 << 47 ForContents2",
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
-        ReleaseSession(SeqID);
+        ReleaseSession(SessionID);
      
         return true;
+    }
+    else
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
+                                       L"ForContents2Failed",
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx);
     }
 
     if (InterlockedCompareExchange(&session.m_Useflag, 0, 1) == 2)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
                                        L"DisconnectForContents3",
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
-        ReleaseSession(session.m_SeqID.SeqNumberAndIdx);
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx);
+        ReleaseSession(SessionID);
     
         return true;
     }
+    else
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
+                                       L"ForContents3Failed",
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx);
+    }
 
-    return false;
+    return true;
 }
 
 void CLanServer::CancelIO_Routine(const ull SessionID)
 {
     //Session에 대한 안정성은  외부에서 보장해주세요.
-
+    BOOL retval;
     clsSession &session = sessions_vec[SessionID >> 47];
-    
-    CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
-    CancelIoEx((HANDLE)session.m_sock, &session.m_recvOverlapped);
+    if (session.m_SeqID.SeqNumberAndIdx != SessionID)
+    {
+
+        retval = CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
+        if (retval != 0 && GetLastError() == ERROR_OPERATION_ABORTED)
+        {
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
+                                           L"SendCancelIO",
+                                           L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
+        }
+
+        retval = CancelIoEx((HANDLE)session.m_sock, &session.m_recvOverlapped);
+        if (retval != 0 && GetLastError() == ERROR_OPERATION_ABORTED)
+        {
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld  %10s %018llu  %10s %4llu ",
+                                           L"RecvCancelIO",
+                                           L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
+        }
+    }
 
 }
 
@@ -596,8 +652,7 @@ void CLanServer::RecvComplete(clsSession *const session, DWORD transferred)
         }
     }
 
-    if (InterlockedCompareExchange(&session->m_blive, 0,0) == 1)
-        RecvPacket(session);
+    RecvPacket(session);
 }
 
 CMessage *CLanServer::CreateMessage(clsSession *const session, class stHeader &header)
@@ -647,8 +702,8 @@ void CLanServer::SendComplete(clsSession *const session, DWORD transferred)
     {
         stTlsObjectPool<CMessage>::Release(msg);
     }
-    if (InterlockedCompareExchange(&session->m_blive, 0, 0) == 1)
-        SendPacket(session);
+    SendPacket(session);
+
 }
 
 void CLanServer::SendPacket(clsSession *const session)
@@ -717,7 +772,7 @@ void CLanServer::SendPacket(clsSession *const session)
 
     arrTPS[TPSidx] += bufCnt;
 
-    if (InterlockedCompareExchange(&session->m_blive, 0, 0) == 1)
+    if (InterlockedCompareExchange(&session->m_blive, 0, 0) != 0)
     {
         local_IoCount = _InterlockedIncrement(&session->m_ioCount);
  
@@ -738,7 +793,7 @@ void CLanServer::SendPacket(clsSession *const session)
         }
         if (LastError == 10014)
             __debugbreak();
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"WSASend",
                                        L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
@@ -789,21 +844,28 @@ void CLanServer::RecvPacket(clsSession *const session)
         bufCnt = 2;
     }
 
-
-    if (InterlockedCompareExchange(&session->m_blive, 0, 0) == 1)
+    local_IoCount = _InterlockedIncrement(&session->m_ioCount);
+    if (InterlockedCompareExchange(&session->m_blive,0,0) != 0)
     {
-        local_IoCount = _InterlockedIncrement(&session->m_ioCount);
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+        
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"WSARecv",
                                        L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
                                        L"IO_Count", local_IoCount);
         wsaRecv_retval = WSARecv(session->m_sock, session->m_lastRecvWSABuf, bufCnt, nullptr, &flag, &session->m_recvOverlapped, nullptr);
-        if (wsaRecv_retval < 0)
-        {
-            LastError = GetLastError();
-            WSARecvError(LastError, session->m_SeqID.SeqNumberAndIdx);
-        }
+
+        LastError = GetLastError();
+        WSARecvError(LastError, session->m_SeqID.SeqNumberAndIdx);
+    }
+    else
+    {
+        local_IoCount = _InterlockedDecrement(&session->m_ioCount);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"WSARecv_liveZero",
+                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"IO_Count", local_IoCount);
     }
 
 }
@@ -829,15 +891,24 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
 
     switch (LastError)
     {
+        //10004   CancelIO
+    case WSAEINTR:
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"[ %-10s %05d ] %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"Send_WSAEINTR", LastError,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", session.m_ioCount);
+        return;
     case WSA_IO_PENDING:
         if (InterlockedCompareExchange(&session.m_blive, 0, 0) == 0)
         {
-            CancelIO_Routine(SessionID);
+            //CancelIO_Routine(SessionID);
+            CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
         }
-        break;
-
+        return;
         // WSAENOTSOCK
     case 10038:
+
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"WSASendError",
@@ -846,7 +917,7 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
         break;
         // WSAECONNABORTED 내가 끊음.
     case 10053:
-        local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
@@ -859,7 +930,7 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
 
         // WSAECONNRESET  상대가 끊음.
     case 10054:
-        local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
@@ -871,12 +942,12 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
 
     default:
 
-        local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+ 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %05d ,%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"Send_UnDefineError", LastError,
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", local_IoCount);
+                                       L"IO_Count", session.m_ioCount);
         if (InterlockedExchange(&session.m_blive, 0) == 1)
         {
             CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
@@ -894,6 +965,8 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
                                            L"m_blive", 0);
         }
     }
+    local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+
 }
 
 void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
@@ -904,52 +977,50 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
 
     switch (LastError)
     {
+        // 10004   CancelIO
+    case WSAEINTR:
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"[ %-10s %05d ] %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"Recv_WSAEINTR", LastError,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", session.m_ioCount);
+        return;
+    case 0:
     case WSA_IO_PENDING:
-        if (InterlockedCompareExchange(&session.m_blive, 0, 0) == 0)
+        if (InterlockedCompareExchange(&session.m_blive,0,0) == 0)
         {
             // 함수가 성공하면 반환 값이 0이 아닙니다.
-            CancelIO_Routine(SessionID);
+            //CancelIO_Routine(SessionID);
+            CancelIoEx((HANDLE)session.m_sock, &session.m_recvOverlapped);
         }
-        break;
+        return;
 
         // WSAENOTSOCK
     case 10038:
+
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"WSARecvError",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
+
         break;
         // WSAECONNABORTED 내가 끊음.
     case 10053:
-        local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
                                        L"ServerRST",
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"GetLastError", LastError);
-        if (InterlockedExchange(&session.m_blive, 0) == 1)
-        {
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
-                                           L"m_blive => 0",
-                                           L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                           L"m_blive", 0);
-        }
-        else
-        {
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3d",
-                                           L"m_blive Failed",
-                                           L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                           L"m_blive", 0);
-        }
+        InterlockedExchange(&session.m_blive, 0);
+
         break;
 
         // WSAECONNRESET  상대가 끊음.
     case 10054:
-        local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+  
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %5d",
@@ -977,19 +1048,24 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
 
     default:
 
-        local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+ 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"Recv_UnDefineError",
+                                       L"[ %-10s %05d ] %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"Recv_UnDefineError", LastError,
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", local_IoCount);
+                                       L"IO_Count", session.m_ioCount);
         InterlockedExchange(&session.m_blive, 0);
     }
+    local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+
 }
 
 void CLanServer::ReleaseSession(ull SessionID)
 {
     clsSession* session = &sessions_vec[(SessionID & SESSION_IDX_MASK) >> 47];
+    thread_local clsSession temp;
+    
+    temp = *session;
     if (session->m_SeqID.SeqNumberAndIdx != SessionID)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
@@ -1000,26 +1076,12 @@ void CLanServer::ReleaseSession(ull SessionID)
         return;
     }
     session->Release();
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                   L"session->Release",
-                                   L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                   L"IO_Count", session->m_ioCount);
-    m_ReleaseSessions.Push(session);
-
-    clsSession *releaseSession;
-    ull idx;
-    while (m_ReleaseSessions.Pop(releaseSession) == true)
-    {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"Closesocket",
-                                       L"HANDLE : ", releaseSession->m_sock, L"seqID :", releaseSession->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", releaseSession->m_SeqID.idx,
-                                       L"IO_Count", releaseSession->m_ioCount);
-        //releaseSession->m_sock = 0;
-        idx = (releaseSession->m_SeqID.SeqNumberAndIdx & SESSION_IDX_MASK) >> 47;
-        closesocket(releaseSession->m_sock);
-        m_IdxStack.Push(idx);
-        _interlockeddecrement64(&m_SessionCount);
-    }
+    closesocket(temp.m_sock);
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                    L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                    L"Closesocket",
+                                   L"HANDLE : ", temp.m_sock, L"seqID :", temp.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", temp.m_SeqID.idx,
+                                   L"IO_Count", temp.m_ioCount);
+    m_IdxStack.Push(SessionID >> 47);
+    _interlockeddecrement64(&m_SessionCount);
 }
