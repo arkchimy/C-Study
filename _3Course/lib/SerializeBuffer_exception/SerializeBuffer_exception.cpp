@@ -5,14 +5,12 @@
 #include <strsafe.h>
 #include "../../../_1Course/lib/Parser_lib/Parser_lib.h"
 
-#define ERROR_BUFFER_SIZE 100
 
 static int g_mode = 0;
 
 CMessage::CMessage()
 {
 
-    DWORD exceptRetval;
     _size = en_BufferSize::bufferSize;
 
     static HANDLE Allcoheap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);

@@ -5,21 +5,37 @@
 #include "../../_3Course/lib/SerializeBuffer_exception/SerializeBuffer_exception.h"
 
 #define MAX_DATA_LEN 1000
-void enCording(CMessage* msg,uint8_t K , uint8_t RK)
+void EnCording(CMessage* msg,uint8_t K , uint8_t RK)
 {
-    uint8_t originalData[MAX_DATA_LEN];
-    SerializeBufferSize len = msg->_size;
+
+    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr - 1;
     uint8_t total = 0;
 
-    memcpy(originalData, msg->_frontPtr, len);
-    
+
+    int current = 1;
+    BYTE P = 0;
+    BYTE E = 0;
+
     for (int i = 0; i < len; i++)
     {
-        total += originalData[i];
+        total += msg->_frontPtr[i];
     }
-    
+    memcpy(msg->_frontPtr, &total, sizeof(total));
+
+    msg->HexLog();
+
+    for (; &msg->_frontPtr[current] != msg->_rearPtr; current++)
+    {
+        BYTE D1 = (msg->_frontPtr)[current];
+        BYTE b = (P + RK + current );
+        P = D1 ^ b;
+        E = P ^ (E + K + current );
+        msg->_frontPtr[current] = E;
+    }
+    msg->HexLog();
 
 }
+
 using checkSumSpace = BYTE;
 
 
@@ -36,11 +52,8 @@ int main()
 
     uint8_t K = 0xA9;
     uint8_t RK = 0x31;
-    enCording(&msg, K, RK);
-    
-    std::cout << sizeof(data);
+    EnCording(&msg, K, RK);
 
-    std::cout << "Hello World!\n";
 }
 
 // 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴

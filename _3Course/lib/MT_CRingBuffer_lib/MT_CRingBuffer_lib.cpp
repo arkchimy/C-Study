@@ -75,7 +75,7 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
     if (freeSize < local_size)
     {
         // TODO : 링버퍼가 가득차버림의 경우
-        HEX_FILE_LOG(L"RingbufferFulled_Error.txt", _begin, s_BufferSize);
+        //HEX_FILE_LOG(L"RingbufferFulled_Error.txt", _begin, s_BufferSize);
         __debugbreak();
         
         return false;
