@@ -59,11 +59,11 @@ struct CMessage
             if (_size == en_BufferSize::bufferSize)
             {
                 ReSize();
-                HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin, _size);
+                HexLog(L"SerializeBuffer_hex.txt");
             }
             else
             {
-                HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin, _size);
+                HexLog(L"SerializeBuffer_hex.txt");
                 throw MessageException(MessageException::NotEnoughSpace, "Buffer is fulled\n");
             }
         }
@@ -79,7 +79,7 @@ struct CMessage
     {
         if (_frontPtr > _rearPtr)
         {
-            HEX_FILE_LOG(L"SerializeBuffer_hex.txt", _begin, _size);
+            HexLog(L"SerializeBuffer_hex.txt");
             throw MessageException(MessageException::HasNotData, "false Packet \n");
         }
 
@@ -93,6 +93,7 @@ struct CMessage
     BOOL ReSize();
     void Peek(char *out, SerializeBufferSize size);
 
+    void HexLog(const wchar_t *filename = L"SerializeBuffer_hex.txt");
     SerializeBufferSize _size;
 
     char *_begin = nullptr;

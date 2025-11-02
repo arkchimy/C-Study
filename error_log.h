@@ -4,9 +4,7 @@
 
 #define ERROR_BUFFER_SIZE 1000
 // str은 const wchar_t* 문자열 상수 일 것!
-#if 0
-void ERROR_FILE_LOG(const wchar_t *LogFilename, const wchar_t *str);
-#else
+
 #define ERROR_FILE_LOG(LogFilename, str)                                          \
     do                                                                            \
     {                                                                             \
@@ -23,7 +21,7 @@ void ERROR_FILE_LOG(const wchar_t *LogFilename, const wchar_t *str);
             fclose(file);                                                         \
         }                                                                         \
     } while (0)
-#define HEX_FILE_LOG(LogFilename, ptr, size)                   \
+/*#define HEX_FILE_LOG(LogFilename, ptr, size)                   \
     do\
     {                                                          \
         static const wchar_t *m = L"0123456789ABCDEF";         \
@@ -51,7 +49,7 @@ void ERROR_FILE_LOG(const wchar_t *LogFilename, const wchar_t *str);
             fclose(file);                                      \
         }                                                      \
     } while (0)
-#endif         
+#endif    */     
 
 //void HEX_FILE_LOG(const wchar_t *LogFilename, void *ptr, size_t size)
 //{

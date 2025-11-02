@@ -91,3 +91,45 @@ void CMessage::Peek(char *out, SerializeBufferSize size)
         throw MessageException(MessageException::HasNotData, "buffer has not Data\n");
     memcpy(out, f, size);
 }
+
+void CMessage::HexLog(const wchar_t *filename)
+{
+    int current = 0;
+
+    wchar_t hexBuffer[MaxSize * 3 + 1]; // 최대 바이트와 띄어쓰기, 널문자 까지 포함. 
+    wchar_t wordSet[] = L"0123456789ABCDEF";
+    BYTE data;
+
+    for (; &_begin[current] != _end; current++)
+    {
+        data = _begin[current];
+
+        hexBuffer[3 * current + 0] = wordSet[ data  >> 4];
+        hexBuffer[3 * current + 1] = wordSet[ data & 0xF];
+        hexBuffer[3 * current + 2] = L' ';
+    }
+    hexBuffer[3 * current + 0] = L'\n';
+    hexBuffer[3 * current + 1] = L'\n';
+    FILE* file;
+    file = nullptr;
+    while (file == nullptr)
+    {
+        _wfopen_s(&file, filename, L"a+ ,ccs=UTF-16LE");
+    }
+    fwrite(hexBuffer, 2, current * 3 + 1, file);
+    current = 0;
+    for (; &_begin[current] != _end; current++)
+    {
+        hexBuffer[3 * current + 0] = L' ';
+        hexBuffer[3 * current + 1] = L' ';
+        hexBuffer[3 * current + 2] = L' ';
+    }
+
+    hexBuffer[3 * (_frontPtr - _begin)] = L'F';
+    hexBuffer[3 * (_rearPtr - _begin)] = L'R';
+    fwrite(hexBuffer, 2, current * 3 + 1, file);
+
+    fclose(file);
+
+}
+
