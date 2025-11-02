@@ -24,7 +24,7 @@ class CTlsLockFreeQueue
     stNode *_head;
     stNode *_tail;
 
-    volatile LONG64 seqNumber;
+    volatile LONG64 seqNumber = 0;
 
 
     LONG64 m_size;

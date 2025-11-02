@@ -48,23 +48,23 @@ class CLanServer
     void Stop();
 
     bool Disconnect(const ull SessionID);
-    bool DisconnectForContents(const ull SessionID); 
     void CancelIO_Routine(const ull SessionID); //Session에 대한 안정성은  외부에서 보장해주세요.
 
-    CMessage *CreateMessage(class clsSession *const session, class stHeader &header);
+    CMessage *CreateMessage(class clsSession& session, class stHeader &header);
     //CMessage *CreateLoginMessage();
     char *CreateLoginMessage();
 
-    void RecvComplete(class clsSession *const session, DWORD transferred);
-    void SendComplete(class clsSession *const session, DWORD transferred);
+    //void RecvComplete(class clsSession *const session, DWORD transferred);
+    void RecvComplete(class clsSession& session, DWORD transferred);
+    void SendComplete(class clsSession& session, DWORD transferred);
 
-    void SendPacket(class clsSession *const session);
-    void RecvPacket(class clsSession *const session);
+    void SendPacket(class clsSession& session);
+    void RecvPacket(class clsSession& session);
 
     virtual bool OnAccept(ull SessionID) = 0;
     virtual float OnRecv(ull SessionID, CMessage *msg) = 0;
 
-    int GetSessionCount();
+    LONG64 GetSessionCount();
     LONG64 GetReleaseSessions();
     LONG64 Get_IdxStack();
 

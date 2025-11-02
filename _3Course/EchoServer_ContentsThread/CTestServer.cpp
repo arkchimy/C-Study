@@ -56,7 +56,7 @@ unsigned ContentsThread(void *arg)
                 __debugbreak();
             message = (CMessage *)addr;
 
-            if (rand() % 1000 == 0)
+           /* if (rand() % 1000 == 0)
             {
                 CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                                L"%-10s %10s %012llu ",
@@ -66,12 +66,18 @@ unsigned ContentsThread(void *arg)
                     stTlsObjectPool<CMessage>::Release(message);
                 else
                     server->EchoProcedure(l_sessionID, message);
-            }
-            // TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            else
+            }*/
+            //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
+            if (rand() % 1000 == 0)
             {
-                server->EchoProcedure(l_sessionID, message);
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                               L"%-10s %10s %012llu ",
+                                               L"DisConnect_Event",
+                                               L"seqID :", l_sessionID);
+                server->Disconnect(l_sessionID);
             }
+            server->EchoProcedure(l_sessionID, message);
+            
             
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
@@ -111,7 +117,7 @@ unsigned MonitorThread(void *arg)
 
             if (server->GetSessionCount() == 0)
                 continue;
-            printf(" ==================================\nTotal Sessions: %d\n", server->GetSessionCount());
+            printf(" ==================================\nTotal Sessions: %lld\n", server->GetSessionCount());
             printf(" Total iDisCounnectCount: %llu\n", server->iDisCounnectCount);
             printf(" IdxStack Size: %lld\n", server->Get_IdxStack());
             printf(" ReleaseSessions Size: %lld\n", server->GetReleaseSessions());
@@ -239,92 +245,53 @@ bool CTestServer::OnAccept(ull SessionID)
 
 void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
 {
-    ull SeqID;
+ 
     clsSession &session = sessions_vec[ sessionID >> 47];
-    ull exchagRetval;
 
-    // TODO : disconnect에 대비해서 풀을 만들어야함.
-    //
-    // 
+    ull Local_ioCount;
+    ull seqID;
 
-    if (InterlockedCompareExchange(&session.m_Useflag, 1, 0) != 0)
+    //session의 보장 장치.
+    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
+
+    if ((Local_ioCount & (ull)1 << 47) != 0)
     {
-        // 이미 연결이 끊긴 세션의 메세지일 수 있음.
-        // 연결이 끊긴상태면 '0'이 아닌값을 의미하므로 만일 '0'이 아닌 세션이라면 끊겨있는 세션으로 판단하여 무시.
-
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld %10s %05lld  %10s %012llu  %10s %4llu",
-                                       L"EchoProcedure",
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
+        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
         stTlsObjectPool<CMessage>::Release(message);
-
+        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
         return;
     }
-    // 지금 막 연결된  대상은 IOCount가 '1'임  만일 다른 ID의 세션으로 오인되도 제대로 끊기가능.
-    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+    // session의 Release는 막았으므로 변경되지않음.
+    seqID = session.m_SeqID.SeqNumberAndIdx;
+    if (seqID != sessionID)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"ContetnsThread",
-                                       L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
-
-        //여기서는 현재 session이 IO가 0이므로 현재 session을 끊어야한다.
-        SeqID = session.m_SeqID.SeqNumberAndIdx;
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"ContentsRelease1",
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
+        // 새로 세팅된 Session이므로 다른 연결이라 판단.
         stTlsObjectPool<CMessage>::Release(message);
-        ReleaseSession(SeqID);
-        return;
-    }
-    // TODO : 인덱스만 같은 다른 Session
-    if (sessionID != session.m_SeqID.SeqNumberAndIdx)
-    {
-        // ★
-        // CMessagePoolManager::pool.Release(message);
+        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
 
-
-        if (InterlockedCompareExchange(&session.m_Useflag, 0,1) == 2)
-        {
-            //그사이에 WorkerThread가 Release 절차를 밟았다면. 여기서 해제.
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                           L"%-10s %10s %d",
-                                           L"EchoProcedure2",
-                                           L"UseFlag : ", 0);
-
-            SeqID = session.m_SeqID.SeqNumberAndIdx;
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                           L"ContentsRelease5",
-                                           L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                           L"IO_Count", session.m_ioCount);
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(sessionID);
         
-            ReleaseSession(SeqID);
-        }
+        return;
+    }
+
+    if (Local_ioCount == 1)
+    {
+        //원래 '0'이 었는데 내가 증가시켰다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(sessionID);
+        
         stTlsObjectPool<CMessage>::Release(message);
         return;
     }
 
-    //_interlockedbittestandreset64
-    //if ((session.m_ioCount & (ull)1 << 47) != 0)
-    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-    {
-        // 뜨는 경우가 있을까?
-        // 떳음.
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"ContetnsThread2",
-                                       L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
-        //어차피 Use로 물고있기 때문에 다른 연결이진않을듯?
-        stTlsObjectPool<CMessage>::Release(message);
-        ReleaseSession(sessionID);
-        return;
-    }
+    
+    // 여기까지 왔다면, 같은 Session으로 판단하자.
     CMessage **ppMsg;
     ull local_IoCount;
     ppMsg = &message;
@@ -337,47 +304,17 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
             profile.End(L"LFQ_Push");
         }
     }
-
+    //PQCS를 시도.
     if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
     {
         ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
         local_IoCount = InterlockedIncrement(&session.m_ioCount);
-        if ((local_IoCount & (ull)1 << 47) == 0 && local_IoCount != 1)
-        {
-            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
-        }
-        else
-        {
-            local_IoCount = InterlockedDecrement(&session.m_ioCount);
-            if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                               L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                               L"ContetnsThread3",
-                                               L"1<<47 : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                               L"IO_Count", session.m_ioCount);
 
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                               L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                               L"ContentsRelease4",
-                                               L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                               L"IO_Count", session.m_ioCount);
-
-                ReleaseSession(sessionID);
-                return;
-            }
-        }
+        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
     }
 
-    if (InterlockedCompareExchange(&session.m_Useflag, 0,1) == 2)
-    {
-
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"ContentsRelease3",
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
+    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
         ReleaseSession(sessionID);
-    }
-
 }

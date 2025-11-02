@@ -56,23 +56,24 @@ class clsSession
 
     void Release();
 
-    SOCKET m_sock = 0;
+    alignas(64) SOCKET m_sock = 0;
 
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
     stOverlapped m_sendOverlapped = stOverlapped(Job_Type::Send);
 
     //CLockFreeQueue<class CMessage*> m_sendBuffer;
-    CTlsLockFreeQueue<class CMessage *> m_sendBuffer;
+    CTlsLockFreeQueue<struct CMessage *> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
 
     WSABUF m_lastRecvWSABuf[2]{0};
 
 
-    CTlsLockFreeQueue<class CMessage *> m_SendMsg;
+    CTlsLockFreeQueue<struct CMessage *> m_SendMsg;
 
     alignas(64) stSessionId m_SeqID{0};
     ull m_ioCount = 0;
-    ull m_blive = 0;
+
+    alignas(64) ull m_blive = 0;
     ull m_flag = 0;
     ull m_Useflag = 0; // RelaseFlag юс
 
