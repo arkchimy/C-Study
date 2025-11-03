@@ -147,21 +147,6 @@ unsigned AcceptThread(void *arg)
         InterlockedExchange(&session->m_ioCount, 1);            // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
         InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
         InterlockedExchange(&session->m_Useflag, 0);
-       
-
- /*       session->m_ioCount = 0;
-        session->m_sock = client_sock;
-        session->m_blive = 1;
-        session->m_flag = 0;
-        session->m_SeqID.SeqNumberAndIdx = (idx << 47 | session_id);
-               InterlockedExchange(&session->m_Useflag, 0);
-       */
-
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %d",
-                                       L"Accept",
-                                       L"UseFlag : ", 0);
-
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
@@ -318,9 +303,10 @@ unsigned WorkerThread(void *arg)
 
     return 0;
 }
-CLanServer::CLanServer()
-{
 
+CLanServer::CLanServer(bool EnCording)
+    : bEnCording(EnCording)
+{
     m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (m_listen_sock == INVALID_SOCKET)
     {
@@ -484,6 +470,7 @@ LONG64 CLanServer::Get_IdxStack()
 void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
 {
     stHeader header;
+    stEnCordingHeader enCordingheader;
     ringBufferSize useSize;
     float qPersentage;
     ull SeqID;
@@ -492,7 +479,8 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
 
     SeqID = session.m_SeqID.SeqNumberAndIdx;
 
-    char *f, *r;
+    char *f, *r,*b;
+    b = session.m_recvBuffer._begin;
     f = session.m_recvBuffer._frontPtr;
     r = session.m_recvBuffer._rearPtr;
 
@@ -504,30 +492,64 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         return;
     }
     // Header의 크기만큼을 확인.
-    while (session.m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
+    if (bEnCording == false)
     {
-        useSize = session.m_recvBuffer.GetUseSize(f, r);
-        if (useSize < header._len + sizeof(stHeader))
+        while (session.m_recvBuffer.Peek(&header, sizeof(stHeader), f, r) == sizeof(stHeader))
         {
-            Disconnect(session.m_SeqID.SeqNumberAndIdx);
-            return;
-        }
-        // 메세지 생성
-        CMessage *msg = CreateMessage(session, header);
-        {
-            Profiler profile;
-            profile.Start(L"OnRecv");
-            qPersentage = OnRecv(SeqID, msg);
-            profile.End(L"OnRecv");
-        }
-        f = session.m_recvBuffer._frontPtr;
-        if (qPersentage >= 75.0)
-        {
-            Disconnect(SeqID);
-            return;
+            useSize = session.m_recvBuffer.GetUseSize(f, r);
+            if (useSize < header._len + sizeof(stHeader))
+            {
+                Disconnect(session.m_SeqID.SeqNumberAndIdx);
+                return;
+            }
+            // 메세지 생성
+            CMessage *msg = CreateMessage(session, header);
+            {
+                Profiler profile;
+                profile.Start(L"OnRecv");
+                qPersentage = OnRecv(SeqID, msg);
+                profile.End(L"OnRecv");
+            }
+            f = session.m_recvBuffer._frontPtr;
+            if (qPersentage >= 75.0)
+            {
+                Disconnect(SeqID);
+                return;
+            }
         }
     }
-
+    else
+    {
+        while (session.m_recvBuffer.Peek(&enCordingheader, sizeof(stEnCordingHeader), f, r) == sizeof(stEnCordingHeader))
+        {
+            useSize = session.m_recvBuffer.GetUseSize(f, r);
+            if (useSize < enCordingheader._len + sizeof(stEnCordingHeader))
+            {
+                Disconnect(session.m_SeqID.SeqNumberAndIdx);
+                return;
+            }
+            // 메세지 생성
+            CMessage *msg = CreateMessage(session, enCordingheader);
+            if ( bEnCording )
+            {
+                BYTE K = enCordingheader.Code;
+                BYTE RK = enCordingheader.RandKey;
+                DeCording(msg, K, RK);
+            }
+            {
+                Profiler profile;
+                profile.Start(L"OnRecv");
+                qPersentage = OnRecv(SeqID, msg);
+                profile.End(L"OnRecv");
+            }
+            f = session.m_recvBuffer._frontPtr;
+            if (qPersentage >= 75.0)
+            {
+                Disconnect(SeqID);
+                return;
+            }
+        }
+    }
     RecvPacket(session);
 }
 
@@ -540,8 +562,30 @@ CMessage *CLanServer::CreateMessage(clsSession& session, class stHeader &header)
     //CMessage *msg = reinterpret_cast<CMessage *>(CMessagePoolManager::pool.Alloc());
     CMessage *msg = reinterpret_cast<CMessage *> (stTlsObjectPool<CMessage>::Alloc());
     profile.End(L"PoolAlloc");
+   
 
-  
+    ringBufferSize deQsize;
+
+    switch (type)
+    {
+    case 0:
+    default:
+    {
+        deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, sizeof(header) + header._len);
+        
+    }
+    }
+    return msg;
+}
+CMessage *CLanServer::CreateMessage(clsSession &session, stEnCordingHeader &header)
+{
+    unsigned short type = 0;
+    Profiler profile;
+
+    profile.Start(L"PoolAlloc");
+    // CMessage *msg = reinterpret_cast<CMessage *>(CMessagePoolManager::pool.Alloc());
+    CMessage *msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
+    profile.End(L"PoolAlloc");
 
     ringBufferSize deQsize;
 
@@ -551,8 +595,8 @@ CMessage *CLanServer::CreateMessage(clsSession& session, class stHeader &header)
     default:
     {
         deQsize = session.m_recvBuffer.Dequeue(msg->_begin, sizeof(header) + header._len);
+        msg->_frontPtr = msg->_begin + offsetof(stEnCordingHeader, CheckSum);
         msg->_rearPtr = msg->_begin + deQsize;
-        msg->_begin = msg->_begin;
     }
     }
     return msg;
@@ -629,7 +673,7 @@ void CLanServer::SendPacket(clsSession& session)
     CMessage *msg;
 
     bufCnt = 0;
-
+    if (bEnCording == false)
     {
         Profiler profile;
         profile.Start(L"LFQ_Pop");
@@ -640,6 +684,22 @@ void CLanServer::SendPacket(clsSession& session)
 
             wsaBuf[bufCnt].buf = msg->_frontPtr;
             wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
+            bufCnt++;
+            useSize -= 8;
+        }
+        profile.End(L"LFQ_Pop");
+    }
+    else
+    {
+        Profiler profile;
+        profile.Start(L"LFQ_Pop");
+        while (session.m_sendBuffer.Pop(msg))
+        {
+
+            session.m_SendMsg.Push(msg);
+
+            wsaBuf[bufCnt].buf = msg->_begin;
+            wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_begin);
             bufCnt++;
             useSize -= 8;
         }
@@ -733,15 +793,7 @@ void CLanServer::RecvPacket(clsSession& session)
         if (wsaRecv_retval <0)
             WSARecvError(LastError, session.m_SeqID.SeqNumberAndIdx);
     }
-    //else
-    //{
-    //    local_IoCount = _InterlockedDecrement(&session->m_ioCount);
-    //    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-    //                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-    //                                   L"WSARecv_liveZero",
-    //                                   L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-    //                                   L"IO_Count", local_IoCount);
-    //}
+
 
 }
 
@@ -762,7 +814,7 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
 {
     clsSession &session = sessions_vec[ SessionID  >> 47];
     ull local_IoCount;
-
+    //TODO : JumpTable이 만들어지는가?
     switch (LastError)
     {
     case WSA_IO_PENDING:
@@ -773,9 +825,9 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
         break;
 
     case WSAEINTR://10004
-    case 10038:
-    case 10053:
-    case 10054:
+    case WSAENOTSOCK://10038
+    case WSAECONNABORTED://    10053 :
+    case WSAECONNRESET: // 10054:
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
         break;
@@ -790,6 +842,7 @@ void CLanServer::WSASendError(const DWORD LastError,const ull SessionID)
                                        L"IO_Count", session.m_ioCount);
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+
     }
    
 
@@ -801,22 +854,20 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
     ull local_IoCount;
     DWORD CancelRetval;
 
+        // TODO : JumpTable이 만들어지는가?
     switch (LastError)
     {
-        // 10004   CancelIO
     case WSA_IO_PENDING:
         if (session.m_blive == 0)
         {
-            // 함수가 성공하면 반환 값이 0이 아닙니다.
-            //CancelIO_Routine(SessionID);
             CancelIoEx((HANDLE)session.m_sock, &session.m_recvOverlapped);
         }
         break;
 
-    case WSAEINTR: // 10004
-    case 10038:
-    case 10053:
-    case 10054:
+    case WSAEINTR:        // 10004
+    case WSAENOTSOCK:     // 10038
+    case WSAECONNABORTED: //    10053 :
+    case WSAECONNRESET:   // 10054:
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
         break;
@@ -829,6 +880,7 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
                                        L"IO_Count", session.m_ioCount);
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+     
     }
 
 
@@ -848,4 +900,69 @@ void CLanServer::ReleaseSession(ull SessionID)
 
     m_IdxStack.Push(SessionID >> 47);
     _interlockeddecrement64(&m_SessionCount);
+}
+
+void CLanServer::EnCording(CMessage *msg, BYTE K, BYTE RK)
+{
+    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr;
+    BYTE total = 0;
+
+    int current = 0;
+    BYTE P = 0;
+    BYTE E = 0;
+
+    for (int i = 0; i < len; i++)
+    {
+        total += msg->_frontPtr[i];
+    }
+    memcpy(msg->_frontPtr, &total, sizeof(total));
+
+    msg->HexLog();
+
+    for (; &msg->_frontPtr[current] != msg->_rearPtr; current++)
+    {
+        BYTE D1 = (msg->_frontPtr)[current];
+        BYTE b = (P + RK + current);
+
+        P = D1 ^ b;
+        E = P ^ (E + K + current);
+        msg->_frontPtr[current] = E;
+    }
+    msg->HexLog();
+}
+
+void CLanServer::DeCording(CMessage *msg, BYTE K, BYTE RK)
+{
+    BYTE P1 = 0, P2;
+    BYTE E1 = 0, E2;
+    BYTE D1 = 0, D2;
+    BYTE total = 0;
+    // 디코딩의 msg는 링버퍼에서 꺼낸 데이터로 내가 작성하는 
+    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr;
+    int current = 0;
+
+    msg->HexLog();
+    // 2기준
+    // D2 ^ (P1 + RK + 2) = P2
+    // P2 ^ (E1 + K + 2) = E2
+
+    // E2 ^ (E1 + K + 2) = P2
+    // P2 ^ (P1 + RK + 2) = D2
+    for (; &msg->_frontPtr[current] != msg->_rearPtr; current++)
+    {
+        E2 = msg->_frontPtr[current];
+        P2 = E2 ^ (E1 + K + current);
+        E1 = E2;
+        D2 = P2 ^ (P1 + RK + current);
+        P1 = P2;
+        msg->_frontPtr[current] = D2;
+    }
+
+    for (int i = 1; i < len; i++)
+    {
+        total += msg->_frontPtr[i];
+    }
+    memcpy(msg->_frontPtr, &total, sizeof(total));
+
+    msg->HexLog();
 }

@@ -47,26 +47,11 @@ unsigned ContentsThread(void *arg)
             if (DeQSisze != sizeof(ull))
                 __debugbreak();
 
-            DeQSisze = server->m_ContentsQ.Peek(&addr, sizeof(size_t));
-            peekMessage = (CMessage *)addr;
-            peekMessage->_begin = peekMessage->_begin;
-
             DeQSisze = server->m_ContentsQ.Dequeue(&addr, sizeof(size_t));
             if (DeQSisze != sizeof(size_t))
                 __debugbreak();
             message = (CMessage *)addr;
 
-           /* if (rand() % 1000 == 0)
-            {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                               L"%-10s %10s %012llu ",
-                                               L"DisConnect_Event",
-                                               L"seqID :", l_sessionID);
-                if(server->DisconnectForContents(l_sessionID) == true)
-                    stTlsObjectPool<CMessage>::Release(message);
-                else
-                    server->EchoProcedure(l_sessionID, message);
-            }*/
             //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
             if (rand() % 1000 == 0)
             {
@@ -133,8 +118,8 @@ unsigned MonitorThread(void *arg)
     return 0;
 }
 
-CTestServer::CTestServer()
-
+CTestServer::CTestServer(int iEncording)
+    : CLanServer(iEncording)
 {
     InitializeSRWLock(&srw_ContentQ);
 
@@ -233,10 +218,6 @@ bool CTestServer::OnAccept(ull SessionID)
                                    L"IO_Count", local_IoCount);
     if (send_retval < 0)
     {
-        if (LastError != ERROR_IO_PENDING)
-        {
-            __debugbreak();
-        }
         WSASendError(LastError, SessionID);
     }
 
@@ -297,7 +278,21 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
     CMessage **ppMsg;
     ull local_IoCount;
     ppMsg = &message;
+    if (bEnCording == false)
     {
+        {
+            Profiler profile;
+            profile.Start(L"LFQ_Push");
+
+            session.m_sendBuffer.Push(*ppMsg);
+            profile.End(L"LFQ_Push");
+        }
+    }
+    else
+    {
+        stEnCordingHeader header;
+        memcpy(&header, (*ppMsg)->_begin, sizeof(header));
+        EnCording(*ppMsg, header.Code, header.RandKey);
         {
             Profiler profile;
             profile.Start(L"LFQ_Push");

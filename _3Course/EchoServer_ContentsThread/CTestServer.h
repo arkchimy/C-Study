@@ -3,7 +3,7 @@
 class CTestServer : public CLanServer
 {
   public:
-    CTestServer();
+    CTestServer(int iEncording = false);
     virtual ~CTestServer();
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
 

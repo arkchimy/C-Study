@@ -8,28 +8,6 @@
 CDump cump;
 
 
-class st_WSAData
-{
-  public:
-    st_WSAData()
-    {
-        WSAData wsa;
-        DWORD wsaStartRetval;
-
-        wsaStartRetval = WSAStartup(MAKEWORD(2, 2), &wsa);
-        if (wsaStartRetval != 0)
-        {
-            ERROR_FILE_LOG(L"WSAData_Error.txt", L"WSAStartup retval is not Zero ");
-            __debugbreak();
-        }
-    }
-    ~st_WSAData()
-    {
-        WSACleanup();
-    }
-};
-
-
 int main()
 {
     CDump::SetHandlerDump();
@@ -40,6 +18,7 @@ int main()
     short bindPort;
 
     int iZeroCopy;
+    int iEnCording;
     int WorkerThreadCnt;
     int reduceThreadCount;
     int NoDelay;
@@ -67,6 +46,9 @@ int main()
 
         parser.GetValue(L"RingBufferSize", iRingBufferSize);
         parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
+        parser.GetValue(L"EnCording", iEnCording);
+
+
  
         CRingBuffer::s_BufferSize = iRingBufferSize;
     }
@@ -76,7 +58,8 @@ int main()
    
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
-        CTestServer EchoServer;
+        CTestServer EchoServer(iEnCording);
+
         EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
         CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
         CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);

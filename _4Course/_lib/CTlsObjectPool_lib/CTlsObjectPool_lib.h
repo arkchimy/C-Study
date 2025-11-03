@@ -214,7 +214,7 @@ struct stTlsObjectPool
         }
         PVOID node = pool->allocPool->Alloc();
         
-      
+        
         return node;
     }
     static void Release(PVOID node)

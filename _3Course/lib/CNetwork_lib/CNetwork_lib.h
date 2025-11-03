@@ -22,6 +22,28 @@
 #define MAX_SESSION_COUNT 7000
 using ull = unsigned long long;
 
+class st_WSAData
+{
+  public:
+    st_WSAData()
+    {
+        WSAData wsa;
+        DWORD wsaStartRetval;
+
+        wsaStartRetval = WSAStartup(MAKEWORD(2, 2), &wsa);
+        if (wsaStartRetval != 0)
+        {
+            ERROR_FILE_LOG(L"WSAData_Error.txt", L"WSAStartup retval is not Zero ");
+            __debugbreak();
+        }
+    }
+    ~st_WSAData()
+    {
+        WSACleanup();
+    }
+};
+
+
 struct stSRWLock
 {
     stSRWLock(SRWLOCK *srw)
@@ -35,12 +57,21 @@ struct stSRWLock
     }
     SRWLOCK *m_srw;
 };
-
+#pragma pack(1)
+struct stEnCordingHeader
+{
+    //Code(1byte) - Len(2byte) - RandKey(1byte) - CheckSum(1byte) 
+    BYTE Code;
+    SHORT _len;
+    BYTE RandKey;
+    BYTE CheckSum;
+};
+#pragma pack()
 
 class CLanServer
 {
   public:
-    CLanServer();
+    CLanServer(bool EnCording = false);
     ~CLanServer();
 
     // 오픈 IP / 포트 / 제로카피 여부 /워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
@@ -51,6 +82,7 @@ class CLanServer
     void CancelIO_Routine(const ull SessionID); //Session에 대한 안정성은  외부에서 보장해주세요.
 
     CMessage *CreateMessage(class clsSession& session, class stHeader &header);
+    CMessage *CreateMessage(class clsSession &session, class stEnCordingHeader &header);
     //CMessage *CreateLoginMessage();
     char *CreateLoginMessage();
 
@@ -76,7 +108,11 @@ class CLanServer
     void WSARecvError(const DWORD LastError, const ull SessionID);
     void ReleaseSession(ull SessionID);
 
+
+    void EnCording(CMessage *msg, BYTE K, BYTE RK); 
+    void DeCording(CMessage *msg, BYTE K, BYTE RK);
   public:
+    
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
     HANDLE *m_hThread = nullptr;
@@ -85,6 +121,7 @@ class CLanServer
 
     bool bZeroCopy = false;
     bool bOn = false;
+    bool bEnCording = false;
 
     LONG64 m_SessionCount = 0;
     ull iDisCounnectCount = 0;

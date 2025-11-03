@@ -5,11 +5,11 @@
 #include "../../_3Course/lib/SerializeBuffer_exception/SerializeBuffer_exception.h"
 
 #define MAX_DATA_LEN 1000
-void EnCording(CMessage* msg,uint8_t K , uint8_t RK)
+void EnCording(CMessage* msg,BYTE K , BYTE RK)
 {
 
-    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr - 1;
-    uint8_t total = 0;
+    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr ;
+    BYTE total = 0;
 
 
     int current = 1;
@@ -35,7 +35,42 @@ void EnCording(CMessage* msg,uint8_t K , uint8_t RK)
     msg->HexLog();
 
 }
+void DeCording(CMessage *msg, BYTE K, BYTE RK)
+{
+    BYTE P1 = 0,P2;
+    BYTE E1 = 0,E2;
+    BYTE D1 = 0,D2;
+    BYTE total = 0;
 
+    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr ;
+    int current = 1;
+
+    // 2기준
+    //D2 ^ (P1 + RK + 2) = P2
+    //P2 ^ (E1 + K + 2) = E2
+
+    //E2 ^ (E1 + K + 2) = P2
+    //P2 ^ (P1 + RK + 2) = D2
+    for (; &msg->_frontPtr[current] != msg->_rearPtr; current++)
+    {
+        E2 = msg->_frontPtr[current];
+        P2  = E2 ^ (E1 + K + current);
+        E1 = E2;
+        D2 = P2 ^ (P1 + RK + current);
+        P1 = P2;
+        msg->_frontPtr[current] = D2;
+    }
+
+    for (int i = 1; i < len; i++)
+    {
+        total += msg->_frontPtr[i];
+    }
+    memcpy(msg->_frontPtr, &total, sizeof(total));
+
+    msg->HexLog();
+
+
+}
 using checkSumSpace = BYTE;
 
 
@@ -50,9 +85,10 @@ int main()
 
     msg.HexLog();
 
-    uint8_t K = 0xA9;
-    uint8_t RK = 0x31;
+    BYTE K = 0xA9;
+    BYTE RK = 0x31;
     EnCording(&msg, K, RK);
+    DeCording(&msg, K, RK);
 
 }
 
