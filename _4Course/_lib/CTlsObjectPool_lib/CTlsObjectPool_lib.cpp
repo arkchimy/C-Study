@@ -115,22 +115,9 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
     {
         swap = pool->allocPool;
         pool->allocPool = instance.GetFullPool(swap);
-        return pool->allocPool->Alloc();
-        CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%10s PushData : %08p return Data %08p",
-                                       L"EmptyPool Push", swap, pool);
-        /*swap = pool->allocPool;
-        if (pool->releasePool->m_size == 0)
-        {
-            pool->allocPool = instance.GetFullPool(swap);
-            return pool->allocPool->Alloc();
-        }
-        pool->allocPool = pool->releasePool;
-        pool->releasePool = swap;*/
     }
     PVOID node = pool->allocPool->Alloc();
     CMessage *msg = reinterpret_cast<CMessage *>(node);
-    msg->_frontPtr = msg->_begin;
-    msg->_rearPtr = msg->_begin;
     CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%10s %10s : %08p %10s %08p %10s %llu",
                                    L"Alloc ", L"Node ", node, L"PoolAddress ", pool->releasePool, L"m_size", pool->allocPool->m_size);
     return node;

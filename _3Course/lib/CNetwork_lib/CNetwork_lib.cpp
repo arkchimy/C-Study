@@ -437,7 +437,7 @@ bool CLanServer::Disconnect(const ull SessionID)
     // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
         ReleaseSession(SessionID);
-    return true;
+    return false;
 }
 
 void CLanServer::CancelIO_Routine(const ull SessionID)
@@ -572,7 +572,8 @@ CMessage *CLanServer::CreateMessage(clsSession& session, class stHeader &header)
     default:
     {
         deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, sizeof(header) + header._len);
-        
+        msg->_rearPtr = msg->_frontPtr + deQsize;
+        //InterlockedExchange((ull*) &msg->_rearPtr, (ull)msg->_frontPtr + deQsize);
     }
     }
     return msg;
@@ -586,6 +587,9 @@ CMessage *CLanServer::CreateMessage(clsSession &session, stEnCordingHeader &head
     // CMessage *msg = reinterpret_cast<CMessage *>(CMessagePoolManager::pool.Alloc());
     CMessage *msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
     profile.End(L"PoolAlloc");
+
+    msg->_frontPtr = msg->_begin;
+    msg->_rearPtr = msg->_begin;
 
     ringBufferSize deQsize;
 
@@ -684,8 +688,10 @@ void CLanServer::SendPacket(clsSession& session)
 
             wsaBuf[bufCnt].buf = msg->_frontPtr;
             wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
+            if (wsaBuf[bufCnt].len != 10)
+                __debugbreak();
             bufCnt++;
-            useSize -= 8;
+      
         }
         profile.End(L"LFQ_Pop");
     }
@@ -701,7 +707,7 @@ void CLanServer::SendPacket(clsSession& session)
             wsaBuf[bufCnt].buf = msg->_begin;
             wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_begin);
             bufCnt++;
-            useSize -= 8;
+    
         }
         profile.End(L"LFQ_Pop");
     }

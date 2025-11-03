@@ -61,9 +61,9 @@ unsigned ContentsThread(void *arg)
                                                L"seqID :", l_sessionID);
                 server->Disconnect(l_sessionID);
             }
-            server->EchoProcedure(l_sessionID, message);
-            
-            
+            else
+                server->EchoProcedure(l_sessionID, message);
+
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
         }
@@ -155,7 +155,7 @@ float CTestServer::OnRecv(ull sessionID, CMessage *msg)
     ContentsUseSize = m_ContentsQ.GetUseSize();
     if (msg == nullptr)
     {
-       
+
         return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
     }
 
@@ -226,13 +226,13 @@ bool CTestServer::OnAccept(ull SessionID)
 
 void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
 {
- 
-    clsSession &session = sessions_vec[ SessionID >> 47];
+
+    clsSession &session = sessions_vec[SessionID >> 47];
 
     ull Local_ioCount;
     ull seqID;
 
-    //session의 보장 장치.
+    // session의 보장 장치.
     Local_ioCount = InterlockedIncrement(&session.m_ioCount);
 
     if ((Local_ioCount & (ull)1 << 47) != 0)
@@ -242,6 +242,20 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
         // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
         return;
     }
+
+    if (Local_ioCount == 1)
+    {
+        // 원래 '0'이 었는데 내가 증가시켰다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(SessionID);
+
+        stTlsObjectPool<CMessage>::Release(message);
+        return;
+    }
+
     // session의 Release는 막았으므로 변경되지않음.
     seqID = session.m_SeqID.SeqNumberAndIdx;
     if (seqID != SessionID)
@@ -254,26 +268,10 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
             ReleaseSession(SessionID);
-        
+
         return;
     }
 
-
-
-    if (Local_ioCount == 1)
-    {
-        //원래 '0'이 었는데 내가 증가시켰다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(SessionID);
-        
-        stTlsObjectPool<CMessage>::Release(message);
-        return;
-    }
-
-    
     // 여기까지 왔다면, 같은 Session으로 판단하자.
     CMessage **ppMsg;
     ull local_IoCount;
@@ -301,7 +299,7 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
             profile.End(L"LFQ_Push");
         }
     }
-    //PQCS를 시도.
+    // PQCS를 시도.
     if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
     {
         ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
