@@ -53,16 +53,8 @@ unsigned ContentsThread(void *arg)
             message = (CMessage *)addr;
 
             //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            if (rand() % 1000 == 0)
-            {
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                               L"%-10s %10s %012llu ",
-                                               L"DisConnect_Event",
-                                               L"seqID :", l_sessionID);
-                server->Disconnect(l_sessionID);
-            }
-            else
-                server->EchoProcedure(l_sessionID, message);
+          
+            server->EchoProcedure(l_sessionID, message);
 
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
@@ -243,6 +235,22 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
         return;
     }
 
+    // session의 Release는 막았으므로 변경되지않음.
+    seqID = session.m_SeqID.SeqNumberAndIdx;
+    if (seqID != SessionID)
+    {
+        // 새로 세팅된 Session이므로 다른 연결이라 판단.
+        stTlsObjectPool<CMessage>::Release(message);
+        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(seqID);
+
+        return;
+    }
+
     if (Local_ioCount == 1)
     {
         // 원래 '0'이 었는데 내가 증가시켰다.
@@ -256,21 +264,7 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
         return;
     }
 
-    // session의 Release는 막았으므로 변경되지않음.
-    seqID = session.m_SeqID.SeqNumberAndIdx;
-    if (seqID != SessionID)
-    {
-        // 새로 세팅된 Session이므로 다른 연결이라 판단.
-        stTlsObjectPool<CMessage>::Release(message);
-        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(SessionID);
-
-        return;
-    }
+  
 
     // 여기까지 왔다면, 같은 Session으로 판단하자.
     CMessage **ppMsg;
