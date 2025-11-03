@@ -243,10 +243,10 @@ bool CTestServer::OnAccept(ull SessionID)
     return true;
 }
 
-void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
+void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
 {
  
-    clsSession &session = sessions_vec[ sessionID >> 47];
+    clsSession &session = sessions_vec[ SessionID >> 47];
 
     ull Local_ioCount;
     ull seqID;
@@ -263,7 +263,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     }
     // session의 Release는 막았으므로 변경되지않음.
     seqID = session.m_SeqID.SeqNumberAndIdx;
-    if (seqID != sessionID)
+    if (seqID != SessionID)
     {
         // 새로 세팅된 Session이므로 다른 연결이라 판단.
         stTlsObjectPool<CMessage>::Release(message);
@@ -272,10 +272,12 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(sessionID);
+            ReleaseSession(SessionID);
         
         return;
     }
+
+
 
     if (Local_ioCount == 1)
     {
@@ -284,7 +286,7 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
         // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(sessionID);
+            ReleaseSession(SessionID);
         
         stTlsObjectPool<CMessage>::Release(message);
         return;
@@ -316,5 +318,5 @@ void CTestServer::EchoProcedure(ull sessionID, CMessage *message)
     Local_ioCount = InterlockedDecrement(&session.m_ioCount);
     // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-        ReleaseSession(sessionID);
+        ReleaseSession(SessionID);
 }

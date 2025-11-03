@@ -422,6 +422,11 @@ bool CLanServer::Disconnect(const ull SessionID)
     // session의 보장 장치.
     Local_ioCount = InterlockedIncrement(&session.m_ioCount);
 
+    if ((Local_ioCount & (ull)1 << 47) != 0)
+    {
+        return false;
+    }
+
     if (SessionID != session.m_SeqID.SeqNumberAndIdx)
     {
 
@@ -434,19 +439,6 @@ bool CLanServer::Disconnect(const ull SessionID)
         return false;
     }
 
-    if (Local_ioCount == 1)
-    {
-        // 원래 '0'이 었는데 내가 증가시켰다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-        if (Local_ioCount == 0)
-        {
-            if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-                ReleaseSession(SessionID);
-        }
-        return true;
-    }
-
     if (InterlockedCompareExchange(&session.m_blive, 0,1) == 1)
     {
         InterlockedIncrement(&iDisCounnectCount);
@@ -456,12 +448,9 @@ bool CLanServer::Disconnect(const ull SessionID)
     CancelIO_Routine(SessionID);
 
     Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-    if (Local_ioCount == 0)
-    {
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(SessionID);
-    }
+    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+        ReleaseSession(SessionID);
     return true;
 }
 
