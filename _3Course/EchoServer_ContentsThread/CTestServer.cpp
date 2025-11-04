@@ -53,8 +53,13 @@ unsigned ContentsThread(void *arg)
             message = (CMessage *)addr;
 
             //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-          
-            server->EchoProcedure(l_sessionID, message);
+            /*if (rand() % 10000 == 0)
+            {
+                server->Disconnect(l_sessionID);
+                stTlsObjectPool<CMessage>::Release(message);
+            }
+            else*/
+                server->EchoProcedure(l_sessionID, message);
 
             f = server->m_ContentsQ._frontPtr;
             useSize -= 16;
@@ -92,12 +97,12 @@ unsigned MonitorThread(void *arg)
                 before_arrTPS[i] = server->arrTPS[i];
             }
 
-            if (server->GetSessionCount() == 0)
-                continue;
             printf(" ==================================\nTotal Sessions: %lld\n", server->GetSessionCount());
             printf(" Total iDisCounnectCount: %llu\n", server->iDisCounnectCount);
             printf(" IdxStack Size: %lld\n", server->Get_IdxStack());
             printf(" ReleaseSessions Size: %lld\n", server->GetReleaseSessions());
+
+            printf(" Accept TPS : %lld\n", arrTPS[0]);
 
             for (int i = 1; i <= server->m_WorkThreadCnt; i++)
             {

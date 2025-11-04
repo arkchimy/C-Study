@@ -122,7 +122,7 @@ unsigned AcceptThread(void *arg)
             ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Error ");
             continue;
         }
-
+        server->arrTPS[0]++;
         {
 
             if (server->m_IdxStack.m_size == 0)
@@ -711,6 +711,8 @@ void CLanServer::SendPacket(clsSession& session)
 
             wsaBuf[bufCnt].buf = msg->_begin;
             wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_begin);
+            if (wsaBuf[bufCnt].len != 10)
+                __debugbreak();
             bufCnt++;
     
         }
