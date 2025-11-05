@@ -11,6 +11,18 @@
 #include <type_traits>
 
 using SerializeBufferSize = DWORD;
+
+#pragma pack(1)
+struct stEnCordingHeader
+{
+    // Code(1byte) - Len(2byte) - RandKey(1byte) - CheckSum(1byte)
+    BYTE Code;
+    SHORT _len;
+    BYTE RandKey;
+    BYTE CheckSum;
+};
+#pragma pack()
+
 class MessageException : public std::exception
 {
   public:
@@ -87,6 +99,11 @@ struct CMessage
         _frontPtr = _frontPtr + sizeof(data);
         return *this;
     }
+
+    void EnCording();
+    void DeCording();
+
+
     SSIZE_T PutData(const char *src, SerializeBufferSize size);
     SSIZE_T GetData(char *desc, SerializeBufferSize size);
 
@@ -102,7 +119,10 @@ struct CMessage
     char *_frontPtr = nullptr;
     char *_rearPtr = nullptr;
 
+    ull ownerID;
     LONG64 s_UseCnt = 0;
+
+    BYTE K = 0xa9; // 고정 키 
 
     inline static HANDLE s_BufferHeap;
 };

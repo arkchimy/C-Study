@@ -118,6 +118,10 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
     }
     PVOID node = pool->allocPool->Alloc();
     CMessage *msg = reinterpret_cast<CMessage *>(node);
+    {
+        msg->_frontPtr = msg->_begin;
+        msg->_rearPtr = msg->_frontPtr;
+    }
     CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%10s %10s : %08p %10s %08p %10s %llu",
                                    L"Alloc ", L"Node ", node, L"PoolAddress ", pool->releasePool, L"m_size", pool->allocPool->m_size);
     return node;
@@ -171,21 +175,5 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
                                        L"FullPool Push", swap, pool);
         return;
     }
-    //10_31 제거
-    // 
-    //pool->releasePool = pool->allocPool;
-    //pool->allocPool = swap;
-    /*
-       //메모리가 계속 증가할것이다.
-    if (pool->releasePool->m_size == tlsPool_init_Capacity)
-       {
-           swap = pool->releasePool;
-           if (pool->allocPool->m_size == tlsPool_init_Capacity)
-           {
-               pool->releasePool = instance.GetEmptyPool(swap);
-               return;
-           }
-           pool->releasePool = pool->allocPool;
-           pool->allocPool = swap;
-       }*/
+
 }

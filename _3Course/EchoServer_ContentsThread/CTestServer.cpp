@@ -9,66 +9,6 @@
 extern SRWLOCK srw_Log;
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
-
-unsigned ContentsThread(void *arg)
-{
-    size_t addr;
-    CMessage *message, *peekMessage;
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-    char *f, *r;
-    HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
-    DWORD hSignalIdx;
-    ringBufferSize useSize, DeQSisze;
-    ull l_sessionID;
-
-    // bool 이 좋아보임.
-
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is ContentsThread");
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is ContentsThread");
-    while (1)
-    {
-        hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
-        if (hSignalIdx - WAIT_OBJECT_0 == 1)
-            break;
-
-        f = server->m_ContentsQ._frontPtr;
-        r = server->m_ContentsQ._rearPtr;
-        useSize = server->m_ContentsQ.GetUseSize(f, r);
-
-        // ID + msg  크기 메세지 하나에 16Byte
-        while (useSize >= 16)
-        {
-
-            DeQSisze = server->m_ContentsQ.Dequeue(&l_sessionID, sizeof(ull));
-            if (DeQSisze != sizeof(ull))
-                __debugbreak();
-
-            DeQSisze = server->m_ContentsQ.Dequeue(&addr, sizeof(size_t));
-            if (DeQSisze != sizeof(size_t))
-                __debugbreak();
-            message = (CMessage *)addr;
-
-            //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            /*if (rand() % 10000 == 0)
-            {
-                server->Disconnect(l_sessionID);
-                stTlsObjectPool<CMessage>::Release(message);
-            }
-            else*/
-                server->EchoProcedure(l_sessionID, message);
-
-            f = server->m_ContentsQ._frontPtr;
-            useSize -= 16;
-        }
-    }
-
-    return 0;
-}
-
 unsigned MonitorThread(void *arg)
 {
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
@@ -114,6 +54,182 @@ unsigned MonitorThread(void *arg)
 
     return 0;
 }
+unsigned ContentsThread(void *arg)
+{
+    size_t addr;
+    CMessage *message, *peekMessage;
+    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+    char *f, *r;
+    HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
+    DWORD hSignalIdx;
+    ringBufferSize useSize, DeQSisze;
+    ull l_sessionID;
+
+    // bool 이 좋아보임.
+
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                   L"%-20s ",
+                                   L"This is ContentsThread");
+    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+                                   L"%-20s ",
+                                   L"This is ContentsThread");
+    while (1)
+    {
+        hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
+        if (hSignalIdx - WAIT_OBJECT_0 == 1)
+            break;
+
+        f = server->m_ContentsQ._frontPtr;
+        r = server->m_ContentsQ._rearPtr;
+        useSize = server->m_ContentsQ.GetUseSize(f, r);
+
+        // ID + msg  크기 메세지 하나에 16Byte
+        while (useSize >= 8)
+        {
+
+            DeQSisze = server->m_ContentsQ.Dequeue(&addr, sizeof(size_t));
+            if (DeQSisze != sizeof(size_t))
+                __debugbreak();
+
+            message = (CMessage *)addr;
+            l_sessionID = message->ownerID;
+
+            //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
+            server->PacketProc(l_sessionID, message);
+
+            f = server->m_ContentsQ._frontPtr;
+            useSize -= 8;
+        }
+    }
+
+    return 0;
+}
+
+bool CTestServer::PacketProc(ull SessionID, CMessage *msg)
+{
+    // TODO : 추후에  Code로 Case문 바꾸기.
+    //  메세지를 보낼때,
+
+    float qPersentage;
+    short len;
+    char EchoBuffer[100];
+    stHeader header;
+    msg->GetData((char *)&header, headerSize);
+    if (bEnCording)
+        len = header._len;
+    else
+        len = 8;
+
+    // TODO : Header.Len => Code로 바꾸기
+    switch (len)
+    {
+    case 8:
+    {
+ 
+        // 헤더를 그대로 복사.
+        /*
+         * msg << 이런식 사용.
+         */
+        msg->GetData(EchoBuffer, header._len);
+        header._len = 8;
+        stTlsObjectPool<CMessage>::Release(msg);
+        msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+
+        msg->PutData((const char *)&header, sizeof(stHeader));
+        msg->PutData(EchoBuffer, header._len);
+        EchoProcedure(SessionID, msg);
+    }
+    break;
+    default:
+        //TODO : 이부분 다시 보기
+        msg->GetData(EchoBuffer, header._len);
+        stTlsObjectPool<CMessage>::Release(msg);
+
+        msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+
+        msg->PutData((const char *)&header, sizeof(stEnCordingHeader));
+        msg->PutData(EchoBuffer, sizeof(EchoBuffer));
+        EchoProcedure(SessionID, msg);
+    }
+
+    return true;
+}
+
+void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
+{
+    clsSession &session = sessions_vec[SessionID >> 47];
+    ull Local_ioCount;
+    ull seqID;
+
+    // session의 보장 장치.
+    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
+
+    if ((Local_ioCount & (ull)1 << 47) != 0)
+    {
+        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
+        stTlsObjectPool<CMessage>::Release(message);
+        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
+        return;
+    }
+
+    // session의 Release는 막았으므로 변경되지않음.
+    seqID = session.m_SeqID.SeqNumberAndIdx;
+    if (seqID != SessionID)
+    {
+        // 새로 세팅된 Session이므로 다른 연결이라 판단.
+        stTlsObjectPool<CMessage>::Release(message);
+        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(seqID);
+
+        return;
+    }
+
+    if (Local_ioCount == 1)
+    {
+        // 원래 '0'이 었는데 내가 증가시켰다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(SessionID);
+
+        stTlsObjectPool<CMessage>::Release(message);
+        return;
+    }
+
+    // 여기까지 왔다면, 같은 Session으로 판단하자.
+    CMessage **ppMsg;
+    ull local_IoCount;
+    ppMsg = &message;
+
+    if (bEnCording)
+        (*ppMsg)->EnCording();
+    {
+        Profiler profile;
+        profile.Start(L"LFQ_Push");
+
+        session.m_sendBuffer.Push(*ppMsg);
+        profile.End(L"LFQ_Push");
+    }
+
+    // PQCS를 시도.
+    if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
+    {
+        ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+        local_IoCount = InterlockedIncrement(&session.m_ioCount);
+
+        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
+    }
+
+    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+        ReleaseSession(SessionID);
+}
 
 CTestServer::CTestServer(int iEncording)
     : CLanServer(iEncording)
@@ -141,6 +257,7 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
+
 float CTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
     // double CurrentQ;
@@ -164,9 +281,7 @@ float CTestServer::OnRecv(ull sessionID, CMessage *msg)
         // 포인터를 넣고
         CMessage **ppMsg;
         ppMsg = &msg;
-
-        if (m_ContentsQ.Enqueue(&sessionID, sizeof(sessionID)) != sizeof(sessionID))
-            __debugbreak();
+        (*ppMsg)->ownerID = sessionID;
 
         if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
             __debugbreak();
@@ -221,94 +336,3 @@ bool CTestServer::OnAccept(ull SessionID)
     return true;
 }
 
-void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
-{
-
-    clsSession &session = sessions_vec[SessionID >> 47];
-
-    ull Local_ioCount;
-    ull seqID;
-
-    // session의 보장 장치.
-    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
-
-    if ((Local_ioCount & (ull)1 << 47) != 0)
-    {
-        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
-        stTlsObjectPool<CMessage>::Release(message);
-        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
-        return;
-    }
-
-    // session의 Release는 막았으므로 변경되지않음.
-    seqID = session.m_SeqID.SeqNumberAndIdx;
-    if (seqID != SessionID)
-    {
-        // 새로 세팅된 Session이므로 다른 연결이라 판단.
-        stTlsObjectPool<CMessage>::Release(message);
-        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(seqID);
-
-        return;
-    }
-
-    if (Local_ioCount == 1)
-    {
-        // 원래 '0'이 었는데 내가 증가시켰다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(SessionID);
-
-        stTlsObjectPool<CMessage>::Release(message);
-        return;
-    }
-
-  
-
-    // 여기까지 왔다면, 같은 Session으로 판단하자.
-    CMessage **ppMsg;
-    ull local_IoCount;
-    ppMsg = &message;
-    if (bEnCording == false)
-    {
-        {
-            Profiler profile;
-            profile.Start(L"LFQ_Push");
-
-            session.m_sendBuffer.Push(*ppMsg);
-            profile.End(L"LFQ_Push");
-        }
-    }
-    else
-    {
-        stEnCordingHeader header;
-        memcpy(&header, (*ppMsg)->_begin, sizeof(header));
-        EnCording(*ppMsg, header.Code, header.RandKey);
-        {
-            Profiler profile;
-            profile.Start(L"LFQ_Push");
-
-            session.m_sendBuffer.Push(*ppMsg);
-            profile.End(L"LFQ_Push");
-        }
-    }
-    // PQCS를 시도.
-    if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
-    {
-        ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
-        local_IoCount = InterlockedIncrement(&session.m_ioCount);
-
-        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
-    }
-
-    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-        ReleaseSession(SessionID);
-}

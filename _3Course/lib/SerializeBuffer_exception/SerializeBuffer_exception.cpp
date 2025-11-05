@@ -20,7 +20,7 @@ CMessage::CMessage()
     if (_begin == nullptr)
         __debugbreak();
     _end = _begin + _size;
-    _frontPtr = _begin;
+    _frontPtr = _begin ;
     _rearPtr = _frontPtr;
 }
 
@@ -29,6 +29,85 @@ CMessage::~CMessage()
     HeapFree(s_BufferHeap, 0, _begin);
     _begin = nullptr;
 
+}
+
+void CMessage::EnCording( )
+{
+    SerializeBufferSize len;
+    BYTE RK;
+    BYTE total = 0;
+    int current = 0;
+
+    BYTE P = 0;
+    BYTE E = 0;
+    char *local_Front;
+
+    RK = 0x31;
+
+    local_Front = _begin + offsetof(stEnCordingHeader, CheckSum);
+    len = _rearPtr - local_Front;
+    
+    for (int i = 0; i < len; i++)
+    {
+        total += local_Front[i];
+    }
+    memcpy(local_Front, &total, sizeof(total));
+
+    for (; &local_Front[current] != _rearPtr; current++)
+    {
+        BYTE D1 = (local_Front)[current];
+        BYTE b = (P + RK + current);
+
+        P = D1 ^ b;
+        E = P ^ (E + K + current);
+        local_Front[current] = E;
+    }
+
+}
+
+void CMessage::DeCording( )
+{
+    BYTE P1 = 0, P2;
+    BYTE E1 = 0, E2;
+    BYTE D1 = 0, D2;
+    BYTE total = 0;
+    BYTE RK;
+    char *local_Front;
+
+    // 디코딩의 msg는 링버퍼에서 꺼낸 데이터로 내가 작성하는
+    SerializeBufferSize len;
+    int current = 0;
+
+    RK = *(_begin + offsetof(stEnCordingHeader, RandKey));
+
+    HexLog();
+    local_Front = _begin + offsetof(stEnCordingHeader, CheckSum);
+    len = _rearPtr - local_Front;
+
+    // 2기준
+    // D2 ^ (P1 + RK + 2) = P2
+    // P2 ^ (E1 + K + 2) = E2
+
+    // E2 ^ (E1 + K + 2) = P2
+    // P2 ^ (P1 + RK + 2) = D2
+    for (; &local_Front[current] != _rearPtr; current++)
+    {
+        E2 = local_Front[current];
+        P2 = E2 ^ (E1 + K + current);
+        E1 = E2;
+        D2 = P2 ^ (P1 + RK + current);
+        P1 = P2;
+        local_Front[current] = D2;
+    }
+
+    for (int i = 1; i < len; i++)
+    {
+        total += local_Front[i];
+    }
+
+    memcpy(local_Front, &total, sizeof(total));
+
+    HexLog();
 }
 
 SSIZE_T CMessage::PutData(const char *src, SerializeBufferSize size)
