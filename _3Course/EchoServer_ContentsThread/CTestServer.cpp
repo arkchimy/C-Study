@@ -3,8 +3,8 @@
 #include "../lib/CNetwork_lib/CNetwork_lib.h"
 #include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
 
-
 #include <thread>
+#include "../lib/CNetwork_lib/Proxy.h"
 
 extern SRWLOCK srw_Log;
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
@@ -57,14 +57,14 @@ unsigned MonitorThread(void *arg)
 unsigned ContentsThread(void *arg)
 {
     size_t addr;
-    CMessage *message, *peekMessage;
+    CMessage *msg, *peekMessage;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
     char *f, *r;
     HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
     DWORD hSignalIdx;
     ringBufferSize useSize, DeQSisze;
     ull l_sessionID;
-
+    stHeader header;
     // bool 이 좋아보임.
 
     CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
@@ -91,11 +91,12 @@ unsigned ContentsThread(void *arg)
             if (DeQSisze != sizeof(size_t))
                 __debugbreak();
 
-            message = (CMessage *)addr;
-            l_sessionID = message->ownerID;
+            msg = (CMessage *)addr;
+            l_sessionID = msg->ownerID;
 
             //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
-            server->PacketProc(l_sessionID, message);
+            msg->GetData((char *)&header, server->headerSize);
+            server->PacketProc(l_sessionID, msg, header);
 
             f = server->m_ContentsQ._frontPtr;
             useSize -= 8;
@@ -105,69 +106,22 @@ unsigned ContentsThread(void *arg)
     return 0;
 }
 
-bool CTestServer::PacketProc(ull SessionID, CMessage *msg)
+void CTestServer::EchoProcedure(ull SessionID, const char *const buffer)
 {
-    // TODO : 추후에  Code로 Case문 바꾸기.
-    //  메세지를 보낼때,
+    //해당 ID가 어느 섹터에 있는지, 보낼 대상을 특정하는 Logic
+    CMessage *msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
 
-    float qPersentage;
-    short len;
-    char EchoBuffer[100];
-    stHeader header;
-    msg->GetData((char *)&header, headerSize);
-    if (bEnCording)
-        len = header._len;
-    else
-        len = 8;
-
-    // TODO : Header.Len => Code로 바꾸기
-    switch (len)
-    {
-    case 8:
-    {
- 
-        // 헤더를 그대로 복사.
-        /*
-         * msg << 이런식 사용.
-         */
-        msg->GetData(EchoBuffer, header._len);
-        header._len = 8;
-        stTlsObjectPool<CMessage>::Release(msg);
-        msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
-
-        msg->PutData((const char *)&header, sizeof(stHeader));
-        msg->PutData(EchoBuffer, header._len);
-        EchoProcedure(SessionID, msg);
-    }
-    break;
-    default:
-        //TODO : 이부분 다시 보기
-        msg->GetData(EchoBuffer, header._len);
-        stTlsObjectPool<CMessage>::Release(msg);
-
-        msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
-
-        msg->PutData((const char *)&header, sizeof(stEnCordingHeader));
-        msg->PutData(EchoBuffer, sizeof(EchoBuffer));
-        EchoProcedure(SessionID, msg);
-    }
-
-    return true;
-}
-
-void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
-{
+    //UnitCast?
     clsSession &session = sessions_vec[SessionID >> 47];
     ull Local_ioCount;
     ull seqID;
-
     // session의 보장 장치.
     Local_ioCount = InterlockedIncrement(&session.m_ioCount);
 
     if ((Local_ioCount & (ull)1 << 47) != 0)
     {
         // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
-        stTlsObjectPool<CMessage>::Release(message);
+        stTlsObjectPool<CMessage>::Release(msg);
         // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
         return;
     }
@@ -177,7 +131,7 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
     if (seqID != SessionID)
     {
         // 새로 세팅된 Session이므로 다른 연결이라 판단.
-        stTlsObjectPool<CMessage>::Release(message);
+        stTlsObjectPool<CMessage>::Release(msg);
         // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
         Local_ioCount = InterlockedDecrement(&session.m_ioCount);
         // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
@@ -197,14 +151,14 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
             ReleaseSession(SessionID);
 
-        stTlsObjectPool<CMessage>::Release(message);
+        stTlsObjectPool<CMessage>::Release(msg);
         return;
     }
 
     // 여기까지 왔다면, 같은 Session으로 판단하자.
     CMessage **ppMsg;
     ull local_IoCount;
-    ppMsg = &message;
+    ppMsg = &msg;
 
     if (bEnCording)
         (*ppMsg)->EnCording();
@@ -231,6 +185,7 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *message)
         ReleaseSession(SessionID);
 }
 
+
 CTestServer::CTestServer(int iEncording)
     : CLanServer(iEncording)
 {
@@ -256,7 +211,6 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 
     return retval;
 }
-
 
 float CTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
@@ -335,4 +289,3 @@ bool CTestServer::OnAccept(ull SessionID)
 
     return true;
 }
-

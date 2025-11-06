@@ -147,11 +147,15 @@
   <ItemGroup>
     <ClInclude Include="clsSession.h" />
     <ClInclude Include="CNetwork_lib.h" />
+    <ClInclude Include="Proxy.h" />
     <ClInclude Include="stHeader.h" />
+    <ClInclude Include="Stub.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="clsSession.cpp" />
     <ClCompile Include="CNetwork_lib.cpp" />
+    <ClCompile Include="Proxy.cpp" />
+    <ClCompile Include="Stub.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CLockFreeStack_lib\CLockFreeStack_lib.vcxproj">

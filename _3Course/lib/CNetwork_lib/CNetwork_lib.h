@@ -18,6 +18,9 @@
 
 #include "clsSession.h"
 #include "stHeader.h"
+
+#include "Stub.h"
+
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 #define MAX_SESSION_COUNT 7000
 using ull = unsigned long long;
@@ -43,7 +46,6 @@ class st_WSAData
     }
 };
 
-
 struct stSRWLock
 {
     stSRWLock(SRWLOCK *srw)
@@ -58,7 +60,7 @@ struct stSRWLock
     SRWLOCK *m_srw;
 };
 
-class CLanServer
+class CLanServer : public Stub
 {
   public:
     CLanServer(bool EnCording = false);
@@ -69,18 +71,18 @@ class CLanServer
     void Stop();
 
     bool Disconnect(const ull SessionID);
-    void CancelIO_Routine(const ull SessionID); //Session에 대한 안정성은  외부에서 보장해주세요.
+    void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
 
-    CMessage *CreateMessage(class clsSession& session, class stHeader &header);
-    //CMessage *CreateLoginMessage();
+    CMessage *CreateMessage(class clsSession &session, class stHeader &header);
+    // CMessage *CreateLoginMessage();
     char *CreateLoginMessage();
 
-    //void RecvComplete(class clsSession *const session, DWORD transferred);
-    void RecvComplete(class clsSession& session, DWORD transferred);
-    void SendComplete(class clsSession& session, DWORD transferred);
+    // void RecvComplete(class clsSession *const session, DWORD transferred);
+    void RecvComplete(class clsSession &session, DWORD transferred);
+    void SendComplete(class clsSession &session, DWORD transferred);
 
-    void SendPacket(class clsSession& session);
-    void RecvPacket(class clsSession& session);
+    void SendPacket(class clsSession &session);
+    void RecvPacket(class clsSession &session);
 
     virtual bool OnAccept(ull SessionID) = 0;
     virtual float OnRecv(ull SessionID, CMessage *msg) = 0;
@@ -98,7 +100,6 @@ class CLanServer
     void ReleaseSession(ull SessionID);
 
   public:
-    
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
     HANDLE *m_hThread = nullptr;
@@ -114,15 +115,16 @@ class CLanServer
     int headerSize = 0;
 
     std::vector<class clsSession> sessions_vec;
-    CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로 
-    //CLockFreeQueue<clsSession *> m_ReleaseSessions;
+    CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로
+    // CLockFreeQueue<clsSession *> m_ReleaseSessions;
     CLockFreeStack<clsSession *> m_ReleaseSessions;
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
     DWORD m_tlsIdxForTPS = 0;
     LONG64 *arrTPS = nullptr; //  idx 0 : Contents , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
 
     HANDLE WorkerArg[2]{0}; // WorkerThread __beginthreadex 매개변수
-    HANDLE AcceptArg[3]{0};  // AcceptThread __beginthreadex 매개변수
+    HANDLE AcceptArg[3]{0}; // AcceptThread __beginthreadex 매개변수
 
     static CSystemLog *systemLog;
+    class Proxy proxy;
 };

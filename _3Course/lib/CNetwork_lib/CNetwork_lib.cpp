@@ -502,7 +502,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     while (session.m_recvBuffer.Peek(&header, headerSize, f, r) == headerSize)
     {
         useSize = session.m_recvBuffer.GetUseSize(f, r);
-        if (useSize < header._len + headerSize)
+        if (useSize < header.sDataLen + headerSize)
         {
             //Disconnect(session.m_SeqID.SeqNumberAndIdx);
             break;
@@ -552,10 +552,10 @@ CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
         profile.End(L"PoolAlloc");
     }
     // 순수하게 데이터만 가져옴.  EnCording 의 경우 RandKey와 CheckSum도 가져옴.
-    deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header._len + headerSize);
+    deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header.sDataLen + headerSize);
     msg->_rearPtr = msg->_frontPtr + deQsize;
 
-    if (header._len + headerSize != deQsize)
+    if (header.sDataLen + headerSize != deQsize)
     {
         // TODO : 조작된 패킷
         CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,

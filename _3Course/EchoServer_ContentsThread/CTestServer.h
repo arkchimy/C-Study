@@ -3,8 +3,8 @@
 class CTestServer : public CLanServer
 {
   public:
-    bool PacketProc(ull SessionID, CMessage *msg);
-    void EchoProcedure(ull sessionID, CMessage *message);
+
+    void EchoProcedure(ull sessionID, const char *const buffer);
   public:
     CTestServer(int iEncording = false);
     virtual ~CTestServer();
