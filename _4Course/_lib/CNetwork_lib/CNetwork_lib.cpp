@@ -1,7 +1,7 @@
 ﻿#include "CNetwork_lib.h"
 
-#include "../CTlsObjectPool_lib/CTlsObjectPool_lib.h"
-#include "../Profiler_MultiThread_lib/Profiler_MultiThread.h"
+#include "../../../_4Course/_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
+#include "../Profiler_MultiThread/Profiler_MultiThread.h"
 
 #include "stHeader.h"
 

@@ -150,17 +150,22 @@
     <ClInclude Include="stHeader.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="clsSession.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">stdafx.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">stdafx.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdafx.h</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdafx.h</PrecompiledHeaderFile>
-    </ClCompile>
+    <ClCompile Include="clsSession.cpp" />
     <ClCompile Include="CNetwork_lib.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CLockFreeStack_lib\CLockFreeStack_lib.vcxproj">
+      <Project>{74664baa-9441-4bfb-a03d-fe16a97e4da2}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\CSystemLog_lib\CSystemLog_lib.vcxproj">
+      <Project>{aa6f5a62-72b2-42bc-b005-a02cc7f109c7}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Profiler_MultiThread\Profiler_MultiThread.vcxproj">
+      <Project>{5e8f90bb-3fc5-47bc-85e9-363129ba3713}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\SerializeBuffer_exception\SerializeBuffer_exception.vcxproj">
+      <Project>{1d36ff30-e26e-4f5c-b13c-db648ce9e8b8}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
