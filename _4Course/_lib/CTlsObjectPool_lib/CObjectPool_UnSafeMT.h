@@ -1,5 +1,11 @@
 #pragma once
 
+#define SEQ_MASK 0XFFFF800000000000
+#define ADDR_MASK 0x00007FFFFFFFFFFF
+
+#define ALLOC_Node 0xcccccccc
+#define RELEASE_Node 0xeeeeeeee
+
 using ull = unsigned long long;
 using ll = long long;
 
