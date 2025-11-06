@@ -3,7 +3,7 @@
 
 #include "pch.h"
 #include "CTlsObjectPool_lib.h"
-#include  "../../../_3Course/lib/SerializeBuffer_exception/SerializeBuffer_exception.h"
+#include  "../SerializeBuffer_lib/SerializeBuffer_exception.h"
 
 int tlsPool_init_Capacity;
 

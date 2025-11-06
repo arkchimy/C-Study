@@ -3,12 +3,6 @@
 #define WIN32_LEAN_AND_MEAN             // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 #include "../CLockFreeMemoryPool/CLockFreeMemoryPool.h"
 
-#define SEQ_MASK 0XFFFF800000000000
-#define ADDR_MASK 0x00007FFFFFFFFFFF
-
-#define ALLOC_Node 0xcccccccc
-#define RELEASE_Node 0xeeeeeeee
-
 template <typename T>
 class CLockFreeQueue
 {
