@@ -1,7 +1,9 @@
 #pragma once
+
 #include "CommonProtocol.h"
 
 using ull = unsigned long long;
+struct CMessage;
 class Proxy
 {
 
@@ -14,7 +16,7 @@ class Proxy
 
     };
 
-    bool LoginProcedure(ull SessionID, INT64 AccountNo);
+    bool LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo);
     void ReqEcho(ull SessionID,const char* buffer,DWORD len);
  /*   void CreatePlayer(Section *clpSection, int id, BYTE byDirection, short x,
                       short y, BYTE byHP,

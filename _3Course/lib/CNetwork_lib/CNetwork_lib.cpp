@@ -634,8 +634,6 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     }
 
     ull msgAddr;
-    CMessage *msg;
-
     bufCnt = 0;
 
     Profiler profile;
@@ -691,8 +689,10 @@ void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
     switch ((En_SendPackType)SendType)
     {
     case En_SendPackType::UnitCast:
+        msg->iUseCnt = 1;
         UnitCast(SessionID, msg, msg->_size);
         break;
+    
     }
       
 }

@@ -53,7 +53,7 @@ struct CMessage
 {
     enum en_BufferSize : DWORD
     {
-        bufferSize = 200,
+        bufferSize = 1000,
         MaxSize = 2000,
     };
     CMessage();
@@ -111,18 +111,18 @@ struct CMessage
     void Peek(char *out, SerializeBufferSize size);
 
     void HexLog(const wchar_t *filename = L"SerializeBuffer_hex.txt");
-    SerializeBufferSize _size;
+    SerializeBufferSize _size = en_BufferSize::bufferSize;
 
-    char *_begin = nullptr;
+    char _begin[MaxSize];
     char *_end = nullptr;
 
     char *_frontPtr = nullptr;
     char *_rearPtr = nullptr;
 
     ull ownerID;
-    LONG64 s_UseCnt = 0;
+    LONG64 iUseCnt = 0;
 
     BYTE K = 0xa9; // 고정 키 
-
+  
     inline static HANDLE s_BufferHeap;
 };

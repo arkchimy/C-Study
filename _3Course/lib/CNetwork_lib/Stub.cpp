@@ -1,4 +1,5 @@
 #include "Stub.h"
+
 #include "../../../_4Course/_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "stHeader.h"
@@ -27,14 +28,15 @@ bool Stub::PacketProc(ull SessionID, CMessage *msg, stHeader &header)
         msg->GetData((char*) &ID, sizeof(ID));
         msg->GetData((char *)&Nickname, sizeof(Nickname));
         msg->GetData((char *)&SessionKey, sizeof(SessionKey));
-        bSucess = LoginProcedure(SessionID, AccontNo, ID, Nickname, SessionKey);
+        msg->~CMessage();
+        bSucess = LoginProcedure(SessionID,msg, AccontNo, ID, Nickname, SessionKey);
         break;
 
     default:
         // 에코 Test
         msg->GetData(EchoBuffer, header.sDataLen);
 
-        bSucess = EchoProcedure(SessionID, EchoBuffer); // 동적 바인딩
+        bSucess = EchoProcedure(SessionID,msg, EchoBuffer); // 동적 바인딩
     }
     stTlsObjectPool<CMessage>::Release(msg);
     return bSucess;

@@ -124,14 +124,12 @@ unsigned ContentsThread(void *arg)
     return 0;
 }
 
-bool CTestServer::EchoProcedure(ull SessionID, const char *const buffer)
+bool CTestServer::EchoProcedure(ull SessionID, CMessage *msg, const char *const buffer)
 {
     //해당 ID가 어느 섹터에 있는지, 보낼 대상을 특정하는 Logic
-    CMessage *msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
-
-   
+    return false;
 }
-bool CTestServer::LoginProcedure(ull SessionID,INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey)
+bool CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey)
 {
     //idx동일.
     CPlayer &player = player_vec[SessionID >> 47];
@@ -142,10 +140,12 @@ bool CTestServer::LoginProcedure(ull SessionID,INT64 AccontNo, WCHAR *ID, WCHAR 
 
     player.m_Timer = timeGetTime();
     player.m_AccountNo = AccontNo;
-    wcsncpy(player.m_ID, ID, 20);
-    wcsncpy(player.m_Nickname, Nickname, 20);
 
-    Proxy::LoginProcedure(SessionID, AccontNo);
+    memcpy(player.m_ID, ID, sizeof(player.m_ID));
+    memcpy(player.m_Nickname, Nickname, sizeof(player.m_Nickname));
+ 
+
+    Proxy::LoginProcedure(SessionID, msg, AccontNo);
     return true;
 
 }

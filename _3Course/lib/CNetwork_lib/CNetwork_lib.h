@@ -1,10 +1,11 @@
 ﻿#pragma once
-#include <WS2tcpip.h>
-#include <WinSock2.h>
-#include <Windows.h>
+
+#include "Stub.h"
+#include "Proxy.h"
 
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "ws2_32")
+
 
 #include <list>
 #include <map>
@@ -15,15 +16,12 @@
 #include "../CLockFreeQueue_lib/CLockFreeQueue_lib.h"
 #include "../CSystemLog_lib/CSystemLog_lib.h"
 
-
 #include "clsSession.h"
 #include "stHeader.h"
 
-#include "Stub.h"
-#include "Proxy.h"
 
-#define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
-#define MAX_SESSION_COUNT 7000
+
+
 using ull = unsigned long long;
 
 class st_WSAData
@@ -79,7 +77,8 @@ struct CPlayer
     int iSectorX = 0;
     int iSectorY = 0;
 };
-class CLanServer : public Stub, public Proxy
+
+class CLanServer : public Stub, public  Proxy
 {
   public:
     CLanServer(bool EnCoding = false);

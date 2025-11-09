@@ -117,11 +117,10 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
         pool->allocPool = instance.GetFullPool(swap);
     }
     PVOID node = pool->allocPool->Alloc();
+
     CMessage *msg = reinterpret_cast<CMessage *>(node);
-    {
-        msg->_frontPtr = msg->_begin;
-        msg->_rearPtr = msg->_frontPtr;
-    }
+    msg->~CMessage();
+
     CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%10s %10s : %08p %10s %08p %10s %llu",
                                    L"Alloc ", L"Node ", node, L"PoolAddress ", pool->releasePool, L"m_size", pool->allocPool->m_size);
     return node;
@@ -131,14 +130,19 @@ template <>
 void stTlsObjectPool<CMessage>::Release(PVOID node)
 {
     static ull Release = 0;
-    ull localReleaseCnt;
-    localReleaseCnt = InterlockedIncrement(&Release);
+    stTlsObjectPool *pool;          // Tls에 존재하는 ObjectPool
+    ObjectPoolType<CMessage> *swap; // PoolManager에서 주는 Pool과 swap 용도 변수
+    CMessage *msg;
+    LONG64 iUseCnt;
 
-    CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%15s %08llu ",
-                                   L"CMessage Release : ", localReleaseCnt);
+    msg = reinterpret_cast<CMessage *>(node);
+    
+    iUseCnt = InterlockedDecrement64(&msg->iUseCnt);
 
-    stTlsObjectPool *pool = nullptr;
-    ObjectPoolType<CMessage> *swap;
+    // UseCnt를 잘못 감소 시킨 경우 
+    if (iUseCnt < 0)
+        __debugbreak();
+
     if (s_tlsIdx == TLS_OUT_OF_INDEXES)
     {
         CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s ",

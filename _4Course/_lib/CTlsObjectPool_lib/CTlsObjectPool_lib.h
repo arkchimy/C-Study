@@ -222,6 +222,7 @@ struct stTlsObjectPool
 
         stTlsObjectPool *pool = nullptr;
         ObjectPoolType<T> *swap;
+        
         if (s_tlsIdx == TLS_OUT_OF_INDEXES)
         {
 

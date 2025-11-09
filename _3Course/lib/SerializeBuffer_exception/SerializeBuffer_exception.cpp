@@ -9,16 +9,9 @@
 static int g_mode = 0;
 
 CMessage::CMessage()
+    : ownerID(GetCurrentThreadId())
 {
 
-    _size = en_BufferSize::bufferSize;
-
-    static HANDLE Allcoheap = HeapCreate(HEAP_GENERATE_EXCEPTIONS, 0, 0);
-    s_BufferHeap = Allcoheap;
-
-    _begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
-    if (_begin == nullptr)
-        __debugbreak();
     _end = _begin + _size;
     _frontPtr = _begin ;
     _rearPtr = _frontPtr;
@@ -26,8 +19,15 @@ CMessage::CMessage()
 
 CMessage::~CMessage()
 {
-    HeapFree(s_BufferHeap, 0, _begin);
-    _begin = nullptr;
+    _size = en_BufferSize::bufferSize;
+
+    _frontPtr = _begin;
+    _rearPtr = _begin;
+    _end = _begin + _size;
+
+    if (iUseCnt != 0)
+        HexLog();
+
 
 }
 
@@ -136,25 +136,24 @@ SSIZE_T CMessage::GetData(char *desc, SerializeBufferSize size)
 BOOL CMessage::ReSize()
 {
     // 직렬화 버퍼는 넣고 뺴고는 하나의 쓰레드에서 할 것으로 예상이 된다.
-
     SerializeBufferSize UseSize;
     char *swap_begin;
 
-    UseSize = SerializeBufferSize(_rearPtr - _frontPtr);
-
     _size = en_BufferSize::MaxSize;
-    swap_begin = (char *)HeapAlloc(s_BufferHeap, HEAP_ZERO_MEMORY | HEAP_GENERATE_EXCEPTIONS, _size);
-    if (swap_begin == nullptr)
-    {
-        ERROR_FILE_LOG(L"HeapAlloc.txt", L"HeapAlloc Error");
-        return FALSE;
-    }
-    // TODO : 복사 범위 생각해보기.
-    memcpy(swap_begin, _frontPtr, UseSize);
-    HeapFree(s_BufferHeap, 0, _begin);
 
-    _begin = swap_begin;
-    _end = swap_begin + _size;
+    // TODO : 복사 범위 생각해보기.
+    //    f     =>    r 인 경우
+    // case : _frontPtr < _rearPtr  옮길 데이터가 없는 상황.
+    //    r       f   인 경우 데이터를 옮겨야 함.
+    if (_frontPtr > _rearPtr)
+    {
+        UseSize = SerializeBufferSize(_rearPtr - _frontPtr);
+        memcpy(_end, _begin, UseSize);
+    }
+    else
+        UseSize = SerializeBufferSize(_frontPtr - _rearPtr);
+
+    _end = _begin + _size;
     _frontPtr = _begin;
     _rearPtr = _begin + UseSize;
     printf("ReSize\n");
