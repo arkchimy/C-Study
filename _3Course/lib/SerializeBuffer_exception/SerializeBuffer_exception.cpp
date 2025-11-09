@@ -31,7 +31,7 @@ CMessage::~CMessage()
 
 }
 
-void CMessage::EnCording( )
+void CMessage::EnCoding( )
 {
     SerializeBufferSize len;
     BYTE RK;
@@ -65,7 +65,7 @@ void CMessage::EnCording( )
 
 }
 
-void CMessage::DeCording( )
+void CMessage::DeCoding( )
 {
     BYTE P1 = 0, P2;
     BYTE E1 = 0, E2;

@@ -2,7 +2,7 @@
 #include "stHeader.h"
 #include "../../../_4Course/_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
-
+#include "CNetwork_lib.h/"
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
 //    
@@ -15,11 +15,24 @@ extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴
 //cPacket << id << byDirection << x << y << byHP;
 //*(cPacket.GetBufferPtr() + 1) = cPacket.GetDataSize() - sizeof(stHeader);
 //NetWork::SendPacket(clpSection, &cPacket, bBroadCast);
-void Proxy::ReqEcho(ull SessionID, const char *buffer)
+
+bool Proxy::LoginProcedure(ull SessionID, INT64 AccountNo)
 {
     CMessage *msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
     stHeader header;
-    header.byCode = 0x89;
-    header.
+
+    header.byType = 0;//임의 값
+    CLanServer *server = reinterpret_cast<CLanServer*>(this);
+
+    msg->PutData((const char *)&header, server->headerSize);
+    *msg << AccountNo;
+    server->SendPacket(SessionID,msg,UnitCast); // msg
+}
+void Proxy::ReqEcho(ull SessionID, const char *buffer,DWORD len)
+{
+    CMessage *msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+    stHeader header;
+
+    header.byType = 0;
 
 }

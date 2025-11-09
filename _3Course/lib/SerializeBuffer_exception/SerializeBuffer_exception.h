@@ -100,8 +100,8 @@ struct CMessage
         return *this;
     }
 
-    void EnCording();
-    void DeCording();
+    void EnCoding();
+    void DeCoding();
 
 
     SSIZE_T PutData(const char *src, SerializeBufferSize size);

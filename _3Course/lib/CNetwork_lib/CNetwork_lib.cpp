@@ -124,7 +124,7 @@ unsigned AcceptThread(void *arg)
         server->arrTPS[0]++;
         {
 
-            if (server->m_IdxStack.m_size == 0)
+            if (server->m_SessionIdxStack.m_size == 0)
             {
                 closesocket(client_sock);
                 // 추가적으로 구현해야되는 부분이 존재함.
@@ -132,7 +132,7 @@ unsigned AcceptThread(void *arg)
                 __debugbreak();
                 continue;
             }
-            server->m_IdxStack.Pop(idx);
+            server->m_SessionIdxStack.Pop(idx);
         }
 
         session = &server->sessions_vec[idx];
@@ -144,7 +144,7 @@ unsigned AcceptThread(void *arg)
         InterlockedExchange(&session->m_flag, 0);
         InterlockedExchange(&session->m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
         InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
-        InterlockedExchange(&session->m_Useflag, 0);
+
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
@@ -299,8 +299,8 @@ unsigned WorkerThread(void *arg)
     return 0;
 }
 
-CLanServer::CLanServer(bool EnCording)
-    : bEnCording(EnCording)
+CLanServer::CLanServer(bool EnCoding)
+    : bEnCording(EnCoding)
 {
     if (bEnCording)
         headerSize = sizeof(stEnCordingHeader);
@@ -337,7 +337,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     sessions_vec.resize(MaxSessions);
 
     for (ull idx = 0; idx < MaxSessions; idx++)
-        m_IdxStack.Push(idx);
+        m_SessionIdxStack.Push(idx);
 
     linger.l_onoff = 1;
     linger.l_linger = 0;
@@ -463,7 +463,7 @@ LONG64 CLanServer::GetReleaseSessions()
 
 LONG64 CLanServer::Get_IdxStack()
 {
-    return m_IdxStack.m_size;
+    return m_SessionIdxStack.m_size;
 }
 
 void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
@@ -472,32 +472,33 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     ringBufferSize useSize,deQsize;
     float qPersentage;
     ull SeqID;
-
-
-    session.m_recvBuffer.MoveRear(transferred);
-
-    SeqID = session.m_SeqID.SeqNumberAndIdx;
-
     char *f, *r, *b;
-    b = session.m_recvBuffer._begin;
-    f = session.m_recvBuffer._frontPtr;
-    r = session.m_recvBuffer._rearPtr;
 
-    // ContentsQ의 상황이 어떤지를 체크.
-    qPersentage = OnRecv(SeqID, nullptr);
-    if (qPersentage >= 75.f)
     {
-        Disconnect(SeqID);
-        CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %10s %05f %10s %08llu",
-                                       L"ContentsQ Full",
-                                       L"qPersentage : ", qPersentage,
-                                       L"TargetID : ", SeqID);
-        return;
+        session.m_recvBuffer.MoveRear(transferred);
+
+        SeqID = session.m_SeqID.SeqNumberAndIdx;
+
+        
+        b = session.m_recvBuffer._begin;
+        f = session.m_recvBuffer._frontPtr;
+        r = session.m_recvBuffer._rearPtr;
+
+        // ContentsQ의 상황이 어떤지를 체크.
+        qPersentage = OnRecv(SeqID, nullptr);
+        if (qPersentage >= 75.f)
+        {
+            Disconnect(SeqID);
+            CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
+                                           L"%-20s %10s %05f %10s %08llu",
+                                           L"ContentsQ Full",
+                                           L"qPersentage : ", qPersentage,
+                                           L"TargetID : ", SeqID);
+            return;
+        }
+    
     }
     // Header의 크기만큼을 확인.
-
-
    
     while (session.m_recvBuffer.Peek(&header, headerSize, f, r) == headerSize)
     {
@@ -511,8 +512,9 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         CMessage *msg = CreateMessage(session, header);
         if (msg == nullptr)
             break;
+
         if (bEnCording)
-            msg->DeCording();
+            msg->DeCoding();
 
         {
             Profiler profile;
@@ -584,20 +586,7 @@ char *CLanServer::CreateLoginMessage()
 
 void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 {
-    CMessage *msg;
-
-    while (session.m_SendMsg.Pop(msg))
-    {
-        stTlsObjectPool<CMessage>::Release(msg);
-    }
-    SendPacket(session);
-}
-
-void CLanServer::SendPacket(clsSession &session)
-{
-
     ringBufferSize useSize, directDQSize;
-    ringBufferSize deQSize;
 
     DWORD bufCnt;
     int send_retval = 0;
@@ -607,6 +596,12 @@ void CLanServer::SendPacket(clsSession &session)
     // LONG64 beforeTPS;
     LONG64 TPSidx;
     ull local_IoCount;
+    CMessage *msg;
+
+    while (session.m_SendMsg.Pop(msg))
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+    }
 
     useSize = (ringBufferSize)session.m_sendBuffer.m_size;
     TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
@@ -642,7 +637,7 @@ void CLanServer::SendPacket(clsSession &session)
     CMessage *msg;
 
     bufCnt = 0;
-    
+
     Profiler profile;
     profile.Start(L"LFQ_Pop");
     while (session.m_sendBuffer.Pop(msg))
@@ -657,8 +652,6 @@ void CLanServer::SendPacket(clsSession &session)
         bufCnt++;
     }
     profile.End(L"LFQ_Pop");
-    
-   
 
     arrTPS[TPSidx] += bufCnt;
 
@@ -692,6 +685,91 @@ void CLanServer::SendPacket(clsSession &session)
     }
 }
 
+void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
+                            int iSectorX, int iSectorY)
+{
+    switch ((En_SendPackType)SendType)
+    {
+    case En_SendPackType::UnitCast:
+        UnitCast(SessionID, msg, msg->_size);
+        break;
+    }
+      
+}
+void CLanServer::UnitCast(ull SessionID, CMessage *msg, size_t size)
+{
+    clsSession &session = sessions_vec[SessionID >> 47];
+    ull Local_ioCount;
+    ull seqID;
+    // session의 보장 장치.
+    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
+
+    if ((Local_ioCount & (ull)1 << 47) != 0)
+    {
+        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
+        stTlsObjectPool<CMessage>::Release(msg);
+        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
+        return;
+    }
+
+    // session의 Release는 막았으므로 변경되지않음.
+    seqID = session.m_SeqID.SeqNumberAndIdx;
+    if (seqID != SessionID)
+    {
+        // 새로 세팅된 Session이므로 다른 연결이라 판단.
+        stTlsObjectPool<CMessage>::Release(msg);
+        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(seqID);
+
+        return;
+    }
+
+    if (Local_ioCount == 1)
+    {
+        // 원래 '0'이 었는데 내가 증가시켰다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(SessionID);
+
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+
+    // 여기까지 왔다면, 같은 Session으로 판단하자.
+    CMessage **ppMsg;
+    ull local_IoCount;
+    ppMsg = &msg;
+
+    if (bEnCording)
+        (*ppMsg)->EnCoding();
+    {
+        Profiler profile;
+        profile.Start(L"LFQ_Push");
+
+        session.m_sendBuffer.Push(*ppMsg);
+        profile.End(L"LFQ_Push");
+    }
+
+    // PQCS를 시도.
+    if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
+    {
+        ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+        local_IoCount = InterlockedIncrement(&session.m_ioCount);
+
+        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
+    }
+
+    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+        ReleaseSession(SessionID);
+}
 void CLanServer::RecvPacket(clsSession &session)
 {
     ringBufferSize freeSize;
@@ -703,10 +781,11 @@ void CLanServer::RecvPacket(clsSession &session)
     DWORD bufCnt;
     ull local_IoCount;
 
+    WSABUF localRecvWSABuf[2]{0};
+
     char *f = session.m_recvBuffer._frontPtr, *r = session.m_recvBuffer._rearPtr;
 
     {
-        ZeroMemory(session.m_lastRecvWSABuf, sizeof(session.m_lastRecvWSABuf));
         ZeroMemory(&session.m_recvOverlapped, sizeof(OVERLAPPED));
     }
 
@@ -716,18 +795,18 @@ void CLanServer::RecvPacket(clsSession &session)
         __debugbreak();
     if (freeSize <= directEnQsize)
     {
-        session.m_lastRecvWSABuf[0].buf = r;
-        session.m_lastRecvWSABuf[0].len = directEnQsize;
+        localRecvWSABuf[0].buf = r;
+        localRecvWSABuf[0].len = directEnQsize;
 
         bufCnt = 1;
     }
     else
     {
-        session.m_lastRecvWSABuf[0].buf = r;
-        session.m_lastRecvWSABuf[0].len = directEnQsize;
+        localRecvWSABuf[0].buf = r;
+        localRecvWSABuf[0].len = directEnQsize;
 
-        session.m_lastRecvWSABuf[1].buf = session.m_recvBuffer._begin;
-        session.m_lastRecvWSABuf[1].len = freeSize - directEnQsize;
+        localRecvWSABuf[1].buf = session.m_recvBuffer._begin;
+        localRecvWSABuf[1].len = freeSize - directEnQsize;
 
         bufCnt = 2;
     }
@@ -740,7 +819,7 @@ void CLanServer::RecvPacket(clsSession &session)
                                        L"WSARecv",
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", local_IoCount);
-        wsaRecv_retval = WSARecv(session.m_sock, session.m_lastRecvWSABuf, bufCnt, nullptr, &flag, &session.m_recvOverlapped, nullptr);
+        wsaRecv_retval = WSARecv(session.m_sock, localRecvWSABuf, bufCnt, nullptr, &flag, &session.m_recvOverlapped, nullptr);
 
         LastError = GetLastError();
         if (wsaRecv_retval < 0)
@@ -866,7 +945,7 @@ void CLanServer::ReleaseSession(ull SessionID)
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
     }
-    m_IdxStack.Push(SessionID >> 47);
+    m_SessionIdxStack.Push(SessionID >> 47);
     _interlockeddecrement64(&m_SessionCount);
 }
 

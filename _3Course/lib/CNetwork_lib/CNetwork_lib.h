@@ -20,6 +20,7 @@
 #include "stHeader.h"
 
 #include "Stub.h"
+#include "Proxy.h"
 
 #define WIN32_LEAN_AND_MEAN // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 #define MAX_SESSION_COUNT 7000
@@ -60,10 +61,28 @@ struct stSRWLock
     SRWLOCK *m_srw;
 };
 
-class CLanServer : public Stub
+struct CPlayer
+{
+    enum en_State
+    {
+        IN_GAME,
+        DisConnect,
+    };
+    en_State m_State = en_State::DisConnect;
+    ull m_sessionID;
+    DWORD m_Timer;
+    INT64 m_AccountNo;
+    WCHAR m_ID[20];
+    WCHAR m_Nickname[20];
+    char m_SessionKey[64];
+
+    int iSectorX = 0;
+    int iSectorY = 0;
+};
+class CLanServer : public Stub, public Proxy
 {
   public:
-    CLanServer(bool EnCording = false);
+    CLanServer(bool EnCoding = false);
     ~CLanServer();
 
     // 오픈 IP / 포트 / 제로카피 여부 /워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
@@ -81,11 +100,14 @@ class CLanServer : public Stub
     void RecvComplete(class clsSession &session, DWORD transferred);
     void SendComplete(class clsSession &session, DWORD transferred);
 
-    void SendPacket(class clsSession &session);
+    void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
+                    int iSectorX = 0, int iSectorY = 0);
+    void UnitCast(ull SessionID, CMessage *msg, size_t size);
+
     void RecvPacket(class clsSession &session);
 
     virtual bool OnAccept(ull SessionID) = 0;
-    virtual float OnRecv(ull SessionID, CMessage *msg) = 0;
+    virtual float OnRecv(ull SessionID, struct CMessage *msg) = 0;
 
     LONG64 GetSessionCount();
     LONG64 GetReleaseSessions();
@@ -115,7 +137,10 @@ class CLanServer : public Stub
     int headerSize = 0;
 
     std::vector<class clsSession> sessions_vec;
-    CLockFreeStack<ull> m_IdxStack; // 반환된 Idx를 Stack형식으로
+    std::vector<class CPlayer> player_vec;
+
+    CLockFreeStack<ull> m_SessionIdxStack; // 반환된 Idx를 Stack형식으로
+    CLockFreeStack<ull> m_PlayerIdxStack; // 반환된 Idx를 Stack형식으로
     // CLockFreeQueue<clsSession *> m_ReleaseSessions;
     CLockFreeStack<clsSession *> m_ReleaseSessions;
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
@@ -126,5 +151,5 @@ class CLanServer : public Stub
     HANDLE AcceptArg[3]{0}; // AcceptThread __beginthreadex 매개변수
 
     static CSystemLog *systemLog;
-    class Proxy proxy;
+    
 };

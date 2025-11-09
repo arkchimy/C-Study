@@ -66,13 +66,14 @@ unsigned ContentsThread(void *arg)
     ull l_sessionID;
     stHeader header;
     // bool 이 좋아보임.
-
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is ContentsThread");
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is ContentsThread");
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"This is ContentsThread");
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"This is ContentsThread");
+    }
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
@@ -83,7 +84,7 @@ unsigned ContentsThread(void *arg)
         r = server->m_ContentsQ._rearPtr;
         useSize = server->m_ContentsQ.GetUseSize(f, r);
 
-        // ID + msg  크기 메세지 하나에 16Byte
+        // msg  크기 메세지 하나에 8Byte
         while (useSize >= 8)
         {
 
@@ -96,95 +97,58 @@ unsigned ContentsThread(void *arg)
 
             //// TODO : 헤더 Type을 넣는다면 Switch문을 탐.
             msg->GetData((char *)&header, server->headerSize);
-            server->PacketProc(l_sessionID, msg, header);
+            if (server->PacketProc(l_sessionID, msg, header) == false)
+                server->Disconnect(l_sessionID);
 
             f = server->m_ContentsQ._frontPtr;
             useSize -= 8;
+        }
+        // 하트비트 부분
+        {
+            DWORD currentTime;
+            DWORD disTime;
+            currentTime = timeGetTime();
+            for (CPlayer &player : server->player_vec)
+            {
+                if (player.m_State == CPlayer::en_State::DisConnect)
+                    continue;
+                disTime = currentTime - player.m_Timer;
+                if (disTime >= 40)
+                {
+                    server->Disconnect(player.m_sessionID);
+                }
+            }
         }
     }
 
     return 0;
 }
 
-void CTestServer::EchoProcedure(ull SessionID, const char *const buffer)
+bool CTestServer::EchoProcedure(ull SessionID, const char *const buffer)
 {
     //해당 ID가 어느 섹터에 있는지, 보낼 대상을 특정하는 Logic
     CMessage *msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
 
-    //UnitCast?
-    clsSession &session = sessions_vec[SessionID >> 47];
-    ull Local_ioCount;
-    ull seqID;
-    // session의 보장 장치.
-    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
-
-    if ((Local_ioCount & (ull)1 << 47) != 0)
-    {
-        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
-        stTlsObjectPool<CMessage>::Release(msg);
-        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
-        return;
-    }
-
-    // session의 Release는 막았으므로 변경되지않음.
-    seqID = session.m_SeqID.SeqNumberAndIdx;
-    if (seqID != SessionID)
-    {
-        // 새로 세팅된 Session이므로 다른 연결이라 판단.
-        stTlsObjectPool<CMessage>::Release(msg);
-        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(seqID);
-
-        return;
-    }
-
-    if (Local_ioCount == 1)
-    {
-        // 원래 '0'이 었는데 내가 증가시켰다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(SessionID);
-
-        stTlsObjectPool<CMessage>::Release(msg);
-        return;
-    }
-
-    // 여기까지 왔다면, 같은 Session으로 판단하자.
-    CMessage **ppMsg;
-    ull local_IoCount;
-    ppMsg = &msg;
-
-    if (bEnCording)
-        (*ppMsg)->EnCording();
-    {
-        Profiler profile;
-        profile.Start(L"LFQ_Push");
-
-        session.m_sendBuffer.Push(*ppMsg);
-        profile.End(L"LFQ_Push");
-    }
-
-    // PQCS를 시도.
-    if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
-    {
-        ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
-        local_IoCount = InterlockedIncrement(&session.m_ioCount);
-
-        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
-    }
-
-    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-        ReleaseSession(SessionID);
+   
 }
+bool CTestServer::LoginProcedure(ull SessionID,INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey)
+{
+    //idx동일.
+    CPlayer &player = player_vec[SessionID >> 47];
+    if (player.m_State != CPlayer::en_State::DisConnect)
+        return false;
+    player.m_State = CPlayer::en_State::IN_GAME;
+    player.m_sessionID = SessionID;
 
+    player.m_Timer = timeGetTime();
+    player.m_AccountNo = AccontNo;
+    wcsncpy(player.m_ID, ID, 20);
+    wcsncpy(player.m_Nickname, Nickname, 20);
+
+    Proxy::LoginProcedure(SessionID, AccontNo);
+    return true;
+
+}
 
 CTestServer::CTestServer(int iEncording)
     : CLanServer(iEncording)
@@ -215,7 +179,6 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 float CTestServer::OnRecv(ull sessionID, CMessage *msg)
 {
     // double CurrentQ;
-    static ll visited = 0;
     ringBufferSize ContentsUseSize;
 
     stSRWLock srw(&srw_ContentQ);
@@ -223,7 +186,7 @@ float CTestServer::OnRecv(ull sessionID, CMessage *msg)
     ContentsUseSize = m_ContentsQ.GetUseSize();
     if (msg == nullptr)
     {
-
+        //ContentsQ 상태 확인용
         return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
     }
 
@@ -250,15 +213,17 @@ float CTestServer::OnRecv(ull sessionID, CMessage *msg)
 bool CTestServer::OnAccept(ull SessionID)
 {
 
-    static char *LoginPacket = CreateLoginMessage();
+    char *LoginPacket = CreateLoginMessage();
 
     WSABUF wsabuf;
     int send_retval;
     DWORD LastError;
     ull local_IoCount;
 
-    clsSession &session = sessions_vec[(SessionID & SESSION_IDX_MASK) >> 47];
-    ull idx = (SessionID & SESSION_IDX_MASK) >> 47;
+    clsSession &session = sessions_vec[ SessionID  >> 47];
+    ull idx = SessionID  >> 47;
+
+
     wsabuf.buf = LoginPacket;
     wsabuf.len = 10;
 

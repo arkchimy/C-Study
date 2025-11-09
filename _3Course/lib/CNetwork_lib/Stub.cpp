@@ -12,18 +12,30 @@ bool Stub::PacketProc(ull SessionID, CMessage *msg, stHeader &header)
     //  메세지를 보낼때,
 
     char EchoBuffer[100];
+    bool bSucess;
 
     // DeCode된 데이터가 옴.
     switch (header.byType)
     {
-        // 에코 Test
+    case en_PACKET_CS_CHAT_REQ_LOGIN:
+        INT64 AccontNo;
+        WCHAR ID[20];
+        WCHAR Nickname[20];
+        char SessionKey[64];
+
+        *msg >> AccontNo;
+        msg->GetData((char*) &ID, sizeof(ID));
+        msg->GetData((char *)&Nickname, sizeof(Nickname));
+        msg->GetData((char *)&SessionKey, sizeof(SessionKey));
+        bSucess = LoginProcedure(SessionID, AccontNo, ID, Nickname, SessionKey);
+        break;
+
     default:
-        // 언마샬링
+        // 에코 Test
         msg->GetData(EchoBuffer, header.sDataLen);
-        stTlsObjectPool<CMessage>::Release(msg);
 
-        EchoProcedure(SessionID, EchoBuffer); // 동적 바인딩
+        bSucess = EchoProcedure(SessionID, EchoBuffer); // 동적 바인딩
     }
-
-    return true;
+    stTlsObjectPool<CMessage>::Release(msg);
+    return bSucess;
 }

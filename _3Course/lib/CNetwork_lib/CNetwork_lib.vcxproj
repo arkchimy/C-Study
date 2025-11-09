@@ -147,6 +147,7 @@
   <ItemGroup>
     <ClInclude Include="clsSession.h" />
     <ClInclude Include="CNetwork_lib.h" />
+    <ClInclude Include="CommonProtocol.h" />
     <ClInclude Include="Proxy.h" />
     <ClInclude Include="stHeader.h" />
     <ClInclude Include="Stub.h" />

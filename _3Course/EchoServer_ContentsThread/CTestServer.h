@@ -4,7 +4,8 @@ class CTestServer : public CLanServer
 {
   public:
 
-    void EchoProcedure(ull sessionID, const char *const buffer);
+    virtual bool EchoProcedure(ull sessionID, const char *const buffer) final;
+    virtual bool LoginProcedure(ull SessionID, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey) final ; // 동적 바인딩
   public:
     CTestServer(int iEncording = false);
     virtual ~CTestServer();
