@@ -29,81 +29,7 @@ class st_WSAData
 #include <sstream>
 #include <string>
 
-#pragma pack(1)
-struct stEnCordingHeader
-{
-    // Code(1byte) - Len(2byte) - RandKey(1byte) - CheckSum(1byte)
-    BYTE Code;
-    SHORT _len;
-    BYTE RandKey;
-    BYTE CheckSum;
-};
-#pragma pack()
-
-void EnCording(CMessage *msg, BYTE K, BYTE RK)
-{
-    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr;
-    BYTE total = 0;
-
-    int current = 0;
-    BYTE P = 0;
-    BYTE E = 0;
-
-    for (int i = 1; i <= len; i++)
-    {
-        total += msg->_frontPtr[i];
-    }
-    memcpy(msg->_frontPtr, &total, sizeof(total));
-
-    msg->HexLog();
-
-    for (; &msg->_frontPtr[current] != msg->_rearPtr; current++)
-    {
-        BYTE D1 = (msg->_frontPtr)[current];
-        BYTE b = (P + RK + current);
-
-        P = D1 ^ b;
-        E = P ^ (E + K + current);
-        msg->_frontPtr[current] = E;
-    }
-    msg->HexLog();
-}
-
-void DeCording(CMessage *msg, BYTE K, BYTE RK)
-{
-    BYTE P1 = 0, P2;
-    BYTE E1 = 0, E2;
-    BYTE D1 = 0, D2;
-    BYTE total = 0;
-    // 디코딩의 msg는 링버퍼에서 꺼낸 데이터로 내가 작성하는
-    SerializeBufferSize len = msg->_rearPtr - msg->_frontPtr;
-    int current = 0;
-
-    msg->HexLog();
-    // 2기준
-    // D2 ^ (P1 + RK + 2) = P2
-    // P2 ^ (E1 + K + 2) = E2
-
-    // E2 ^ (E1 + K + 2) = P2
-    // P2 ^ (P1 + RK + 2) = D2
-    for (; &msg->_frontPtr[current] != msg->_rearPtr; current++)
-    {
-        E2 = msg->_frontPtr[current];
-        P2 = E2 ^ (E1 + K + current);
-        E1 = E2;
-        D2 = P2 ^ (P1 + RK + current);
-        P1 = P2;
-        msg->_frontPtr[current] = D2;
-    }
-
-    for (int i = 1; i < len; i++)
-    {
-        total += msg->_frontPtr[i];
-    }
-    memcpy(msg->_frontPtr, &total, sizeof(total));
-
-    msg->HexLog();
-}
+#include "../../_3Course/lib/CNetwork_lib/stHeader.h"
 
 int main()
 {
@@ -111,8 +37,12 @@ int main()
     short port;
     std::wstring str;
 
-    std::cin >> port;
+    std::cout << "IP Address : ";
     std::wcin >> str;
+
+    std::cout << "Port : ";
+    std::cin  >> port;
+    
 
     SOCKET m_Socket;
     SOCKADDR_IN serverAddr;
@@ -120,7 +50,8 @@ int main()
 
     char buffer[100];
     char DataStr[] = "aaaaaaaaaabbbbbbbbbbcccccccccc1234567890abcdefghijklmn";
-    stEnCordingHeader header;
+
+    stHeader header;
     {
         linger linger;
         int buflen;
@@ -158,37 +89,37 @@ int main()
         while (1)
         {
             
-            CMessage msg;
-
-            header.Code = 0xa9;
-            header.RandKey = 0x31;
-            header._len = sizeof(DataStr);
-
-            msg._frontPtr = msg._begin + offsetof(stEnCordingHeader, CheckSum);
-
-            msg.PutData((char *)&header, sizeof(header));
-            msg.PutData((char *)DataStr, sizeof(DataStr));
-
-            EnCording(&msg, header.Code, header.RandKey);
-
-            send(m_Socket, (char *)msg._begin, header._len + sizeof(header), 0);
-            recvRetval = recv(m_Socket, (char *)msg._begin, header._len + sizeof(header), 0);
-
-            msg._frontPtr = msg._begin + offsetof(stEnCordingHeader, CheckSum);
-            msg._rearPtr = msg._begin + recvRetval;
-
-            DeCording(&msg, header.Code, header.RandKey);
+            CMessage clsSendMessage;
+            CMessage clsRecvMessage;
             
-            if (recvRetval == header._len + sizeof(header))
+
+            //struct stHeader
+            //{
+            //  public:
+            //    BYTE byCode;
+            //    BYTE byType; //
+            //    SHORT sDataLen;
+            //    BYTE byRandKey;
+            //    BYTE byCheckSum;
+            //};
+            header.byCode = 0x89;
+            header.byType = 250;
+            header.sDataLen = sizeof(DataStr);
+ 
+            clsSendMessage.PutData((char *)&header, sizeof(header));
+            clsSendMessage.PutData((char *)DataStr, sizeof(DataStr));
+
+            clsSendMessage.EnCoding();
+
+            send(m_Socket, (char *)clsSendMessage._begin, header.sDataLen + sizeof(header), 0);
+            recvRetval = recv(m_Socket, (char *)clsRecvMessage._begin, header.sDataLen + sizeof(header), 0);
+            clsRecvMessage._rearPtr = clsRecvMessage._begin + recvRetval;
+            if (clsRecvMessage.DeCoding() == false)
             {
-                for (int i = 0; i < sizeof(DataStr); i++)
-                {
-                    if (msg._frontPtr[i+1] != (BYTE)DataStr[i])
-                        __debugbreak();
-                }
-            }
-            else
+                clsSendMessage.HexLog(CMessage::en_Tag::NORMAL);// 보낸 데이터
+                clsRecvMessage.HexLog(CMessage::en_Tag::DECODE);// 받은 데이터를 디코딩한 것
                 __debugbreak();
+            }
         }
     }
 }

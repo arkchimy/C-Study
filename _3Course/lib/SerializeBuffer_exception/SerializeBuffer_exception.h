@@ -9,19 +9,10 @@
 #include "../CLockFreeMemoryPool_Backup/CLockFreeMemoryPool.h"
 #include <concepts>
 #include <type_traits>
+#include "../CNetwork_lib/stHeader.h"
 
 using SerializeBufferSize = DWORD;
 
-#pragma pack(1)
-struct stEnCordingHeader
-{
-    // Code(1byte) - Len(2byte) - RandKey(1byte) - CheckSum(1byte)
-    BYTE Code;
-    SHORT _len;
-    BYTE RandKey;
-    BYTE CheckSum;
-};
-#pragma pack()
 
 class MessageException : public std::exception
 {
@@ -56,6 +47,15 @@ struct CMessage
         bufferSize = 1000,
         MaxSize = 2000,
     };
+    enum class en_Tag : BYTE
+    {
+        ENCODE,
+        DECODE,
+        NORMAL,
+        _ERROR,
+        MAX,
+    };
+
     CMessage();
     ~CMessage();
     CMessage(const CMessage &) = delete;
@@ -71,11 +71,11 @@ struct CMessage
             if (_size == en_BufferSize::bufferSize)
             {
                 ReSize();
-                HexLog(L"SerializeBuffer_hex.txt");
+                HexLog(en_Tag::_ERROR);
             }
             else
             {
-                HexLog(L"SerializeBuffer_hex.txt");
+                HexLog(en_Tag::_ERROR);
                 throw MessageException(MessageException::NotEnoughSpace, "Buffer is fulled\n");
             }
         }
@@ -91,7 +91,7 @@ struct CMessage
     {
         if (_frontPtr > _rearPtr)
         {
-            HexLog(L"SerializeBuffer_hex.txt");
+            HexLog(en_Tag::_ERROR);
             throw MessageException(MessageException::HasNotData, "false Packet \n");
         }
 
@@ -101,16 +101,16 @@ struct CMessage
     }
 
     void EnCoding();
-    void DeCoding();
+    bool DeCoding();
 
 
-    SSIZE_T PutData(const char *src, SerializeBufferSize size);
+    SSIZE_T PutData(PVOID src, SerializeBufferSize size);
     SSIZE_T GetData(char *desc, SerializeBufferSize size);
 
     BOOL ReSize();
     void Peek(char *out, SerializeBufferSize size);
 
-    void HexLog(const wchar_t *filename = L"SerializeBuffer_hex.txt");
+    void HexLog(en_Tag tag = en_Tag::NORMAL, const wchar_t *filename = L"SerializeBuffer_hex.txt");
     SerializeBufferSize _size = en_BufferSize::bufferSize;
 
     char _begin[MaxSize];

@@ -1,10 +1,10 @@
 #pragma once
-
+#include "../lib/CNetwork_lib/CNetwork_lib.h"
 class CTestServer : public CLanServer
 {
   public:
 
-    virtual bool EchoProcedure(ull sessionID, CMessage *msg, const char *const buffer) final;
+    virtual bool EchoProcedure(ull sessionID, CMessage *msg, char *const const buffer, short len) final;
     virtual bool LoginProcedure(ull SessionID,CMessage* msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey) final ; // 동적 바인딩
   public:
     CTestServer(int iEncording = false);

@@ -8,6 +8,16 @@
 
 static int g_mode = 0;
 
+const wchar_t *format[(BYTE)CMessage::en_Tag::MAX] =
+    {
+        L"\nEnCode FrontPtr : %08p  RearPtr : %08p \n%s   \n",
+        L"\nDeCode FrontPtr : %08p  RearPtr : %08p \n%s   \n",
+        L"\nBefore FrontPtr : %08p  RearPtr : %08p \n%s   \n",
+        L"\nERROR  FrontPtr : %08p  RearPtr : %08p \n%s   \n",
+};
+
+
+
 CMessage::CMessage()
     : ownerID(GetCurrentThreadId())
 {
@@ -42,17 +52,29 @@ void CMessage::EnCoding( )
     BYTE E = 0;
     char *local_Front;
 
-    RK = 0x31;
+    RK = rand() % UCHAR_MAX;
 
-    local_Front = _begin + offsetof(stEnCordingHeader, CheckSum);
+    local_Front = _begin + offsetof(stHeader, byCheckSum);
     len = _rearPtr - local_Front;
-    
-    for (int i = 0; i < len; i++)
+
+    //struct stHeader
+    //{
+    //  public:
+    //    BYTE byCode;
+    //    BYTE byType; //
+    //    SHORT sDataLen;
+    //    BYTE byRandKey;
+    //    BYTE byCheckSum;
+    //};
+    memcpy(_begin + offsetof(stHeader, byRandKey), &RK, sizeof(BYTE));
+
+    for (SerializeBufferSize i = 1; i < len; i++)
     {
         total += local_Front[i];
     }
     memcpy(local_Front, &total, sizeof(total));
 
+    //HexLog();
     for (; &local_Front[current] != _rearPtr; current++)
     {
         BYTE D1 = (local_Front)[current];
@@ -62,10 +84,10 @@ void CMessage::EnCoding( )
         E = P ^ (E + K + current);
         local_Front[current] = E;
     }
-
+    //HexLog(en_Tag::ENCODE);
 }
 
-void CMessage::DeCoding( )
+bool CMessage::DeCoding( )
 {
     BYTE P1 = 0, P2;
     BYTE E1 = 0, E2;
@@ -78,12 +100,23 @@ void CMessage::DeCoding( )
     SerializeBufferSize len;
     int current = 0;
 
-    RK = *(_begin + offsetof(stEnCordingHeader, RandKey));
+    // struct stHeader
+    //{
+    //  public:
+    //    BYTE byCode;
+    //    BYTE byType; //
+    //    SHORT sDataLen;
+    //    BYTE byRandKey;
+    //    BYTE byCheckSum;
 
-    HexLog();
-    local_Front = _begin + offsetof(stEnCordingHeader, CheckSum);
-    len = _rearPtr - local_Front;
+    //};
+    RK = *(_begin + offsetof(stHeader, byRandKey));
 
+    //HexLog();
+    local_Front = _begin + offsetof(stHeader, byCheckSum);
+    len = (SerializeBufferSize)(_rearPtr - local_Front);
+    if (len > _size)
+        return false;
     // 2기준
     // D2 ^ (P1 + RK + 2) = P2
     // P2 ^ (E1 + K + 2) = E2
@@ -100,17 +133,21 @@ void CMessage::DeCoding( )
         local_Front[current] = D2;
     }
 
-    for (int i = 1; i < len; i++)
+    for (SerializeBufferSize i = 1; i < len; i++)
     {
         total += local_Front[i];
     }
-
-    memcpy(local_Front, &total, sizeof(total));
-
-    HexLog();
+  
+    if (local_Front[0] != total)
+    {
+        HexLog(en_Tag::_ERROR);
+        
+        return false;
+    }
+    return true;
 }
 
-SSIZE_T CMessage::PutData(const char *src, SerializeBufferSize size)
+SSIZE_T CMessage::PutData(PVOID src, SerializeBufferSize size)
 {
     char *r = _rearPtr;
     if (r + size > _end)
@@ -168,11 +205,18 @@ void CMessage::Peek(char *out, SerializeBufferSize size)
     memcpy(out, f, size);
 }
 
-void CMessage::HexLog(const wchar_t *filename)
+
+void CMessage::HexLog(en_Tag tag , const wchar_t * filename)
 {
     int current = 0;
 
-    wchar_t hexBuffer[MaxSize * 3 + 1]; // 최대 바이트와 띄어쓰기, 널문자 까지 포함. 
+    wchar_t *hexBuffer = (wchar_t*)malloc(MaxSize * 3 + 4); // 최대 바이트와 띄어쓰기, 널문자 까지 포함.
+    wchar_t *printBuffer = (wchar_t *)malloc(MaxSize * 4);
+    if (hexBuffer == nullptr)
+        __debugbreak();
+    if (printBuffer == nullptr)
+        __debugbreak();
+
     wchar_t wordSet[] = L"0123456789ABCDEF";
     BYTE data;
 
@@ -180,19 +224,20 @@ void CMessage::HexLog(const wchar_t *filename)
     {
         data = _begin[current];
 
-        hexBuffer[3 * current + 0] = wordSet[ data  >> 4];
-        hexBuffer[3 * current + 1] = wordSet[ data & 0xF];
+        hexBuffer[3 * current + 0] = wordSet[data >> 4];
+        hexBuffer[3 * current + 1] = wordSet[data & 0xF];
         hexBuffer[3 * current + 2] = L' ';
     }
-    hexBuffer[3 * current + 0] = L'\n';
-    hexBuffer[3 * current + 1] = L'\n';
-    FILE* file;
+    hexBuffer[3 * current + 0] = L'\0';
+
+    FILE *file;
     file = nullptr;
     while (file == nullptr)
     {
         _wfopen_s(&file, filename, L"a+ ,ccs=UTF-16LE");
     }
-    fwrite(hexBuffer, 2, current * 3 + 1, file);
+    StringCchPrintfW(printBuffer, MaxSize * 4 / sizeof(wchar_t), format[(BYTE)tag], _frontPtr, _rearPtr, hexBuffer);
+    fwrite(printBuffer, 2, wcslen(printBuffer), file);
     current = 0;
     for (; &_begin[current] != _end; current++)
     {
@@ -200,12 +245,16 @@ void CMessage::HexLog(const wchar_t *filename)
         hexBuffer[3 * current + 1] = L' ';
         hexBuffer[3 * current + 2] = L' ';
     }
+    hexBuffer[3 * current + 0] = L'\n';
+    hexBuffer[3 * current + 1] = L'\0';
 
     hexBuffer[3 * (_frontPtr - _begin)] = L'F';
     hexBuffer[3 * (_rearPtr - _begin)] = L'R';
-    fwrite(hexBuffer, 2, current * 3 + 1, file);
+    fwrite(hexBuffer, 2, wcslen(hexBuffer), file);
 
     fclose(file);
 
+    free(hexBuffer);
+    free(printBuffer);
 }
 

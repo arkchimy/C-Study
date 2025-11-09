@@ -303,9 +303,9 @@ CLanServer::CLanServer(bool EnCoding)
     : bEnCording(EnCoding)
 {
     if (bEnCording)
-        headerSize = sizeof(stEnCordingHeader);
-    else
         headerSize = sizeof(stHeader);
+    else
+        headerSize =  offsetof(stHeader, sDataLen);
 
     m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (m_listen_sock == INVALID_SOCKET)
@@ -645,8 +645,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
         wsaBuf[bufCnt].buf = msg->_frontPtr;
         wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
-        if (wsaBuf[bufCnt].len != 10)
-            __debugbreak();
+
         bufCnt++;
     }
     profile.End(L"LFQ_Pop");
@@ -746,8 +745,6 @@ void CLanServer::UnitCast(ull SessionID, CMessage *msg, size_t size)
     ull local_IoCount;
     ppMsg = &msg;
 
-    if (bEnCording)
-        (*ppMsg)->EnCoding();
     {
         Profiler profile;
         profile.Start(L"LFQ_Push");

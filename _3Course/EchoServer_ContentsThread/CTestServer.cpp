@@ -103,31 +103,32 @@ unsigned ContentsThread(void *arg)
             f = server->m_ContentsQ._frontPtr;
             useSize -= 8;
         }
-        // 하트비트 부분
-        {
-            DWORD currentTime;
-            DWORD disTime;
-            currentTime = timeGetTime();
-            for (CPlayer &player : server->player_vec)
-            {
-                if (player.m_State == CPlayer::en_State::DisConnect)
-                    continue;
-                disTime = currentTime - player.m_Timer;
-                if (disTime >= 40)
-                {
-                    server->Disconnect(player.m_sessionID);
-                }
-            }
-        }
+        //// 하트비트 부분
+        //{
+        //    DWORD currentTime;
+        //    DWORD disTime;
+        //    currentTime = timeGetTime();
+        //    for (CPlayer &player : server->player_vec)
+        //    {
+        //        if (player.m_State == CPlayer::en_State::DisConnect)
+        //            continue;
+        //        disTime = currentTime - player.m_Timer;
+        //        if (disTime >= 4000)
+        //        {
+        //            server->Disconnect(player.m_sessionID);
+        //        }
+        //    }
+        //}
     }
 
     return 0;
 }
 
-bool CTestServer::EchoProcedure(ull SessionID, CMessage *msg, const char *const buffer)
+bool CTestServer::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, short len)
 {
     //해당 ID가 어느 섹터에 있는지, 보낼 대상을 특정하는 Logic
-    return false;
+    this->Proxy::EchoProcedure(SessionID, msg, buffer,len);
+    return true;
 }
 bool CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey)
 {
