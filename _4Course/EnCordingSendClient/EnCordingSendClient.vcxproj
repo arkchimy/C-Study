@@ -140,6 +140,9 @@
     <ProjectReference Include="..\..\_3Course\lib\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj">
       <Project>{75b1f209-92d7-4410-bf05-3c1effab017b}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\..\_3Course\lib\CrushDump_lib\CrushDump_lib\CrushDump_lib.vcxproj">
+      <Project>{b5035720-6cd1-4206-a4d5-c190fab6cdde}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\_3Course\lib\SerializeBuffer_exception\SerializeBuffer_exception.vcxproj">
       <Project>{1d36ff30-e26e-4f5c-b13c-db648ce9e8b8}</Project>
     </ProjectReference>

@@ -59,7 +59,6 @@ void Proxy::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, shor
 
     server = reinterpret_cast<CTestServer *>((char*)this - 8);
     header.byCode = 0x89;
-    header.sDataLen = len;
 
     msg->~CMessage();
  
@@ -69,7 +68,7 @@ void Proxy::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, shor
     msg->PutData(buffer, len);
     
     short *pheaderlen = (short*)(msg->_frontPtr + offsetof(stHeader, sDataLen));
-    *pheaderlen = msg->_frontPtr - msg->_rearPtr - server->headerSize;
+    *pheaderlen = msg->_rearPtr - msg->_frontPtr - server->headerSize;
     if (server->bEnCording)
     {
         msg->EnCoding();

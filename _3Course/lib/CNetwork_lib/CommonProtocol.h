@@ -133,7 +133,7 @@ enum en_PACKET_TYPE
     //   }
     //
     //------------------------------------------------------------
-    en_PACKET_CS_CHAT_REQ_ECHO,
+    en_PACKET_CS_CHAT_REQ_ECHO = 250,
 
 
 };

@@ -10,12 +10,23 @@ static int g_mode = 0;
 
 const wchar_t *format[(BYTE)CMessage::en_Tag::MAX] =
     {
-        L"\nEnCode FrontPtr : %08p  RearPtr : %08p \n%s   \n",
-        L"\nDeCode FrontPtr : %08p  RearPtr : %08p \n%s   \n",
-        L"\nBefore FrontPtr : %08p  RearPtr : %08p \n%s   \n",
-        L"\nERROR  FrontPtr : %08p  RearPtr : %08p \n%s   \n",
+        L"\n%s\n",
+        L"\n  %-15s  \n%s   \n",
+        L"\n  %-15s  \n%s   \n",
+        L"\n  %-15s  \n%s   \n",
+        L"\n  %-15s  \n%s   \n",
+        L"\n  %-15s  \n%s   \n",
 };
+const wchar_t *Stringformat[(BYTE)CMessage::en_Tag::MAX] = 
+{
+    L"==================================================================================================================",
+    L"Dummy가 보낸 인코딩 후 데이터  ",
+    L"Server가 준 디코딩 후 데이터 ",
+    L"Dummy가 보낸 인코딩 전 데이터  ",
+    L"Server가 준 디코딩 전 데이터  ",
+    L"dif Data",
 
+};
 
 
 CMessage::CMessage()
@@ -235,7 +246,12 @@ void CMessage::HexLog(en_Tag tag , const wchar_t * filename)
     {
         _wfopen_s(&file, filename, L"a+ ,ccs=UTF-16LE");
     }
-    StringCchPrintfW(printBuffer, MaxSize * 4 / sizeof(wchar_t), format[(BYTE)tag], _frontPtr, _rearPtr, hexBuffer);
+    if ((BYTE)tag == 0)
+    {
+        StringCchPrintfW(printBuffer, MaxSize * 4 / sizeof(wchar_t), format[(BYTE)tag], Stringformat[(BYTE)tag]);
+    }
+    else
+        StringCchPrintfW(printBuffer, MaxSize * 4 / sizeof(wchar_t), format[(BYTE)tag], Stringformat[(BYTE)tag], hexBuffer);
     fwrite(printBuffer, 2, wcslen(printBuffer), file);
     current = 0;
     for (; &_begin[current] != _end; current++)
@@ -249,8 +265,10 @@ void CMessage::HexLog(en_Tag tag , const wchar_t * filename)
 
     hexBuffer[3 * (_frontPtr - _begin)] = L'F';
     hexBuffer[3 * (_rearPtr - _begin)] = L'R';
-    fwrite(hexBuffer, 2, wcslen(hexBuffer), file);
-
+    if ((BYTE)tag != 0)
+    {
+        fwrite(hexBuffer, 2, wcslen(hexBuffer), file);
+    }
     fclose(file);
 
     free(hexBuffer);

@@ -509,8 +509,6 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
             break;
         }
         // 메세지 생성
-        if (session.m_recvBuffer.Dequeue(&header, headerSize) != headerSize)
-            __debugbreak();
 
         CMessage *msg = CreateMessage(session, header);
         if (msg == nullptr)
@@ -518,7 +516,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
 
         if (bEnCording)
             msg->DeCoding();
-
+        msg->_frontPtr = msg->_frontPtr + headerSize;
         {
             Profiler profile;
             profile.Start(L"OnRecv");
@@ -557,7 +555,7 @@ CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
         profile.End(L"PoolAlloc");
     }
     // 순수하게 데이터만 가져옴.  EnCording 의 경우 RandKey와 CheckSum도 가져옴.
-    deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header.sDataLen);
+    deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header.sDataLen + headerSize);
     msg->_rearPtr = msg->_frontPtr + deQsize;
 
     if (header.sDataLen + headerSize != deQsize)

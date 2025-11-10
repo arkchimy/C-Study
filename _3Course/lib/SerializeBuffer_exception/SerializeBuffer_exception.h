@@ -49,9 +49,12 @@ struct CMessage
     };
     enum class en_Tag : BYTE
     {
+        NORMAL,
         ENCODE,
         DECODE,
-        NORMAL,
+ 
+        ENCODE_BEFORE,
+        DECODE_BEFORE,
         _ERROR,
         MAX,
     };

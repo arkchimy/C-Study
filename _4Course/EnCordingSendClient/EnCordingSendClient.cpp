@@ -6,13 +6,21 @@
 #pragma comment(lib, "ws2_32")
 #include "../../_3Course/lib/SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+//#include "../../_3Course/lib/CNetwork_lib/CNetwork_lib.h"
+#include "../../_3Course/lib/CNetwork_lib/CommonProtocol.h"
 
+#include <sstream>
+#include <string>
+
+#include "../../_3Course/lib/CNetwork_lib/stHeader.h"
+#include <conio.h>
+#include <thread>
 CDump dump;
-
-class st_WSAData
+bool bDebug = true;
+class st_WSAData2
 {
   public:
-    st_WSAData()
+    st_WSAData2()
     {
         WSAData wsa;
         DWORD wsaStartRetval;
@@ -23,20 +31,34 @@ class st_WSAData
             __debugbreak();
         }
     }
-    ~st_WSAData()
+    ~st_WSAData2()
     {
         WSACleanup();
     }
 };
 
-#include <sstream>
-#include <string>
-
-#include "../../_3Course/lib/CNetwork_lib/stHeader.h"
-
+unsigned int InputThread(void *arg) 
+{
+    while (1)
+    {
+        if (_kbhit())
+        {
+            char ch = _getch();
+            if (ch == 'D' || ch == 'd')
+            {
+                if (!bDebug)
+                    printf("DeBugMode\n");
+                else
+                    printf("ReleaseMode\n");
+                bDebug = !bDebug;
+            }
+        }
+    }
+    return 0;
+}
 int main()
 {
-    st_WSAData wsa;
+    st_WSAData2 wsa;
     short port;
     std::wstring str;
 
@@ -46,6 +68,7 @@ int main()
     std::cout << "Port : ";
     std::cin  >> port;
     
+    _beginthreadex(nullptr, 0, InputThread, nullptr, 0, nullptr);
 
     SOCKET m_Socket;
     SOCKADDR_IN serverAddr;
@@ -74,7 +97,7 @@ int main()
     while (1)
     {
     retry:
-
+        srand(3);
         m_Socket = socket(AF_INET, SOCK_STREAM, 0);
         if (m_Socket == INVALID_SOCKET)
         {
@@ -84,6 +107,8 @@ int main()
         setsockopt(m_Socket, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
 
         Connect_retval = connect(m_Socket, (sockaddr *)&serverAddr, sizeof(serverAddr));
+        
+
         if (Connect_retval != 0)
         {
             static int cnt = 1;
@@ -93,59 +118,109 @@ int main()
         }
         else
         {
-            std::cout << " Connected\n";
+            std::cout << " Connected  \n ================== DeBugMode : D ================== \n";
         }
         char temp[1000];
         recv(m_Socket, (char *)temp, 100, 0);
         int recvRetval;
         int sendRetval;
+
         while (1)
         {
             
             CMessage clsSendMessage;
             CMessage clsRecvMessage;
             
-
             //struct stHeader
             //{
             //  public:
             //    BYTE byCode;
-            //    BYTE byType; //
             //    SHORT sDataLen;
             //    BYTE byRandKey;
             //    BYTE byCheckSum;
             //};
             header.byCode = 0x89;
-            header.byType = 250;
-            header.sDataLen = sizeof(DataStr);
- 
+            
             clsSendMessage.PutData((char *)&header, sizeof(header));
+
+            clsSendMessage << WORD(en_PACKET_CS_CHAT_REQ_ECHO);
+            clsSendMessage << WORD(sizeof(DataStr));
             clsSendMessage.PutData((char *)DataStr, sizeof(DataStr));
 
-            clsSendMessage.EnCoding();
+            short *pHeaderLen = (short*)(clsSendMessage._frontPtr + offsetof(stHeader, sDataLen));
+            *pHeaderLen = clsSendMessage._rearPtr - clsSendMessage._frontPtr - sizeof(stHeader);
 
-            sendRetval = send(m_Socket, (char *)clsSendMessage._begin, header.sDataLen + sizeof(header), 0);
-            if (sendRetval == -1)
+            if (bDebug)
             {
-                std::cout << "연결이 끊어졌습니다.\n";
-                closesocket(m_Socket);
-                goto retry;
-            }
-            recvRetval = recv(m_Socket, (char *)clsRecvMessage._begin, header.sDataLen + sizeof(header), 0);
+                clsSendMessage.HexLog();
+                clsSendMessage.HexLog(CMessage::en_Tag::ENCODE_BEFORE);
 
-            if (recvRetval == -1)
-            {
-                std::cout << "연결이 끊어졌습니다.\n";
-                closesocket(m_Socket);
-                goto retry;
+                clsSendMessage.EnCoding();
+
+            
+                clsSendMessage.HexLog(CMessage::en_Tag::ENCODE);
+
+                sendRetval = send(m_Socket, (char *)clsSendMessage._begin, *pHeaderLen + sizeof(header), 0);
+                if (sendRetval == -1)
+                {
+                    std::cout << "연결이 끊어졌습니다.\n";
+                    closesocket(m_Socket);
+                    goto retry;
+                }
+                recvRetval = recv(m_Socket, (char *)clsRecvMessage._begin, *pHeaderLen + sizeof(header), 0);
+
+                if (recvRetval == -1)
+                {
+                    std::cout << "연결이 끊어졌습니다.\n";
+                    closesocket(m_Socket);
+                    goto retry;
+                }
+                clsRecvMessage._rearPtr = clsRecvMessage._begin + recvRetval;
+                clsRecvMessage.HexLog(CMessage::en_Tag::DECODE_BEFORE);
+
+                if (clsRecvMessage.DeCoding() == false)
+                {
+                    // 보낸 데이터와 받은 데이터가 다르다면  __debugbreak;
+                    clsSendMessage.HexLog(CMessage::en_Tag::ENCODE); // 보낸 인코딩 된 데이터
+                    clsRecvMessage.HexLog(CMessage::en_Tag::DECODE); // 받은 데이터를 디코딩한 것
+                    __debugbreak();
+                }
+                
+                clsRecvMessage.HexLog(CMessage::en_Tag::DECODE); // 받은 데이터를 디코딩한 것
+                clsSendMessage.HexLog();
+                system("pause");
+                Sleep(1000);
+                
             }
-            clsRecvMessage._rearPtr = clsRecvMessage._begin + recvRetval;
-            if (clsRecvMessage.DeCoding() == false)
+            else
             {
-                // 보낸 데이터와 받은 데이터가 다르다면  __debugbreak;
-                clsSendMessage.HexLog(CMessage::en_Tag::ENCODE);// 보낸 인코딩 된 데이터
-                clsRecvMessage.HexLog(CMessage::en_Tag::DECODE);// 받은 데이터를 디코딩한 것
-                __debugbreak();
+                clsSendMessage.EnCoding();
+       
+                sendRetval = send(m_Socket, (char *)clsSendMessage._begin, *pHeaderLen + sizeof(header), 0);
+                if (sendRetval == -1)
+                {
+                    std::cout << "연결이 끊어졌습니다.\n";
+                    closesocket(m_Socket);
+                    goto retry;
+                }
+                recvRetval = recv(m_Socket, (char *)clsRecvMessage._begin, *pHeaderLen + sizeof(header), 0);
+
+                if (recvRetval == -1)
+                {
+                    std::cout << "연결이 끊어졌습니다.\n";
+                    closesocket(m_Socket);
+                    goto retry;
+                }
+                clsRecvMessage._rearPtr = clsRecvMessage._begin + recvRetval;
+
+                if (clsRecvMessage.DeCoding() == false)
+                {
+                    // 보낸 데이터와 받은 데이터가 다르다면  __debugbreak;
+                    clsSendMessage.HexLog(CMessage::en_Tag::ENCODE); // 보낸 인코딩 된 데이터
+                    clsRecvMessage.HexLog(CMessage::en_Tag::DECODE); // 받은 데이터를 디코딩한 것
+                    __debugbreak();
+                }
+        
             }
         }
     }
