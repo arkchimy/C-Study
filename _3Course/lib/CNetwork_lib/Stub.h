@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "stHeader.h"
 #include "CommonProtocol.h"
+#include "ServerProtocol.h"
 
 using ull = unsigned long long;
 struct CMessage;
@@ -10,7 +11,7 @@ class Stub
 {
   public:
 
-    virtual bool EchoProcedure(ull SessionID, CMessage *msg, const char *const buffer,short len) { return false; }                       // 동적 바인딩
-    virtual bool LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey) { return false; }; // 동적 바인딩
-    bool PacketProc(ull SessionID,  CMessage *msg, stHeader &header);
+    virtual void EchoProcedure(ull SessionID, CMessage *msg, const char *const buffer, short len) { }                            // 동적 바인딩
+    virtual void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey) { }; // 동적 바인딩
+    void PacketProc(ull SessionID,  CMessage *msg, stHeader &header, WORD type);
 };

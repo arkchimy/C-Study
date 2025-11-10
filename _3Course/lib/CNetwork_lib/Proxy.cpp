@@ -19,13 +19,13 @@ extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴
 //*(cPacket.GetBufferPtr() + 1) = cPacket.GetDataSize() - sizeof(stHeader);
 // NetWork::SendPacket(clpSection, &cPacket, bBroadCast);
 
-bool Proxy::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo)
+void Proxy::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo)
 {
     stHeader header;
     CLanServer *server;
 
-    server = reinterpret_cast<CLanServer *>(this);
-    header.byType = 0x89; // 임의 값
+    server = reinterpret_cast<CTestServer *>((char *)this - 8);
+    header.byCode = 0x89; // 임의 값
 
     msg->PutData(&header, server->headerSize);
     *msg << AccountNo;
@@ -34,28 +34,46 @@ bool Proxy::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo)
         msg->EnCoding();
 
     server->SendPacket(SessionID, msg, UnitCast); // msg
-
-    return true;
 }
 
 
 void Proxy::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, short len)
 {
+    //struct stHeader
+    //{
+    //  public:
+    //    BYTE byCode;
+    //    SHORT sDataLen;
+    //    BYTE byRandKey;
+    //    BYTE byCheckSum;
+    //};
+    // 
+    //    {
+    //      WORD   Type => 250
+    //      WORD   MessageLen
+    //      CHAR   Message[MessageLen]
+    //   }
     stHeader header;
     CLanServer *server;
+    WORD type = en_PACKET_CS_CHAT_REQ_ECHO;
 
     server = reinterpret_cast<CTestServer *>((char*)this - 8);
-    header.byType = en_PACKET_CS_ECHO;
     header.byCode = 0x89;
     header.sDataLen = len;
 
     msg->~CMessage();
-
+ 
     msg->PutData(&header, server->headerSize);
+    *msg << type;
+    *msg << len;
     msg->PutData(buffer, len);
     
+    short *pheaderlen = (short*)(msg->_frontPtr + offsetof(stHeader, sDataLen));
+    *pheaderlen = msg->_frontPtr - msg->_rearPtr - server->headerSize;
     if (server->bEnCording)
+    {
         msg->EnCoding();
+    }
 
     server->SendPacket(SessionID, msg, UnitCast); // msg
 }

@@ -509,6 +509,9 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
             break;
         }
         // 메세지 생성
+        if (session.m_recvBuffer.Dequeue(&header, headerSize) != headerSize)
+            __debugbreak();
+
         CMessage *msg = CreateMessage(session, header);
         if (msg == nullptr)
             break;
@@ -554,7 +557,7 @@ CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
         profile.End(L"PoolAlloc");
     }
     // 순수하게 데이터만 가져옴.  EnCording 의 경우 RandKey와 CheckSum도 가져옴.
-    deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header.sDataLen + headerSize);
+    deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header.sDataLen);
     msg->_rearPtr = msg->_frontPtr + deQsize;
 
     if (header.sDataLen + headerSize != deQsize)
@@ -680,6 +683,69 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
         if (send_retval < 0)
             WSASendError(LastError, session.m_SeqID.SeqNumberAndIdx);
     }
+}
+bool CLanServer::SessionLock(ull SessionID) 
+{
+    /*
+        ※ 인자로 Msg들고오기 싫음. 
+        => False를 리턴받는다면 호출부에서 msg폐기를 요구합니다.
+
+        * Release된 Session이라면  False를 리턴  
+        * SessionID가 다르다면     False를 리턴  IO를 감소 시킨후 Release시도 ,  적어도 진입순간에는 Session은 살아있었음.
+        * 증가시킨 IO가 '1'인 경우 감소 시킨 후  Release시도 , False를 리턴
+        * 
+    */
+    clsSession& session = sessions_vec[SessionID >> 47];
+    ull Local_ioCount;
+    ull seqID;
+
+    // session의 보장 장치.
+    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
+
+    if ((Local_ioCount & (ull)1 << 47) != 0)
+    {
+        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
+        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
+        return false;
+    }
+
+    // session의 Release는 막았으므로 변경되지않음.
+    seqID = session.m_SeqID.SeqNumberAndIdx;
+    if (seqID != SessionID)
+    {
+        // 새로 세팅된 Session이므로 다른 연결이라 판단.
+        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(seqID);
+
+        return false;
+    }
+
+    if (Local_ioCount == 1)
+    {
+        // 원래 '0'이 었는데 내가 증가시켰다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession(SessionID);
+
+        return false;
+    }
+    return true;
+}
+void CLanServer::SessionUnLock(ull SessionID) 
+{
+    clsSession &session = sessions_vec[SessionID >> 47];
+    ull Local_ioCount;
+
+    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+        ReleaseSession(SessionID);
 }
 
 void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,

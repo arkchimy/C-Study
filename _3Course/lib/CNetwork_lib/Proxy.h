@@ -15,8 +15,7 @@ class Proxy
         SectorAround = 2,
 
     };
-
-    bool LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo);
+    void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo);
     void EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, short len);
     
 };

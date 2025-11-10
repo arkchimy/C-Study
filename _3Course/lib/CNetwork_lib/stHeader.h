@@ -9,7 +9,6 @@ struct stHeader
 {
   public:
     BYTE byCode;
-    BYTE byType; // 
     SHORT sDataLen;
     BYTE byRandKey;
     BYTE byCheckSum;

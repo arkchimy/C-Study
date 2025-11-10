@@ -59,24 +59,6 @@ struct stSRWLock
     SRWLOCK *m_srw;
 };
 
-struct CPlayer
-{
-    enum en_State
-    {
-        IN_GAME,
-        DisConnect,
-    };
-    en_State m_State = en_State::DisConnect;
-    ull m_sessionID;
-    DWORD m_Timer;
-    INT64 m_AccountNo;
-    WCHAR m_ID[20];
-    WCHAR m_Nickname[20];
-    char m_SessionKey[64];
-
-    int iSectorX = 0;
-    int iSectorY = 0;
-};
 
 class CLanServer : public Stub, public  Proxy
 {
@@ -98,6 +80,9 @@ class CLanServer : public Stub, public  Proxy
     // void RecvComplete(class clsSession *const session, DWORD transferred);
     void RecvComplete(class clsSession &session, DWORD transferred);
     void SendComplete(class clsSession &session, DWORD transferred);
+
+    bool SessionLock(ull SessionID);   // 내부에서 IO를 증가시켜 안전을 보장함.
+    void SessionUnLock(ull SessionID); // 반환형 쓸때가 없음.
 
     void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
                     int iSectorX = 0, int iSectorY = 0);
@@ -136,10 +121,9 @@ class CLanServer : public Stub, public  Proxy
     int headerSize = 0;
 
     std::vector<class clsSession> sessions_vec;
-    std::vector<class CPlayer> player_vec;
 
     CLockFreeStack<ull> m_SessionIdxStack; // 반환된 Idx를 Stack형식으로
-    CLockFreeStack<ull> m_PlayerIdxStack; // 반환된 Idx를 Stack형식으로
+
     // CLockFreeQueue<clsSession *> m_ReleaseSessions;
     CLockFreeStack<clsSession *> m_ReleaseSessions;
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
