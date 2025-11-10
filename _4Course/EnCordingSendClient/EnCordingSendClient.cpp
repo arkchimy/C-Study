@@ -5,6 +5,9 @@
 #include <iostream>
 #pragma comment(lib, "ws2_32")
 #include "../../_3Course/lib/SerializeBuffer_exception/SerializeBuffer_exception.h"
+#include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+
+CDump dump;
 
 class st_WSAData
 {
@@ -50,10 +53,10 @@ int main()
 
     char buffer[100];
     char DataStr[] = "aaaaaaaaaabbbbbbbbbbcccccccccc1234567890abcdefghijklmn";
-
+    linger linger;
     stHeader header;
     {
-        linger linger;
+ 
         int buflen;
 
         DWORD bind_retval;
@@ -67,18 +70,27 @@ int main()
         serverAddr.sin_port = htons(port);
         InetPtonW(AF_INET, str.c_str(), &serverAddr.sin_addr);
 
-        m_Socket = socket(AF_INET, SOCK_STREAM, 0);
-        if (m_Socket == INVALID_SOCKET)
-        {
-            __debugbreak();
-        }
-        setsockopt(m_Socket, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
     }
     while (1)
     {
+    retry:
+
+        m_Socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (m_Socket == INVALID_SOCKET)
+        {
+            Sleep(1000);
+            goto retry;
+        }
+        setsockopt(m_Socket, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
+
         Connect_retval = connect(m_Socket, (sockaddr *)&serverAddr, sizeof(serverAddr));
         if (Connect_retval != 0)
-            __debugbreak();
+        {
+            static int cnt = 1;
+            Sleep(1000);
+            std::cout << cnt++ << "번쨰 시도 중\n";
+            goto retry;
+        }
         else
         {
             std::cout << " Connected\n";
@@ -86,6 +98,7 @@ int main()
         char temp[1000];
         recv(m_Socket, (char *)temp, 100, 0);
         int recvRetval;
+        int sendRetval;
         while (1)
         {
             
@@ -111,26 +124,29 @@ int main()
 
             clsSendMessage.EnCoding();
 
-            send(m_Socket, (char *)clsSendMessage._begin, header.sDataLen + sizeof(header), 0);
+            sendRetval = send(m_Socket, (char *)clsSendMessage._begin, header.sDataLen + sizeof(header), 0);
+            if (sendRetval == -1)
+            {
+                std::cout << "연결이 끊어졌습니다.\n";
+                closesocket(m_Socket);
+                goto retry;
+            }
             recvRetval = recv(m_Socket, (char *)clsRecvMessage._begin, header.sDataLen + sizeof(header), 0);
+
+            if (recvRetval == -1)
+            {
+                std::cout << "연결이 끊어졌습니다.\n";
+                closesocket(m_Socket);
+                goto retry;
+            }
             clsRecvMessage._rearPtr = clsRecvMessage._begin + recvRetval;
             if (clsRecvMessage.DeCoding() == false)
             {
-                clsSendMessage.HexLog(CMessage::en_Tag::NORMAL);// 보낸 데이터
+                // 보낸 데이터와 받은 데이터가 다르다면  __debugbreak;
+                clsSendMessage.HexLog(CMessage::en_Tag::ENCODE);// 보낸 인코딩 된 데이터
                 clsRecvMessage.HexLog(CMessage::en_Tag::DECODE);// 받은 데이터를 디코딩한 것
                 __debugbreak();
             }
         }
     }
 }
-
-// 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴
-// 프로그램 디버그: <F5> 키 또는 [디버그] > [디버깅 시작] 메뉴
-
-// 시작을 위한 팁:
-//   1. [솔루션 탐색기] 창을 사용하여 파일을 추가/관리합니다.
-//   2. [팀 탐색기] 창을 사용하여 소스 제어에 연결합니다.
-//   3. [출력] 창을 사용하여 빌드 출력 및 기타 메시지를 확인합니다.
-//   4. [오류 목록] 창을 사용하여 오류를 봅니다.
-//   5. [프로젝트] > [새 항목 추가]로 이동하여 새 코드 파일을 만들거나, [프로젝트] > [기존 항목 추가]로 이동하여 기존 코드 파일을 프로젝트에 추가합니다.
-//   6. 나중에 이 프로젝트를 다시 열려면 [파일] > [열기] > [프로젝트]로 이동하고 .sln 파일을 선택합니다.
