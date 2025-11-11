@@ -5,7 +5,6 @@
 
 struct CPlayer
 {
-    en_State m_State = en_State::DisConnect;
     ull m_sessionID;
 
     DWORD m_Timer;
@@ -25,7 +24,8 @@ class CTestServer : public CLanServer
     virtual void EchoProcedure(ull sessionID, CMessage *msg, char *const const buffer, short len) final;
     virtual void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey) final; // 동적 바인딩
 
-    void InitalizePlayer(CMessage* msg);
+    void DeletePlayer(CMessage* msg);
+
   public:
     CTestServer(int iEncording = false);
     virtual ~CTestServer();
@@ -36,8 +36,7 @@ class CTestServer : public CLanServer
   
     virtual float OnRecv(ull SessionID, CMessage *msg) override;
     virtual bool OnAccept(ull SessionID) override;
-
-    bool GetId(short& idx);
+    virtual LONG64 GetPlayerCount() { return m_TotalPlayers; }
 
     SRWLOCK srw_ContentQ;
 
@@ -46,14 +45,19 @@ class CTestServer : public CLanServer
     HANDLE hContentsThread = 0;
     HANDLE hMonitorThread = 0 ;
 
-    // Player의 자료구조를 어떤 것으로 둘까?
-    CObjectPool_UnSafeMT<CPlayer> player_pool;
+    // TODO: 특정 인원이상 안늘어나게 조치.
+    CObjectPool_UnSafeMT<CPlayer> player_pool; 
 
-    std::unordered_map<ull, CPlayer*> player_hash;
-    //std::vector<class CPlayer> player_vec; //
-    std::stack<short> idle_stack;
+    // Account   Key , Player접근.
+    std::unordered_map<ull, CPlayer*> AccountNo_hash; // 중복 접속을 제거하는 용도
+    // SessionID Key , Player접근.
+    std::unordered_map<ull, CPlayer*> SessionID_hash; // 중복 접속을 제거하는 용도
+
 
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
-    int m_maxSessions = 0;
+    int m_maxSessions = 0;   
+    int m_maxPlayers = 7000;   
+    LONG64 m_TotalPlayers = 0; // 현재 Player의 Cnt
+    int m_State_Session = 0; // 아직 Player가 되지못한 Session의 Cnt
 };

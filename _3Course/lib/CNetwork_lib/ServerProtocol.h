@@ -13,4 +13,5 @@ enum en_ServerPACKET_TYPE
     //------------------------------------------------------------
 
     en_PACKET_Player_Alloc = 200,
+    en_PACKET_Player_Delete ,
 };

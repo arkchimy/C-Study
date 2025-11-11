@@ -62,6 +62,10 @@ class CObjectPool_UnSafeMT
         for (DWORD i = 0; i < iSize; i++)
             Release(new stNode());
     }
+    void Limite_Lock()
+    {
+        m_blimite = true;
+    }
     PVOID Alloc()
     {
         stNode *oldTop;
@@ -69,13 +73,16 @@ class CObjectPool_UnSafeMT
         stNode *ret_Node;
 
         // Stack에서 빼기
-
+        m_AllocatedCount++;
         oldTop = reinterpret_cast<stNode *>(m_Top);
 
         // 비어있다는 것을 알아야함.
         if (oldTop == &m_Dummy)
         {
             // 정보 세팅
+            if (m_blimite)
+                return nullptr;
+
             oldTop = new stNode();
 #ifdef POOLTEST
 
@@ -95,17 +102,22 @@ class CObjectPool_UnSafeMT
         // TODO : Push 하기
         stNode *oldTop;
 
+
         oldTop = reinterpret_cast<stNode *>(m_Top);
 
         reinterpret_cast<stNode *>(newNode)->next = oldTop;
 
         m_Top = newNode;
         m_size++;
+
+        m_AllocatedCount--;
     }
 
     PVOID m_Top;
     stNode m_Dummy;
 
+    DWORD m_AllocatedCount; // 밖에 돌아다니고있는 Node들의 Cnt
+    bool m_blimite = false;
     ll seqNumber = -1;
     ll m_size = 0;
 };

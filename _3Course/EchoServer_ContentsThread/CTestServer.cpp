@@ -38,6 +38,7 @@ unsigned MonitorThread(void *arg)
             }
 
             printf(" ==================================\nTotal Sessions: %lld\n", server->GetSessionCount());
+            printf(" ==================================\nTotal Players: %lld\n", server->GetPlayerCount());
             printf(" Total iDisCounnectCount: %llu\n", server->iDisCounnectCount);
             printf(" IdxStack Size: %lld\n", server->Get_IdxStack());
             printf(" ReleaseSessions Size: %lld\n", server->GetReleaseSessions());
@@ -101,13 +102,17 @@ unsigned ContentsThread(void *arg)
 
             switch (type)
             {
+            //현재 미 사용중
             case en_PACKET_Player_Alloc:
-                server->InitalizePlayer(msg);
+                __debugbreak();
                 break;
-            
+
+            case en_PACKET_Player_Delete:
+                server->DeletePlayer(msg);
+                break;
+
             default:
                 server->PacketProc(l_sessionID, msg, header,type);
-                 
             }
 
             f = server->m_ContentsQ._frontPtr;
@@ -141,14 +146,10 @@ void CTestServer::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer
 }
 void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey)
 {
-
     clsSession &session = sessions_vec[SessionID >> 47];
     CPlayer *player;
 
-    // 옳바른 연결인지는 SessionKey에 의존.
-    {
-        //Logic
-    }
+    // 옳바른 연결인지는 Token에 의존.
 
     //여기로 까지 왔다는 것은 로그인 서버의 인증을 통해 온  옳바른 연결이다.
     // 릴리즈 되었거나, ID가 다르다면 false를 리턴
@@ -169,19 +170,26 @@ void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, 
         }
         
         session.m_State = en_State::Player;
-        if (player_hash.find(AccountNo) != player_hash.end())
+        if (SessionID_hash.find(AccountNo) != SessionID_hash.end())
         {
-            // char	SessionKey[64];		// 인증토큰
-            // 같은 AccountNo가 로그인 되어있다. 
-            // 누군가 자신이 아닌
+            //중복 로그인 이면 둘 다 끊기
             stTlsObjectPool<CMessage>::Release(msg);
             Disconnect(SessionID);
-            Disconnect(player_hash[AccountNo]->m_sessionID);
+            Disconnect(SessionID_hash[AccountNo]->m_sessionID);
             return;
         }
         //
         player = (CPlayer *)player_pool.Alloc();
-        player_hash[AccountNo] = player;
+        if (player == nullptr)
+        {
+            //Player가 가득 참.
+            //TODO : 이 경우에는 끊기보다는 유예를 둬야하나?
+            Disconnect(SessionID);
+            return;
+        }
+        m_TotalPlayers++; // Player 카운트 
+
+        SessionID_hash[AccountNo] = player;
         //Login응답.
         Proxy::LoginProcedure(SessionID, msg, AccountNo);
     }
@@ -189,43 +197,27 @@ void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, 
     SessionUnLock(SessionID);
 }
 
-void CTestServer::InitalizePlayer(CMessage *msg)
+void CTestServer::DeletePlayer(CMessage *msg)
 {
-    //Player생성 고민
-    {
-        // Hash의 key를 Account로 작성을 해야. 중복 로그인을 막을 수 있지않을까?
-        //
-        // 내가 만든 메세지임.
-        // 왜냐하면 이 메세지는 디코딩을 안하고 사용함.
-        // 원래 남이 내 메세지인척 들어온다면, 수신 버퍼에서는 무조건 꺼내고 디코딩하는 작업이 들어가는데.
-        // 이 메세지는 디코딩을 안하고 바로 ContentsQ에 넣어줌으로써 나만이 사용할 수 있음.
-    }
+    // TODO : 이 구현이 TestServer에 있는게 맞는가?
+    //Player를 다루는 모든 자료구조에서 해당 Player를 제거.
+
+    ull SessionID;
     CPlayer *player;
+    SessionID = msg->ownerID;
 
-    INT64 AccountNo;
-    *msg >> AccountNo;
+    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        __debugbreak();
+    player = SessionID_hash[SessionID];
+    SessionID_hash.erase(SessionID);
 
-    if (player_hash.find(AccountNo) == player_hash.end())
-    {
-        player = (CPlayer *)player_pool.Alloc();
-        player_hash[AccountNo] = player; // 생성
+    if (AccountNo_hash.find(player->m_AccountNo) == AccountNo_hash.end())
+        __debugbreak();
+    SessionID_hash.erase(player->m_AccountNo);
 
-        player_hash[AccountNo]->m_sessionID = msg->ownerID;
-        player_hash[AccountNo]->m_State = en_State::Session;
-        player_hash[AccountNo]->m_Timer = timeGetTime();
-    }
-    //만일 누군가 들어있다고 해도 이것을  Connect 단계에서 끊는 것은 잘못됨.
+    player_pool.Release(player);
+    m_TotalPlayers--;
 
-/* 핵심:
-
-    해당연결에 대한 끊음은 ?
-    연결 끊음을 session에 대해서 순회하자? 에반데.
-
-    겹칠 경우 Player자료형을 따로 하나 더 두자? 
-    아직 Player는 아니지만 , 연결을 끊기위한 
-        
-*/
-    
 }
 
 CTestServer::CTestServer(int iEncording)
@@ -236,8 +228,10 @@ CTestServer::CTestServer(int iEncording)
     m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
 
-    for (int i = 0; i < m_maxSessions; i++)
-        idle_stack.push(i);
+    //TODO : 한계치를 정하는 함수 구현하기. 아직 미완임.
+    player_pool.Initalize(m_maxPlayers);
+    player_pool.Limite_Lock(); // Pool이 늘어나지않음. 
+
 }
 
 CTestServer::~CTestServer()
@@ -334,7 +328,7 @@ bool CTestServer::OnAccept(ull SessionID)
     session.m_State = en_State::Session;
     session.m_AcceptTime = timeGetTime(); //이때 시간을 저장.
 
-    {
+    /*{
 
         LoginPacket = CreateLoginMessage();
         wsabuf.buf = LoginPacket;
@@ -366,15 +360,8 @@ bool CTestServer::OnAccept(ull SessionID)
         }
 
         return true;
-    }
-}
-
-bool CTestServer::GetId(short &idx)
-{
-    if (idle_stack.empty())
-        return false;
-    idx = idle_stack.top();
-    idle_stack.pop();
+    }*/
 
     return true;
 }
+

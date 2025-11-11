@@ -517,6 +517,27 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         if (bEnCording)
             msg->DeCoding();
         msg->_frontPtr = msg->_frontPtr + headerSize;
+        WORD type;
+        memcpy(&type, msg->_frontPtr, sizeof(WORD));
+        msg->iUseCnt = 1;
+
+        //중복 로그인 패킷
+        if (type == en_PACKET_CS_CHAT_REQ_LOGIN && session.m_State != en_State::Session)
+        {
+            stTlsObjectPool<CMessage>::Release(msg);
+            Disconnect(SeqID);
+
+            return;
+        }
+        else if (session.m_State != en_State::Player)
+        {
+            stTlsObjectPool<CMessage>::Release(msg);
+            Disconnect(SeqID);
+
+            return;
+
+        }
+
         {
             Profiler profile;
             profile.Start(L"OnRecv");

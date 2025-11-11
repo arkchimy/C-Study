@@ -16,7 +16,7 @@
 #include <conio.h>
 #include <thread>
 CDump dump;
-bool bDebug = true;
+bool bDebug = false;
 class st_WSAData2
 {
   public:
@@ -120,8 +120,8 @@ int main()
         {
             std::cout << " Connected  \n ================== DeBugMode : D ================== \n";
         }
-        char temp[1000];
-        recv(m_Socket, (char *)temp, 100, 0);
+        //char temp[1000];
+        //recv(m_Socket, (char *)temp, 100, 0);
         int recvRetval;
         int sendRetval;
 
@@ -189,7 +189,7 @@ int main()
                 clsRecvMessage.HexLog(CMessage::en_Tag::DECODE); // 받은 데이터를 디코딩한 것
                 clsSendMessage.HexLog();
                 system("pause");
-                Sleep(1000);
+                Sleep(100);
                 
             }
             else

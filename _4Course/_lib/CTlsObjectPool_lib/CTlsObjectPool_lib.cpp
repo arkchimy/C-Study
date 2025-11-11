@@ -129,7 +129,6 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
 template <>
 void stTlsObjectPool<CMessage>::Release(PVOID node)
 {
-    static ull Release = 0;
     stTlsObjectPool *pool;          // Tls에 존재하는 ObjectPool
     ObjectPoolType<CMessage> *swap; // PoolManager에서 주는 Pool과 swap 용도 변수
     CMessage *msg;
@@ -142,6 +141,8 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
     // UseCnt를 잘못 감소 시킨 경우 
     if (iUseCnt < 0)
         __debugbreak();
+    if (iUseCnt != 0)
+        return;
 
     if (s_tlsIdx == TLS_OUT_OF_INDEXES)
     {

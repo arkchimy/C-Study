@@ -94,6 +94,7 @@ class CLanServer : public Stub, public  Proxy
     virtual float OnRecv(ull SessionID, struct CMessage *msg) = 0;
 
     LONG64 GetSessionCount();
+    virtual LONG64 GetPlayerCount() { return 0; } // Contents에서 구현하기.
     LONG64 GetReleaseSessions();
     LONG64 Get_IdxStack();
 
