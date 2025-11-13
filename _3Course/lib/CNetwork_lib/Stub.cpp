@@ -16,7 +16,6 @@ void Stub::PacketProc(ull SessionID, CMessage *msg, stHeader &header,WORD type)
     bool bSucess;
     CTestServer *server = (CTestServer *)this;
     // DeCode된 데이터가 옴.
-
     switch (type)
     {
     case en_PACKET_CS_CHAT_REQ_LOGIN:

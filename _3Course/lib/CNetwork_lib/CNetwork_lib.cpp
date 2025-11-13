@@ -165,14 +165,7 @@ unsigned AcceptThread(void *arg)
 
         server->RecvPacket(session);
 
-        local_IoCount = InterlockedDecrement(&session.m_ioCount); // Accept시 1로 초기화 시킨 것 감소
-
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld %10s %05lld  %10s %012llu  %10s %4llu",
-                                       L"Accept_Decrement",
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", local_IoCount);
-        server->DecrementIoCountAndMaybeDeleteSession(session);
+        server->DecrementIoCountAndMaybeDeleteSession(session);       
     }
     return 0;
 }
@@ -1005,6 +998,7 @@ void CLanServer::ReleaseSession(ull SessionID)
                                    L"Closesocket",
                                    L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                    L"IO_Count", session.m_ioCount);
+    OnRelease(SessionID);
     session.Release();
     retval = closesocket(session.m_sock);
     DWORD LastError = GetLastError();
@@ -1019,5 +1013,6 @@ void CLanServer::ReleaseSession(ull SessionID)
     }
     m_SessionIdxStack.Push(SessionID >> 47);
     _interlockeddecrement64(&m_SessionCount);
+   
 }
 

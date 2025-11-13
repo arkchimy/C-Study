@@ -57,6 +57,8 @@ class CTestServer : public CLanServer
   
     virtual float OnRecv(ull SessionID, CMessage *msg) override;
     virtual bool OnAccept(ull SessionID) override;
+    virtual void OnRelease(ull SessionID) override;
+
     virtual LONG64 GetPlayerCount() { return m_TotalPlayers; }
 
     SRWLOCK srw_ContentQ;

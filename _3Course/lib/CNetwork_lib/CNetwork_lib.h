@@ -93,6 +93,7 @@ class CLanServer : public Stub, public  Proxy
 
     virtual bool OnAccept(ull SessionID) = 0;
     virtual float OnRecv(ull SessionID, struct CMessage *msg) = 0;
+    virtual void OnRelease(ull SessionID) = 0;
 
     LONG64 GetSessionCount();
     virtual LONG64 GetPlayerCount() { return 0; } // Contents에서 구현하기.
@@ -139,5 +140,5 @@ class CLanServer : public Stub, public  Proxy
     static CSystemLog *systemLog;
 
     LONG64 m_AllocMsgCount = 0;
-    int m_AllocLimitCnt = 1000;
+    int m_AllocLimitCnt = 10000;
 };
