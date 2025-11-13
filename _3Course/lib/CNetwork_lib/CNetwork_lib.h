@@ -133,7 +133,9 @@ class CLanServer : public Stub, public  Proxy
 
     HANDLE WorkerArg[2]{0}; // WorkerThread __beginthreadex 매개변수
     HANDLE AcceptArg[3]{0}; // AcceptThread __beginthreadex 매개변수
-
-    static CSystemLog *systemLog;
     
+    static CSystemLog *systemLog;
+
+    LONG64 m_AllocMsgCount = 0;
+    int m_AllocLimitCnt = 1000;
 };

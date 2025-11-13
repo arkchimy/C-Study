@@ -17,15 +17,6 @@ using ull = unsigned long long;
 #define SESSION_IDX_MASK 0xFFFF800000000000
 #define SESSION_SEQ_MASK 0x00007FFFFFFFFFFF
 
-enum class en_State
-{
-    Session,
-    Player,
-    DisConnect,
-    Max,
-};
-
-
 enum class Job_Type
 {
     Recv,
@@ -66,7 +57,6 @@ class clsSession
     void Release();
 
     SOCKET m_sock = 0;
-    en_State m_State = en_State::Max;
     DWORD m_AcceptTime = 0;
 
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);

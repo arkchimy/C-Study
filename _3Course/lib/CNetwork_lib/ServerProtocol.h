@@ -1,5 +1,5 @@
 #pragma once
-enum en_ServerPACKET_TYPE
+enum en_ServerPACKET_TYPE : unsigned short
 {
     //------------------------------------------------------------
     // 

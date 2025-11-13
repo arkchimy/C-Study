@@ -68,17 +68,6 @@ SRWLOCK srw_Log;
 
 unsigned AcceptThread(void *arg)
 {
-
-    /* arg 에 대해서
-     * arg[0] 에는 클라이언트에게 연결시킬 hIOCP의 HANDLE을 넣기.
-     * arg[1] 에는 listen_sock의 주소를 넣기
-     */
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is AcceptThread");
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is AcceptThread");
     SOCKET client_sock;
     SOCKADDR_IN addr;
 
@@ -87,7 +76,6 @@ unsigned AcceptThread(void *arg)
     SOCKET listen_sock = SOCKET(arrArg[1]);
 
     DWORD listen_retval;
-
     DWORD flag;
 
     ull session_id = 0;
@@ -99,7 +87,21 @@ unsigned AcceptThread(void *arg)
     int addrlen;
     stSessionId stsessionID;
     ull local_IoCount;
-    // wchar_t buffer[100];
+
+    LONG64 localAllocCnt;
+    /* arg 에 대해서
+     * arg[0] 에는 클라이언트에게 연결시킬 hIOCP의 HANDLE을 넣기.
+     * arg[1] 에는 listen_sock의 주소를 넣기
+     */
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                   L"%-20s ",
+                                   L"This is AcceptThread");
+    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+                                   L"%-20s ",
+                                   L"This is AcceptThread");
+ 
+
+
 
     addrlen = sizeof(addr);
     server = reinterpret_cast<CLanServer *>(arrArg[2]);
@@ -121,7 +123,8 @@ unsigned AcceptThread(void *arg)
             ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Error ");
             continue;
         }
-        server->arrTPS[0]++;
+        server->arrTPS[0]++; //Accept TPS 측정
+
         {
 
             if (server->m_SessionIdxStack.m_size == 0)
@@ -154,8 +157,44 @@ unsigned AcceptThread(void *arg)
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
 
         // InterlockedIncrement(&session->m_ioCount); // Login의 완료통지가 Recv전에 도착하면 IO_Count가 0이 되버리는 상황 방지.
+        {
+            localAllocCnt = _InterlockedIncrement64(&server->m_AllocMsgCount);
 
-        server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
+            // Alloc Message가 너무 쏟아진다면 큐잉을 안함.
+            if (localAllocCnt < server->m_AllocLimitCnt)
+            {
+           
+                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-10s %10s %4llu %10s %05lld  %10s %012llu  %10s %4llu %10s %05lld ",
+                                               L"AllocMsg_Refuse",
+                                               L"LocalMsgCnt", localAllocCnt,
+                                               L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx
+                                               );
+                //다시 감소 시키고,Session의 삭제 절차.
+                localAllocCnt = _InterlockedDecrement64(&server->m_AllocMsgCount);
+                local_IoCount = InterlockedDecrement(&session->m_ioCount); // Accept시 1로 초기화 시킨 것 감소
+                if (local_IoCount == 0)
+                {
+
+                    if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
+                    {
+                        continue;
+                    }
+                    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                                   L"AcceptRelease",
+                                                   L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                                   L"IO_Count", session->m_ioCount);
+
+                    ull seqID = session->m_SeqID.SeqNumberAndIdx;
+                    server->ReleaseSession(seqID);
+                }
+                continue;
+            }
+
+            server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
+        }
+
         server->RecvPacket(*session);
 
         local_IoCount = InterlockedDecrement(&session->m_ioCount); // Accept시 1로 초기화 시킨 것 감소
@@ -505,38 +544,19 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         useSize = session.m_recvBuffer.GetUseSize(f, r);
         if (useSize < header.sDataLen + headerSize)
         {
-            //Disconnect(session.m_SeqID.SeqNumberAndIdx);
+            // 데이터가 덜 옴.
             break;
         }
         // 메세지 생성
-
         CMessage *msg = CreateMessage(session, header);
+
         if (msg == nullptr)
             break;
-
         if (bEnCording)
             msg->DeCoding();
+
         msg->_frontPtr = msg->_frontPtr + headerSize;
-        WORD type;
-        memcpy(&type, msg->_frontPtr, sizeof(WORD));
-        msg->iUseCnt = 1;
-
-        //중복 로그인 패킷
-        if (type == en_PACKET_CS_CHAT_REQ_LOGIN && session.m_State != en_State::Session)
-        {
-            stTlsObjectPool<CMessage>::Release(msg);
-            Disconnect(SeqID);
-
-            return;
-        }
-        else if (session.m_State != en_State::Player)
-        {
-            stTlsObjectPool<CMessage>::Release(msg);
-            Disconnect(SeqID);
-
-            return;
-
-        }
+        // PayLoad를 읽고 무엇인가 처리하는 Logic이 NetWork에 들어가선 안된다.
 
         {
             Profiler profile;
@@ -544,6 +564,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
             qPersentage = OnRecv(SeqID, msg);
             profile.End(L"OnRecv");
         }
+
         if (qPersentage >= 75.0)
         {
             Disconnect(SeqID);
@@ -590,6 +611,7 @@ CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
         msg->HexLog();
         return nullptr;
     }
+    msg->iUseCnt = 1;
     return msg;
 }
 
