@@ -106,7 +106,7 @@ unsigned ContentsThread(void *arg)
             {
             //현재 미 사용중
             case en_PACKET_Player_Alloc:
-                __debugbreak();
+                server->AllocPlayer(msg);
                 break;
 
             case en_PACKET_Player_Delete:
@@ -244,9 +244,7 @@ void CTestServer::AllocPlayer(CMessage *msg)
 
     CPlayer *player;
     ull SessionID;
-    ull AccountNo;
-
-    *msg >> AccountNo;
+    
     SessionID = msg->ownerID;
 
     SessionLock(SessionID);
@@ -260,13 +258,13 @@ void CTestServer::AllocPlayer(CMessage *msg)
         return;
     }
     //이때 할당. 
-    SessionID_hash[SessionID] = player;
-    // AccountNo 는 Login을 통해야만 알 수있음.
-    // AccountNo_hash[AccountNo] = player;
+    prePlayer_hash[SessionID] = player;
+    // prePlayer_hash 는 Login을 기다리는 Session임.
+    // LoginPacket을 받았다면 ;
 
     m_prePlayerCount++;
-
     SessionUnLock(SessionID);
+    InterlockedDecrement64(&m_AllocMsgCount);
 }
 
 void CTestServer::DeletePlayer(CMessage *msg)
@@ -359,28 +357,40 @@ float CTestServer::OnRecv(ull sessionID, CMessage *msg)
 
 bool CTestServer::OnAccept(ull SessionID)
 {
-    // ContentsQ 에 PlayerAlloc 삽입 안하는 방향으로 가보는 중
+    // Accept의 요청이 밀리고 있다고한다면, 그 이후에 Accept로 들어오는 Session을 끊겠다.
+    // m_AllocMsgCount 처리량을 보여주는 변수.
+
+    float qPersentage;
+    LONG64 localAllocCnt;
+    LONG64 local_IoCount;
+    clsSession &session = sessions_vec[SessionID >> 47];
+
+    localAllocCnt = _InterlockedIncrement64(&m_AllocMsgCount);
+
+    // Alloc Message가 너무 쏟아진다면 인큐를 안함.
+    if (localAllocCnt < m_AllocLimitCnt)
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"%-10s %10s %4llu %10s %05lld  %10s %012llu  %10s %4llu %10s %05lld ",
+                                       L"AllocMsg_Refuse",
+                                       L"LocalMsgCnt", localAllocCnt,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
+        
+        // 다시 감소 시키고, Session의 삭제 절차.
+        localAllocCnt = _InterlockedDecrement64(&m_AllocMsgCount);
+        // false를 반환하여 WSARecv를 걸지않고, Session에 대한 제거를 유도루틴을 타자.
+        return false;
+    }
+
     {
         CMessage *msg;
         
         msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
         
         *msg << (unsigned short)en_PACKET_Player_Alloc;
-        *msg << SessionID;
+        msg->ownerID = SessionID;
 
-        {
-            stSRWLock lock(&srw_ContentQ);
-
-            CMessage **ppMsg;
-            ppMsg = &msg;
-            (*ppMsg)->ownerID = SessionID;
-
-            if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
-                __debugbreak();
-
-            SetEvent(m_ContentsEvent);
-        }
-       
+        OnRecv(SessionID, msg);
     }
 
    

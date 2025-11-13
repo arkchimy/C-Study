@@ -138,89 +138,41 @@ unsigned AcceptThread(void *arg)
             server->m_SessionIdxStack.Pop(idx);
         }
 
-        session = &server->sessions_vec[idx];
+        clsSession& session = server->sessions_vec[idx];
         stsessionID.idx = idx;
         stsessionID.seqNumber = session_id++;
 
-        InterlockedExchange(&session->m_sock, client_sock);
-        InterlockedExchange(&session->m_blive, 1);
-        InterlockedExchange(&session->m_flag, 0);
-        InterlockedExchange(&session->m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
-        InterlockedExchange(&session->m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+        InterlockedExchange(&session.m_sock, client_sock);
+        InterlockedExchange(&session.m_blive, 1);
+        InterlockedExchange(&session.m_flag, 0);
+        InterlockedExchange(&session.m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
+        InterlockedExchange(&session.m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
 
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
-                                       L"Accept", L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx);
+                                       L"Accept", L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
 
         _interlockedincrement64(&server->m_SessionCount);
-        CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)session, 0);
+        CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)&session, 0);
 
-        // InterlockedIncrement(&session->m_ioCount); // Login의 완료통지가 Recv전에 도착하면 IO_Count가 0이 되버리는 상황 방지.
+        // AllocMsg의 처리가 너무 많이 발생한다면 False를 반환.
+        if (server->OnAccept(session.m_SeqID.SeqNumberAndIdx) == false)
         {
-            localAllocCnt = _InterlockedIncrement64(&server->m_AllocMsgCount);
-
-            // Alloc Message가 너무 쏟아진다면 큐잉을 안함.
-            if (localAllocCnt < server->m_AllocLimitCnt)
-            {
-           
-                CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                               L"%-10s %10s %4llu %10s %05lld  %10s %012llu  %10s %4llu %10s %05lld ",
-                                               L"AllocMsg_Refuse",
-                                               L"LocalMsgCnt", localAllocCnt,
-                                               L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx
-                                               );
-                //다시 감소 시키고,Session의 삭제 절차.
-                localAllocCnt = _InterlockedDecrement64(&server->m_AllocMsgCount);
-                local_IoCount = InterlockedDecrement(&session->m_ioCount); // Accept시 1로 초기화 시킨 것 감소
-                if (local_IoCount == 0)
-                {
-
-                    if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
-                    {
-                        continue;
-                    }
-                    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                                   L"AcceptRelease",
-                                                   L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                                   L"IO_Count", session->m_ioCount);
-
-                    ull seqID = session->m_SeqID.SeqNumberAndIdx;
-                    server->ReleaseSession(seqID);
-                }
-                continue;
-            }
-
-            server->OnAccept(session->m_SeqID.SeqNumberAndIdx);
+            server->DecrementIoCountAndMaybeDeleteSession(session);
+            continue;
         }
 
-        server->RecvPacket(*session);
+        server->RecvPacket(session);
 
-        local_IoCount = InterlockedDecrement(&session->m_ioCount); // Accept시 1로 초기화 시킨 것 감소
+        local_IoCount = InterlockedDecrement(&session.m_ioCount); // Accept시 1로 초기화 시킨 것 감소
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld %10s %05lld  %10s %012llu  %10s %4llu",
                                        L"Accept_Decrement",
-                                       L"HANDLE : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", local_IoCount);
-
-        if (local_IoCount == 0)
-        {
-
-            if (InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0) != 0)
-            {
-                continue;
-            }
-            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                           L"AcceptRelease",
-                                           L"1<<47 : ", session->m_sock, L"seqID :", session->m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session->m_SeqID.idx,
-                                           L"IO_Count", session->m_ioCount);
-
-            ull seqID = session->m_SeqID.SeqNumberAndIdx;
-            server->ReleaseSession(seqID);
-        }
+        server->DecrementIoCountAndMaybeDeleteSession(session);
     }
     return 0;
 }
@@ -253,7 +205,7 @@ unsigned WorkerThread(void *arg)
     DWORD transferred;
     ull key;
     OVERLAPPED *overlapped;
-    clsSession *session;
+    clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
 
     ull local_IoCount;
     Profiler profile;
@@ -581,6 +533,21 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     }
 
     RecvPacket(session);
+}
+
+void CLanServer::DecrementIoCountAndMaybeDeleteSession(clsSession &session)
+{
+    LONG64 local_IoCount;
+
+    local_IoCount = InterlockedDecrement(&session.m_ioCount);
+    if (local_IoCount == 0)
+    {
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) != 0)
+            return;
+        
+        ReleaseSession(session.m_SeqID.SeqNumberAndIdx);
+    }
 }
 
 CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
@@ -943,6 +910,7 @@ int CLanServer::getSendMessageTPS()
 {
     return 0;
 }
+
 
 void CLanServer::WSASendError(const DWORD LastError, const ull SessionID)
 {

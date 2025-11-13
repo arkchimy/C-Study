@@ -73,6 +73,7 @@ class CLanServer : public Stub, public  Proxy
     bool Disconnect(const ull SessionID);
     void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
 
+    void DecrementIoCountAndMaybeDeleteSession(clsSession &session);
     CMessage *CreateMessage(class clsSession &session, class stHeader &header);
     // CMessage *CreateLoginMessage();
     char *CreateLoginMessage();
@@ -101,6 +102,7 @@ class CLanServer : public Stub, public  Proxy
     int getAcceptTPS();
     int getRecvMessageTPS();
     int getSendMessageTPS();
+
 
     void WSASendError(const DWORD LastError, const ull SessionID);
     void WSARecvError(const DWORD LastError, const ull SessionID);
