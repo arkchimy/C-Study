@@ -1,0 +1,686 @@
+﻿#include <iostream>
+#include <strsafe.h>
+
+#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
+#include <vector>
+
+
+wchar_t CommonPath[FILENAME_MAX];
+
+#define BufferMax 500
+#define PackStartFormat L"\n\t const static BYTE %s \t=\t %s ;"
+
+#define CMessageDefaultFormat L"\tconst BYTE %s \t= \t (%s + %d) ;" // 1 씩증가
+#define CMessageCustomFormat L"\tconst BYTE %s \t= \t  %s      ;"   // 직접 정의
+
+#define InitCommonFORMAT L"#include <Windows.h>\n#ifndef CONSTANTS_H \n #define CONSTANTS_H \n"
+#define CommonFORMAT L"\t %s \n"
+#define CLOSECommonFORMAT L"#endif // CONSTANTS_H \n"
+//======================================================================
+// Proxy
+#define InitProxyFORMAT                                                                      \
+    L"#pragma once\n#include <windows.h> \n#include \"structs.h\"\n#include \"Common.h\" \n" \
+    L"class Proxy \n{\n public : \n"
+#define CloseProxyFORMAT L"};\n "
+#define ProxyFORMAT L"\t void %s; \n"
+
+#define ProxyCPPINIT_FORMAT \
+    L"#include \"Proxy.h\" \n#include \"CPacket.h\" \n#include \"Network.h\"\n "
+#define ProxyCPPStart_FORMAT \
+    L"void Proxy::%s \n \
+{ \n \
+\t stHeader header; \n \
+\t header.byType =  %s;\n \
+\t header.byCode = 0x89; \n \
+\t CPacket cPacket;\n \
+\t cPacket.PutData( (char*)&header,sizeof(stHeader)); \n\
+"
+#define ProxyCPPArg_FORMAT L" << %s"
+#define ProxyCPPClose_FORMAT \
+    L"\t *(cPacket.GetBufferPtr() + 1) = cPacket.GetDataSize() - sizeof(stHeader);\n \
+\t NetWork::SendPacket(clpSection , &cPacket , bBroadCast );\n};\n\n"
+// Proxy 끝
+//======================================================================
+
+//===================================================================
+// Stub 시작
+std::vector<wchar_t *> gDefineVec;
+
+std::vector<wchar_t *> gCommonVec; // Common.h 에 들어가야할 것들.
+std::vector<wchar_t *>
+    gRPCvec; // Proxy나 stub의 구분 없이. 함수명이 들어가있는 곳
+// 함수 선언부를 통해 매개변수들을 사용해야 함.
+std::vector<wchar_t *> packStartnum; // 임시 변수 저장
+
+bool LoadFile(wchar_t **buffer);
+wchar_t *WordSplit(wchar_t *left, wchar_t *right, wchar_t *limit,
+                   wchar_t **temp);
+
+wchar_t *GlobalPacketSplit(wchar_t *left, wchar_t *right, wchar_t *limit,
+                           wchar_t **temp);
+wchar_t *FuncMaker(wchar_t *left, wchar_t *right, wchar_t *limit,
+                   wchar_t **temp);
+
+void MakeCommon();
+void MakeProxy();
+void MakeStub();
+
+int main()
+{
+    wchar_t *buffer;
+    if (LoadFile(&buffer) == false)
+    {
+        wprintf_s(L"LoadFile Failed \n");
+    }
+    wchar_t *limit = buffer + wcslen(buffer) + 1;
+
+    wchar_t *left = buffer, *right = buffer;
+    wchar_t *temp;
+
+    while (left <= limit)
+    {
+        left = WordSplit(left, right, limit, &temp);
+        right = left;
+        wprintf_s(L"%s\n", temp);
+    }
+    MakeCommon();
+    MakeProxy();
+    MakeStub();
+}
+
+bool LoadFile(wchar_t **buffer)
+{
+    FILE *file;
+
+    fopen_s(&file, "IDL.bin", "r,ccs = UTF-16LE");
+    if (file == nullptr)
+        return false;
+
+    fseek(file, 0, SEEK_END);
+    int len = ftell(file);
+
+    fseek(file, 0, SEEK_SET);
+    *buffer = (wchar_t *)malloc(len);
+    if (*buffer == nullptr)
+        return false;
+
+    fread_s(*buffer, len, 1, len, file);
+
+    fclose(file);
+
+    return true;
+}
+
+wchar_t *WordSplit(
+    wchar_t *left, wchar_t *right, wchar_t *limit,
+    wchar_t **temp) // 동적할당을 안에서 해주는 함수 사용이 끝나면 Free해야함.
+{
+    static bool bChk = false; // { 의 체크
+    static bool bEquleChk = false;
+    static int cnt = 0;
+
+    while (1)
+    {
+        if (*right == L'{')
+        {
+            bChk = true;
+        }
+        else if (*right == L'}')
+        {
+            bChk = false;
+            packStartnum.pop_back();
+        }
+        else if (*right == L'=')
+        {
+            bEquleChk = true;
+        }
+        else if (*right == L'/')
+        {
+            left = right;
+            while (*right != L'\n')
+            {
+                right++;
+            }
+            *temp = (wchar_t *)malloc(2);
+            if (*temp == nullptr)
+                __debugbreak();
+            (*temp)[0] = L'\0';
+            return right;
+        }
+        else if (*right == L'#')
+        {
+            left = right;
+            while (1)
+            {
+                if (limit <= right)
+                    break;
+                if (*right == L'\n')
+                    break;
+                right++;
+            }
+            *temp = (wchar_t *)malloc((right - left) * sizeof(wchar_t) + 2);
+            if (*temp == nullptr)
+                __debugbreak();
+            memcpy_s(*temp, (right - left) * sizeof(wchar_t), left,
+                     (right - left) * sizeof(wchar_t));
+            (*temp)[right - left] = L'\0';
+            gDefineVec.push_back(*temp);
+            return right;
+        }
+        // 문자의 시작점에 left 놓기.
+        if ((L'A' <= *right && *right <= L'Z') ||
+            (L'a' <= *right && *right <= L'z') ||
+            (L'0' <= *right && *right <= L'9') || *right == L'=')
+
+        {
+            left = right;
+            break;
+        }
+        right++;
+    }
+    // 문자의 끝점에 right 놓기.
+    while (1)
+    {
+        if (right >= limit)
+            break;
+
+        if (*right == L' ' || *right == L'\t' || *right == L'\n')
+        {
+            *temp = (wchar_t *)malloc((right - left) * sizeof(wchar_t) + 2);
+            if (*temp == nullptr)
+                __debugbreak();
+            memcpy_s(*temp, (right - left) * sizeof(wchar_t) + 2, left,
+                     (right - left) * sizeof(wchar_t));
+            (*temp)[right - left] = L'\0';
+
+            break;
+        }
+        right++;
+    }
+    if (bChk == true)
+    {
+        if (packStartnum.size() == 0)
+            __debugbreak();
+        wchar_t *equltChk = right;
+        wchar_t buffer[BufferMax] = {
+            0,
+        };
+
+        while (1)
+        {
+            if (*equltChk == L'\n')
+            {
+                StringCchPrintfW(buffer, BufferMax, CMessageDefaultFormat,
+                                 *temp, packStartnum[0], cnt++);
+                break;
+            }
+            else if (*equltChk == L'=')
+            {
+                wchar_t *val;
+                left = equltChk + 1;
+                right = left;
+
+                while (1)
+                {
+                    if (*right == L'\n')
+                    {
+                        val = (wchar_t *)malloc((right - left + 1) *
+                                                sizeof(wchar_t));
+                        if (val == nullptr)
+                            __debugbreak();
+                        memcpy(val, left, (right - left) * sizeof(wchar_t));
+                        val[right - left] = L'\0';
+                        break;
+                    }
+                    right++;
+                }
+                StringCchPrintfW(buffer, BufferMax, CMessageCustomFormat, *temp,
+                                 val);
+                packStartnum.pop_back();
+                packStartnum.push_back(val);
+                cnt = 0;
+                break;
+            }
+            equltChk++;
+        }
+
+        free(*temp);
+        *temp = (wchar_t *)malloc((wcslen(buffer) + 1) * sizeof(wchar_t));
+        if (*temp == nullptr)
+            __debugbreak();
+        memcpy(*temp, buffer, sizeof(wchar_t) * wcslen(buffer) + 2);
+        gCommonVec.push_back(*temp);
+    }
+    // 뜯어낸 단어가 global 일때 Common.h에 작성되야하는 목록 초기화
+    else if (wcscmp(L"global", *temp) == 0)
+    {
+        left = GlobalPacketSplit(left, right, limit, temp);
+        right = left;
+    }
+    // 뜯어낸 단어가 void일때  gRPCvec에 작성 되어야하는 목록
+    else if (wcscmp(L"void", *temp) == 0)
+    {
+        left = FuncMaker(left, right, limit, temp);
+        right = left;
+    }
+    return right;
+}
+
+wchar_t *GlobalPacketSplit(wchar_t *left, wchar_t *right, wchar_t *limit,
+                           wchar_t **temp)
+{
+    free(*temp);
+
+    wchar_t buffer[BufferMax];
+
+    wchar_t *key;
+    wchar_t *equle;
+    wchar_t *val;
+
+    left = WordSplit(left, right, limit, &key);
+    right = left;
+    packStartnum.emplace_back(key);
+
+    left = WordSplit(left, right, limit, &equle);
+    right = left;
+
+    left = WordSplit(left, right, limit, &val);
+    right = left;
+
+    StringCchPrintfW(buffer, BufferMax, PackStartFormat, key, val);
+
+    *temp = (wchar_t *)malloc(sizeof(wchar_t) * (wcslen(buffer) + 1));
+    memcpy(*temp, buffer, sizeof(wchar_t) * (wcslen(buffer) + 1));
+    free(equle);
+    free(val);
+
+    gCommonVec.push_back(*temp);
+
+    return right;
+}
+
+wchar_t *FuncMaker(wchar_t *left, wchar_t *right, wchar_t *limit,
+                   wchar_t **temp)
+{
+    left = right;
+    // 세미콜론
+    while (1)
+    {
+        if (*right == L';')
+        {
+            break;
+        }
+        right++;
+    }
+    *temp = (wchar_t *)malloc((right - left + 1) * sizeof(wchar_t));
+    if (*temp == nullptr)
+        __debugbreak();
+    memcpy(*temp, left, (right - left) * sizeof(wchar_t));
+    (*temp)[right - left] = L'\0';
+
+    // void Fname (int a, int b , int c); 가 저장 됨.
+    gRPCvec.push_back(*temp);
+
+    return right;
+}
+
+void MakeCommon()
+{
+    {
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
+        parser.GetValue(L"CommonPath", CommonPath, sizeof(CommonPath));
+
+    }
+    FILE *file;
+    wchar_t route[FILENAME_MAX];
+
+    StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Common.h");
+    _wfopen_s(&file, CommonPath, L"w ,ccs = UTF-16LE");
+    if (file == nullptr)
+        __debugbreak();
+
+    wchar_t buffer[BufferMax];
+
+    fwrite(InitCommonFORMAT, 2, wcslen(InitCommonFORMAT), file);
+
+    for (wchar_t *data : gDefineVec)
+    {
+        StringCchPrintfW(buffer, BufferMax, CommonFORMAT, data);
+        fwrite(buffer, 2, wcslen(buffer), file);
+    }
+
+    for (wchar_t *data : gCommonVec)
+    {
+        StringCchPrintfW(buffer, BufferMax, CommonFORMAT, data);
+        fwrite(buffer, 2, wcslen(buffer), file);
+    }
+    fwrite(CLOSECommonFORMAT, 2, wcslen(CLOSECommonFORMAT), file);
+    fclose(file);
+}
+
+void MakeProxy()
+{
+    FILE *file;
+    wchar_t route[FILENAME_MAX];
+
+    // Proxy.h
+    {
+        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Proxy.h");
+        _wfopen_s(&file, CommonPath, L"w, ccs = UTF-16LE");
+        if (file == nullptr)
+            __debugbreak();
+        wchar_t buffer[BufferMax];
+        fwrite(InitProxyFORMAT, 2, wcslen(InitProxyFORMAT), file);
+
+        for (wchar_t *data : gRPCvec)
+        {
+            StringCchPrintfW(buffer, BufferMax, ProxyFORMAT, data);
+            fwrite(buffer, 2, wcslen(buffer), file);
+        }
+
+        fwrite(CloseProxyFORMAT, 2, wcslen(CloseProxyFORMAT), file);
+
+        fclose(file);
+    }
+
+    // Proxy.cpp
+    {
+
+        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Proxy.cpp");
+        _wfopen_s(&file, route, L"w, ccs = UTF-16LE");
+        if (file == nullptr)
+            __debugbreak();
+
+        wchar_t buffer[BufferMax];
+
+        fwrite(ProxyCPPINIT_FORMAT, 2, wcslen(ProxyCPPINIT_FORMAT), file);
+        for (wchar_t *data : gRPCvec)
+        {
+            size_t rmData = wcslen(data);
+            memcpy(buffer, data, wcslen(data) * sizeof(wchar_t));
+            buffer[rmData] = L'\0';
+
+            size_t oriLen = wcslen(data);
+            size_t currentIdx = 0;
+
+            std::vector<wchar_t *> words;
+            words.clear();
+
+            size_t i = 0;
+            while (1)
+            {
+
+                if (buffer[i] == L'=')
+                {
+                    while (1)
+                    {
+                        if (buffer[i] == L',' || buffer[i] == L')')
+                            break;
+                        i++;
+                    }
+                    buffer[currentIdx++] = L' ';
+                }
+                buffer[currentIdx++] = buffer[i++];
+                if (i >= oriLen)
+                    break;
+            }
+            buffer[currentIdx++] = L'\0';
+            wchar_t *left = buffer, *right = buffer;
+            wchar_t *limit = buffer + wcslen(buffer);
+
+            bool bChk = false;
+            size_t cnt = 0;
+            while (1)
+            {
+
+                if (right >= limit)
+                    break;
+
+                while (bChk == false)
+                {
+                    if (*left == L'(')
+                    {
+                        bChk = true;
+                        left++;
+                        right = left;
+                        break;
+                    }
+                    left++;
+                }
+                wchar_t *temp;
+                left = WordSplit(left, right, limit, &temp);
+                right = left;
+                if (*temp == L',')
+                    continue;
+                cnt++;
+                if (cnt % 2 == 0)
+                    words.push_back(temp);
+            }
+            wchar_t buffer2[BufferMax];
+
+            StringCchPrintfW(buffer2, BufferMax, ProxyCPPStart_FORMAT, buffer,
+                             L"byType");
+            fwrite(buffer2, 2, wcslen(buffer2), file);
+
+            fwrite(L"\t cPacket ", 2, wcslen(L"\t cPacket "), file);
+            for (std::vector<wchar_t *>::iterator iter = words.begin() + 1;
+                 iter != words.end() - 2; iter++)
+            {
+                StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT, *iter);
+                fwrite(buffer, 2, wcslen(buffer), file);
+            }
+            fwrite(L";\n", 2, wcslen(L";\n"), file);
+            fwrite(ProxyCPPClose_FORMAT, 2, wcslen(ProxyCPPClose_FORMAT), file);
+        }
+
+        fclose(file);
+    }
+}
+
+#define STUB_H_STARTFORMAT \
+    L"#pragma once\n\
+#include \"Common.h\"\n\
+#include \"CPacket.h\"\n\n#include \"structs.h\"\n\
+class Stub\n { \n public:\n\
+"
+#define STUB_H_DEF_FORMAT L"\t virtual void %s {}\n"
+#define STUB_H_CLOSEFORMAT                                             \
+    L"\t bool PacketProc(Section *clpSection, CPacket &cPacket, BYTE " \
+    L"byType); \n};\n"
+
+#define STUB_CPP_STARTFORMAT                                              \
+    L"#include <windows.h> \n#include \"Stub.h\"  \n"                     \
+    L"bool Stub::PacketProc(Section *clpSection, CPacket &cPacket, BYTE " \
+    L"byType)\n { \n\tswitch(byType)\n \t{\n"
+//  int a ;
+#define STUB_CPP_OPEN_FORMAT L"\tcase %s :\n \t{ \n"
+#define STUB_CPP_DEF_FORMAT L"\t\t %s %s ;\n"
+#define STUB_CPP_DEF_FORMAT2 L" >> %s"
+#define STUB_CPP_FUNCTION_FORMAT L"\t\t%s"
+#define STUB_CPP_DEFCLOSE_FORMAT L"\t return true; \n \t}\n"
+#define STUB_CPP_CLOSE_FORMAT L"\n \t}\n return false;\n }\n"
+void MakeStub()
+{
+    FILE *file;
+
+    // Stub.h
+    {
+        wchar_t route[FILENAME_MAX];
+
+        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Stub.h");
+        _wfopen_s(&file, CommonPath, L"w, ccs = UTF-16LE");
+        //StringCchPrintfA(route, BufferMax, CommonPath, "Stub.h");
+        //fopen_s(&file, route, "w, ccs = UTF-16LE");
+        if (file == nullptr)
+            __debugbreak();
+
+        wchar_t buffer[BufferMax];
+        fwrite(STUB_H_STARTFORMAT, 2, wcslen(STUB_H_STARTFORMAT), file);
+
+        for (wchar_t *data : gRPCvec)
+        {
+            StringCchPrintfW(buffer, BufferMax, STUB_H_DEF_FORMAT, data);
+            fwrite(buffer, 2, wcslen(buffer), file);
+        }
+        fwrite(STUB_H_CLOSEFORMAT, 2, wcslen(STUB_H_CLOSEFORMAT), file);
+        fclose(file);
+    }
+    // Stub.cpp
+    {
+        wchar_t route[FILENAME_MAX];
+
+        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Stub.cpp");
+        _wfopen_s(&file, CommonPath, L"w, ccs = UTF-16LE");
+
+        if (file == nullptr)
+            __debugbreak();
+        wchar_t buffer[BufferMax];
+
+        fwrite(STUB_CPP_STARTFORMAT, 2, wcslen(STUB_CPP_STARTFORMAT), file);
+
+        for (wchar_t *data : gRPCvec)
+        {
+            size_t rmData = wcslen(data);
+            memcpy(buffer, data, wcslen(data) * sizeof(wchar_t));
+            buffer[rmData] = L'\0';
+
+            size_t oriLen = wcslen(data);
+            size_t currentIdx = 0;
+
+            std::vector<wchar_t *> types;
+            std::vector<wchar_t *> words;
+            words.clear();
+            types.clear();
+            std::vector<wchar_t *> wordvals;
+            size_t i = 0;
+
+            wchar_t *left = buffer, *right = buffer;
+            wchar_t *limit = buffer + wcslen(buffer);
+
+            while (1)
+            {
+
+                if (buffer[i] == L'=')
+                {
+                    i++;
+                    wchar_t *temp;
+                    WordSplit(buffer + i, buffer + i, limit, &temp);
+                    wordvals.push_back(temp);
+
+                    break;
+                }
+                i++;
+            }
+            i = 0;
+            while (1)
+            {
+
+                if (buffer[i] == L'=')
+                {
+                    while (1)
+                    {
+                        if (buffer[i] == L',' || buffer[i] == L')')
+                            break;
+                        i++;
+                    }
+                    buffer[currentIdx++] = L' ';
+                }
+                buffer[currentIdx++] = buffer[i++];
+                if (i >= oriLen)
+                    break;
+            }
+            buffer[currentIdx++] = L'\0';
+            limit = buffer + wcslen(buffer);
+            bool bChk = false;
+            size_t cnt = 0;
+            while (1)
+            {
+
+                if (right >= limit)
+                    break;
+
+                while (bChk == false)
+                {
+                    if (*left == L'(')
+                    {
+                        bChk = true;
+                        left++;
+                        right = left;
+                        break;
+                    }
+                    left++;
+                }
+                wchar_t *temp;
+                left = WordSplit(left, right, limit, &temp);
+                right = left;
+                if (*temp == L',')
+                    continue;
+                cnt++;
+                if (cnt % 2 == 1)
+                    types.push_back(temp);
+                if (cnt % 2 == 0)
+                    words.push_back(temp);
+            }
+            wchar_t buffer2[BufferMax];
+
+            StringCchPrintfW(buffer2, BufferMax, STUB_CPP_OPEN_FORMAT,
+                             wordvals[0]);
+            fwrite(buffer2, 2, wcslen(buffer2), file);
+
+            {
+                int cnt = types.size() < words.size() - 2 ? types.size() : words.size() - 2;
+                for (int i = 1; i < cnt; i++)
+                {
+                    StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_FORMAT,
+                                     types[i], words[i]);
+                    fwrite(buffer2, 2, wcslen(buffer2), file);
+                }
+            }
+            fwrite(L"\t\t cPacket", 2, wcslen(L"\t\t cPacket"), file);
+
+            for (std::vector<wchar_t *>::iterator iter = words.begin() + 1;
+                 iter != words.end() - 2; iter++)
+            {
+                StringCchPrintfW(buffer, BufferMax, STUB_CPP_DEF_FORMAT2,
+                                 *iter);
+                fwrite(buffer, 2, wcslen(buffer), file);
+            }
+            fwrite(L";\n", 2, wcslen(L";\n"), file);
+
+            right = data;
+            while (1)
+            {
+                if (*right == L'(')
+                {
+                    right++;
+                    break;
+                }
+                right++;
+            }
+            memcpy(buffer, data, sizeof(wchar_t) * (right - data));
+            buffer[right - data] = L'\0';
+
+            StringCchPrintfW(buffer2, BufferMax, STUB_CPP_FUNCTION_FORMAT, buffer);
+            fwrite(buffer2, 2, wcslen(buffer2), file);
+
+            for (int i = 0; i < words.size() - 2; i++)
+            {
+                if (i == words.size() - 3)
+                {
+                    StringCchPrintfW(buffer, BufferMax, L"%s );\n", words[i]);
+                    fwrite(buffer, 2, wcslen(buffer), file);
+                }
+                else
+                {
+                    StringCchPrintfW(buffer, BufferMax, L"%s ,", words[i]);
+                    fwrite(buffer, 2, wcslen(buffer), file);
+                }
+            }
+            fwrite(STUB_CPP_DEFCLOSE_FORMAT, 2,
+                   wcslen(STUB_CPP_DEFCLOSE_FORMAT), file);
+        }
+        fwrite(STUB_CPP_CLOSE_FORMAT, 2, wcslen(STUB_CPP_CLOSE_FORMAT), file);
+        fclose(file);
+    }
+}

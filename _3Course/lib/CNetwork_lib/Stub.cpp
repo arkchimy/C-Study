@@ -18,6 +18,7 @@ void Stub::PacketProc(ull SessionID, CMessage *msg, stHeader &header,WORD type)
     // DeCode된 데이터가 옴.
     switch (type)
     {
+     
     case en_PACKET_CS_CHAT_REQ_LOGIN:
         INT64 AccontNo;
         WCHAR ID[20];
@@ -32,6 +33,7 @@ void Stub::PacketProc(ull SessionID, CMessage *msg, stHeader &header,WORD type)
       
         server->LoginProcedure(SessionID,msg, AccontNo, ID, Nickname, SessionKey);
         break;
+
     case en_PACKET_CS_CHAT_REQ_ECHO:
         //
         //    {
