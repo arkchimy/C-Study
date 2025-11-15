@@ -10,8 +10,8 @@ class Proxy
   public:
     enum En_SendPackType : BYTE
     {
-        BroadCast = 0,
-        UnitCast = 1,
+        UnitCast = 0,
+        BroadCast = 1,
         SectorAround = 2,
 
     };

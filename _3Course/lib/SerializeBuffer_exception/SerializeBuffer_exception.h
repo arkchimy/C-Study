@@ -10,6 +10,7 @@
 #include <concepts>
 #include <type_traits>
 #include "../CNetwork_lib/stHeader.h"
+#include <string>
 
 using SerializeBufferSize = DWORD;
 
@@ -71,7 +72,7 @@ struct CMessage
     {
         if (_end < _rearPtr + sizeof(data))
         {
-            if (_size == en_BufferSize::bufferSize)
+            if (_size == en_BufferSize::bufferSize && _end < _rearPtr + sizeof(data) < en_BufferSize::MaxSize)
             {
                 ReSize();
                 HexLog(en_Tag::_ERROR);
@@ -88,11 +89,33 @@ struct CMessage
 
         return *this;
     }
+    // std::string
+    CMessage &operator << (char* const str)
+    {
+        size_t len = strlen(str);
+        if (_end < _rearPtr + len)
+        {
+            if (_size == en_BufferSize::bufferSize && _end < _rearPtr + len < en_BufferSize::MaxSize)
+            {
+                ReSize();
+                HexLog(en_Tag::_ERROR);
+            }
+            else
+            {
+                HexLog(en_Tag::_ERROR);
+                throw MessageException(MessageException::NotEnoughSpace, "Buffer is fulled\n");
+            }
+        }
+        memcpy(_rearPtr, str, len);
+        _rearPtr = _rearPtr + len;
 
+        return *this;
+    }
     template <Fundamental T>
     CMessage &operator>>(T &data)
     {
-        if (_frontPtr > _rearPtr)
+        size_t len = sizeof(T);
+        if (_frontPtr + len > _rearPtr)
         {
             HexLog(en_Tag::_ERROR);
             throw MessageException(MessageException::HasNotData, "false Packet \n");
@@ -102,7 +125,22 @@ struct CMessage
         _frontPtr = _frontPtr + sizeof(data);
         return *this;
     }
+    CMessage& operator >> (char* const str)
+    {
+        //뒤에 모든 데이터를 한번에 긁자.
+        if (str == nullptr)
+            return;
+        size_t len = _rearPtr - _frontPtr;
+        if (_frontPtr > _rearPtr)
+        {
+            HexLog(en_Tag::_ERROR);
+            throw MessageException(MessageException::HasNotData, "false Packet \n");
+        }
 
+        memcpy(str, _frontPtr, len);
+        _frontPtr = _frontPtr + len;
+        return *this;
+    }
     void EnCoding();
     bool DeCoding();
 

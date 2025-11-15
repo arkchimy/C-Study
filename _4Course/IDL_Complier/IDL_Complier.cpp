@@ -5,9 +5,9 @@
 #include <vector>
 
 
-wchar_t CommonPath[FILENAME_MAX];
+wchar_t TargetPath[FILENAME_MAX];
 
-#define BufferMax 500
+#define BufferMax 700
 #define PackStartFormat L"\n\t const static BYTE %s \t=\t %s ;"
 
 #define CMessageDefaultFormat L"\tconst BYTE %s \t= \t (%s + %d) ;" // 1 씩증가
@@ -19,26 +19,31 @@ wchar_t CommonPath[FILENAME_MAX];
 //======================================================================
 // Proxy
 #define InitProxyFORMAT                                                                      \
-    L"#pragma once\n#include <windows.h> \n#include \"structs.h\"\n#include \"Common.h\" \n" \
-    L"class Proxy \n{\n public : \n"
+    L"\nclass Proxy \n{\n public : \n"
 #define CloseProxyFORMAT L"};\n "
 #define ProxyFORMAT L"\t void %s; \n"
 
-#define ProxyCPPINIT_FORMAT \
-    L"#include \"Proxy.h\" \n#include \"CPacket.h\" \n#include \"Network.h\"\n "
 #define ProxyCPPStart_FORMAT \
     L"void Proxy::%s \n \
 { \n \
 \t stHeader header; \n \
-\t header.byType =  %s;\n \
+\t CLanServer *server; \n \
+\t server = reinterpret_cast<CTestServer *>((char *)this - 8); \n \
+\n\
 \t header.byCode = 0x89; \n \
-\t CPacket cPacket;\n \
-\t cPacket.PutData( (char*)&header,sizeof(stHeader)); \n\
+\t msg->~CMessage(); \n \
+\t \n \
+\t msg->PutData(&header,sizeof(stHeader)); \n\
 "
 #define ProxyCPPArg_FORMAT L" << %s"
 #define ProxyCPPClose_FORMAT \
-    L"\t *(cPacket.GetBufferPtr() + 1) = cPacket.GetDataSize() - sizeof(stHeader);\n \
-\t NetWork::SendPacket(clpSection , &cPacket , bBroadCast );\n};\n\n"
+    L"\
+\t short *pheaderlen = (short *)(msg->_frontPtr + offsetof(stHeader, sDataLen));\n\
+\t *pheaderlen = msg->_rearPtr - msg->_frontPtr - server->headerSize;\n\
+\t if (server->bEnCording)\n\
+\t \t msg->EnCoding(); \n \
+\t server->SendPacket(SessionID, msg, bBroadCast);\n};\n\n // msg\
+"
 // Proxy 끝
 //======================================================================
 
@@ -92,7 +97,7 @@ bool LoadFile(wchar_t **buffer)
 {
     FILE *file;
 
-    fopen_s(&file, "IDL.bin", "r,ccs = UTF-16LE");
+    fopen_s(&file, "IDL.txt", "r,ccs = UTF-16LE");
     if (file == nullptr)
         return false;
 
@@ -329,14 +334,14 @@ void MakeCommon()
     {
         Parser parser;
         parser.LoadFile(L"Config.txt");
-        parser.GetValue(L"CommonPath", CommonPath, sizeof(CommonPath));
+        parser.GetValue(L"TargetPath", TargetPath, sizeof(TargetPath));
 
     }
     FILE *file;
     wchar_t route[FILENAME_MAX];
 
-    StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Common.h");
-    _wfopen_s(&file, CommonPath, L"w ,ccs = UTF-16LE");
+    StringCchPrintfW(route, FILENAME_MAX, TargetPath, L"Common.h");
+    _wfopen_s(&file, route, L"w ,ccs = UTF-16LE");
     if (file == nullptr)
         __debugbreak();
 
@@ -366,11 +371,33 @@ void MakeProxy()
 
     // Proxy.h
     {
-        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Proxy.h");
-        _wfopen_s(&file, CommonPath, L"w, ccs = UTF-16LE");
+        StringCchPrintfW(route, FILENAME_MAX, TargetPath, L"Proxy.h");
+        _wfopen_s(&file, route, L"w, ccs = UTF-16LE");
         if (file == nullptr)
             __debugbreak();
+
         wchar_t buffer[BufferMax];
+        {
+            wchar_t Value[BufferMax];
+            wchar_t headerTag[BufferMax];
+
+            Parser parser;
+            parser.LoadFile(L"Config.txt");
+
+            //ProxyHeader 작성.
+            int Include_ProxyHeaderCnt;
+            parser.GetValue(L"Include_ProxyHeaderCnt", Include_ProxyHeaderCnt);
+            for (int i = 1; i <= Include_ProxyHeaderCnt; i++)
+            {
+                StringCchPrintfW(headerTag, BufferMax, L"Include_ProxyHeader%d", i);
+                parser.GetValue(headerTag, Value, BufferMax);
+
+                StringCchPrintfW(buffer, BufferMax, L"%s\n", Value);
+                fwrite(buffer, 2, wcslen(buffer), file);
+            }
+            
+        }
+ 
         fwrite(InitProxyFORMAT, 2, wcslen(InitProxyFORMAT), file);
 
         for (wchar_t *data : gRPCvec)
@@ -387,14 +414,32 @@ void MakeProxy()
     // Proxy.cpp
     {
 
-        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Proxy.cpp");
+        StringCchPrintfW(route, FILENAME_MAX, TargetPath, L"Proxy.cpp");
         _wfopen_s(&file, route, L"w, ccs = UTF-16LE");
         if (file == nullptr)
             __debugbreak();
 
         wchar_t buffer[BufferMax];
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
 
-        fwrite(ProxyCPPINIT_FORMAT, 2, wcslen(ProxyCPPINIT_FORMAT), file);
+        // ProxyCpp 작성.
+        {
+            wchar_t Value[BufferMax];
+            wchar_t headerTag[BufferMax];
+
+            int Include_ProxyCppCnt;
+            parser.GetValue(L"Include_ProxyCppCnt", Include_ProxyCppCnt);
+            for (int i = 1; i <= Include_ProxyCppCnt; i++)
+            {
+                StringCchPrintfW(headerTag, BufferMax, L"Include_ProxyCpp%d", i);
+                parser.GetValue(headerTag, Value, BufferMax);
+
+                StringCchPrintfW(buffer, BufferMax, L"%s\n", Value);
+                fwrite(buffer, 2, wcslen(buffer), file);
+            }
+        }
+
         for (wchar_t *data : gRPCvec)
         {
             size_t rmData = wcslen(data);
@@ -463,8 +508,15 @@ void MakeProxy()
                              L"byType");
             fwrite(buffer2, 2, wcslen(buffer2), file);
 
-            fwrite(L"\t cPacket ", 2, wcslen(L"\t cPacket "), file);
-            for (std::vector<wchar_t *>::iterator iter = words.begin() + 1;
+            fwrite(L"\t *msg ", 2, wcslen(L"\t *msg "), file);
+
+            {
+                std::vector<wchar_t *>::iterator iter = words.end() - 2;
+                StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT, *iter);
+                fwrite(buffer, 2, wcslen(buffer), file);
+            }
+
+            for (std::vector<wchar_t *>::iterator iter = words.begin() + 2;
                  iter != words.end() - 2; iter++)
             {
                 StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT, *iter);
@@ -479,27 +531,28 @@ void MakeProxy()
 }
 
 #define STUB_H_STARTFORMAT \
-    L"#pragma once\n\
-#include \"Common.h\"\n\
-#include \"CPacket.h\"\n\n#include \"structs.h\"\n\
-class Stub\n { \n public:\n\
+    L"\n\
+class Stub\n{ \n public:\n\
 "
 #define STUB_H_DEF_FORMAT L"\t virtual void %s {}\n"
 #define STUB_H_CLOSEFORMAT                                             \
-    L"\t bool PacketProc(Section *clpSection, CPacket &cPacket, BYTE " \
+    L"\t void PacketProc(ull SessionID, CMessage *msg, BYTE " \
     L"byType); \n};\n"
 
 #define STUB_CPP_STARTFORMAT                                              \
-    L"#include <windows.h> \n#include \"Stub.h\"  \n"                     \
-    L"bool Stub::PacketProc(Section *clpSection, CPacket &cPacket, BYTE " \
-    L"byType)\n { \n\tswitch(byType)\n \t{\n"
+    L"\nvoid Stub::PacketProc(ull SessionID, CMessage *msg, BYTE " \
+    L"byType)\n {\n 	char MessageBuffer[1000];\n\n\tswitch(byType)\n \t{\n"
 //  int a ;
 #define STUB_CPP_OPEN_FORMAT L"\tcase %s :\n \t{ \n"
 #define STUB_CPP_DEF_FORMAT L"\t\t %s %s ;\n"
 #define STUB_CPP_DEF_FORMAT2 L" >> %s"
+#define STUB_CPP_DEF_ARRFORMAT L"\t\t %s %s [%d] ;\n"
+
+#define STUB_CPP_DEF_ARRBUFFERSIZE 2000
+
 #define STUB_CPP_FUNCTION_FORMAT L"\t\t%s"
-#define STUB_CPP_DEFCLOSE_FORMAT L"\t return true; \n \t}\n"
-#define STUB_CPP_CLOSE_FORMAT L"\n \t}\n return false;\n }\n"
+#define STUB_CPP_DEFCLOSE_FORMAT L"\t\t break; \n \t}\n"
+#define STUB_CPP_CLOSE_FORMAT L"\n \t}\n \n }\n"
 void MakeStub()
 {
     FILE *file;
@@ -508,14 +561,34 @@ void MakeStub()
     {
         wchar_t route[FILENAME_MAX];
 
-        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Stub.h");
-        _wfopen_s(&file, CommonPath, L"w, ccs = UTF-16LE");
-        //StringCchPrintfA(route, BufferMax, CommonPath, "Stub.h");
-        //fopen_s(&file, route, "w, ccs = UTF-16LE");
+        StringCchPrintfW(route, FILENAME_MAX, TargetPath, L"Stub.h");
+        _wfopen_s(&file, route, L"w, ccs = UTF-16LE");
+
         if (file == nullptr)
             __debugbreak();
 
         wchar_t buffer[BufferMax];
+
+        {
+            wchar_t Value[BufferMax];
+            wchar_t headerTag[BufferMax];
+
+            Parser parser;
+            parser.LoadFile(L"Config.txt");
+
+            // ProxyHeader 작성.
+            int Include_StubHeaderCnt;
+            parser.GetValue(L"Include_StubHeaderCnt", Include_StubHeaderCnt);
+            for (int i = 1; i <= Include_StubHeaderCnt; i++)
+            {
+                StringCchPrintfW(headerTag, BufferMax, L"Include_StubHeader%d", i);
+                parser.GetValue(headerTag, Value, BufferMax);
+
+                StringCchPrintfW(buffer, BufferMax, L"%s\n", Value);
+                fwrite(buffer, 2, wcslen(buffer), file);
+            }
+        }
+
         fwrite(STUB_H_STARTFORMAT, 2, wcslen(STUB_H_STARTFORMAT), file);
 
         for (wchar_t *data : gRPCvec)
@@ -530,12 +603,32 @@ void MakeStub()
     {
         wchar_t route[FILENAME_MAX];
 
-        StringCchPrintfW(route, FILENAME_MAX, CommonPath, L"Stub.cpp");
-        _wfopen_s(&file, CommonPath, L"w, ccs = UTF-16LE");
+        StringCchPrintfW(route, FILENAME_MAX, TargetPath, L"Stub.cpp");
+        _wfopen_s(&file, route, L"w, ccs = UTF-16LE");
 
         if (file == nullptr)
             __debugbreak();
         wchar_t buffer[BufferMax];
+
+        // ProxyCpp 작성.
+        {
+            wchar_t Value[BufferMax];
+            wchar_t headerTag[BufferMax];
+
+            Parser parser;
+            parser.LoadFile(L"Config.txt");
+
+            int Include_StubCppCnt;
+            parser.GetValue(L"Include_StubCppCnt", Include_StubCppCnt);
+            for (int i = 1; i <= Include_StubCppCnt; i++)
+            {
+                StringCchPrintfW(headerTag, BufferMax, L"Include_StubCpp%d", i);
+                parser.GetValue(headerTag, Value, BufferMax);
+
+                StringCchPrintfW(buffer, BufferMax, L"%s\n", Value);
+                fwrite(buffer, 2, wcslen(buffer), file);
+            }
+        }
 
         fwrite(STUB_CPP_STARTFORMAT, 2, wcslen(STUB_CPP_STARTFORMAT), file);
 
@@ -632,18 +725,41 @@ void MakeStub()
                 int cnt = types.size() < words.size() - 2 ? types.size() : words.size() - 2;
                 for (int i = 1; i < cnt; i++)
                 {
-                    StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_FORMAT,
-                                     types[i], words[i]);
+                    {
+                        std::wstring temp(types[i]);
+
+                        if (temp.compare(L"char*") == 0)
+                        {
+                            StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_ARRFORMAT,
+                                             L"char", words[i], STUB_CPP_DEF_ARRBUFFERSIZE);
+                        }
+                        else
+                        {
+                            StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_FORMAT,
+                                             types[i], words[i]);
+                        }
+                    }
+          
                     fwrite(buffer2, 2, wcslen(buffer2), file);
                 }
             }
-            fwrite(L"\t\t cPacket", 2, wcslen(L"\t\t cPacket"), file);
+            fwrite(L"\t\t *msg", 2, wcslen(L"\t\t *msg"), file);
 
-            for (std::vector<wchar_t *>::iterator iter = words.begin() + 1;
+            for (std::vector<wchar_t *>::iterator iter = words.begin() + 2;
                  iter != words.end() - 2; iter++)
             {
-                StringCchPrintfW(buffer, BufferMax, STUB_CPP_DEF_FORMAT2,
-                                 *iter);
+                std::wstring temp(*iter);
+
+                if (temp.compare(L"MessageBuffer") == 0)
+                {
+                    StringCchPrintfW(buffer, BufferMax, STUB_CPP_DEF_FORMAT2,
+                                     *iter);
+                }
+                else
+                {
+                    StringCchPrintfW(buffer, BufferMax, STUB_CPP_DEF_FORMAT2,
+                                     *iter);
+                }
                 fwrite(buffer, 2, wcslen(buffer), file);
             }
             fwrite(L";\n", 2, wcslen(L";\n"), file);

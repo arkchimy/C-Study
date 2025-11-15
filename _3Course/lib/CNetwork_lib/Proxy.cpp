@@ -37,7 +37,7 @@ void Proxy::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo)
 }
 
 
-void Proxy::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, short len)
+void Proxy::EchoProcedure(ull SessionID, CMessage *msg, char * buffer, short len)
 {
     //struct stHeader
     //{
@@ -64,7 +64,8 @@ void Proxy::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, shor
  
     msg->PutData(&header, server->headerSize);
     *msg << type;
-    *msg << len;
+    *msg << len << buffer;
+
     msg->PutData(buffer, len);
     
     short *pheaderlen = (short*)(msg->_frontPtr + offsetof(stHeader, sDataLen));
