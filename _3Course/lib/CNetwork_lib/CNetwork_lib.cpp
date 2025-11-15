@@ -752,9 +752,9 @@ void CLanServer::SessionUnLock(ull SessionID)
 void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
                             int iSectorX, int iSectorY)
 {
-    switch ((En_SendPackType)SendType)
+    switch (SendType)
     {
-    case En_SendPackType::UnitCast:
+    case 0:
         msg->iUseCnt = 1;
         UnitCast(SessionID, msg, msg->_size);
         break;

@@ -128,8 +128,7 @@ struct CMessage
     CMessage& operator >> (char* const str)
     {
         //뒤에 모든 데이터를 한번에 긁자.
-        if (str == nullptr)
-            return;
+
         size_t len = _rearPtr - _frontPtr;
         if (_frontPtr > _rearPtr)
         {
@@ -146,7 +145,7 @@ struct CMessage
 
 
     SSIZE_T PutData(PVOID src, SerializeBufferSize size);
-    SSIZE_T GetData(char *desc, SerializeBufferSize size);
+    SSIZE_T GetData(PVOID desc, SerializeBufferSize size);
 
     BOOL ReSize();
     void Peek(char *out, SerializeBufferSize size);

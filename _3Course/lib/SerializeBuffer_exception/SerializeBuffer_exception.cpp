@@ -167,7 +167,7 @@ SSIZE_T CMessage::PutData(PVOID src, SerializeBufferSize size)
     return _rearPtr - r;
 }
 
-SSIZE_T CMessage::GetData(char *desc, SerializeBufferSize size)
+SSIZE_T CMessage::GetData(PVOID desc, SerializeBufferSize size)
 {
     char *f = _frontPtr;
     if (f + size > _rearPtr)

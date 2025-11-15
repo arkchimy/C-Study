@@ -116,14 +116,14 @@ unsigned ContentsThread(void *arg)
                 break;
 
             default:
-                if (server->SessionID_hash.find(l_sessionID) == server->SessionID_hash.end())
-                {
-                    // Login Not Recv
-                    stTlsObjectPool<CMessage>::Release(msg);
-                    server->Disconnect(l_sessionID);
-                }
-                else
-                    server->PacketProc(l_sessionID, msg, header,type);
+                //if (server->SessionID_hash.find(l_sessionID) == server->SessionID_hash.end())
+                //{
+                //    // Login Not Recv
+                //    stTlsObjectPool<CMessage>::Release(msg);
+                //    server->Disconnect(l_sessionID);
+                //}
+                //else
+                    server->PacketProc(l_sessionID, msg,type);
             }
 
             f = server->m_ContentsQ._frontPtr;
@@ -175,12 +175,12 @@ unsigned ContentsThread(void *arg)
     return 0;
 }
 
-void CTestServer::EchoProcedure(ull SessionID, CMessage *msg, char *const buffer, short len)
+void CTestServer::EchoProcedure(ull SessionID, CMessage *msg, WCHAR *const buffer, short len)
 {
     //해당 ID가 어느 섹터에 있는지, 보낼 대상을 특정하는 Logic
-    Proxy::EchoProcedure(SessionID, msg, buffer,len);
+    Proxy::EchoProcedure(SessionID, msg, len ,buffer);
 }
-void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey)
+void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey)
 {
     CPlayer *player;
 
@@ -239,7 +239,7 @@ void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, 
 
     {
         //Login응답.
-        Proxy::LoginProcedure(SessionID, msg, AccountNo);
+        Proxy::LoginProcedure(SessionID, msg, AccountNo, ID, Nickname, SessionKey);
     }
     
     SessionUnLock(SessionID);

@@ -41,8 +41,8 @@ class CTestServer : public CLanServer
 {
   public:
     
-    virtual void EchoProcedure(ull sessionID, CMessage *msg, char *const const buffer, short len) final;
-    virtual void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, char *SessionKey) final; // 동적 바인딩
+    virtual void EchoProcedure(ull sessionID, CMessage *msg, WCHAR *const const buffer, short len) final;
+    virtual void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey) final; // 동적 바인딩
 
     void AllocPlayer(CMessage* msg);
     void DeletePlayer(CMessage* msg);

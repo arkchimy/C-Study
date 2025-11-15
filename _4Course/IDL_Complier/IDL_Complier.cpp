@@ -3,7 +3,10 @@
 
 #include "../../_1Course/lib/Parser_lib/Parser_lib.h"
 #include <vector>
+#include <sstream>
 
+const std::wstring needle1 = L"SizedArray'";
+const std::wstring needle2 = L"DynamicArray'";
 
 wchar_t TargetPath[FILENAME_MAX];
 
@@ -13,7 +16,7 @@ wchar_t TargetPath[FILENAME_MAX];
 #define CMessageDefaultFormat L"\tconst BYTE %s \t= \t (%s + %d) ;" // 1 씩증가
 #define CMessageCustomFormat L"\tconst BYTE %s \t= \t  %s      ;"   // 직접 정의
 
-#define InitCommonFORMAT L"#include <Windows.h>\n#ifndef CONSTANTS_H \n #define CONSTANTS_H \n"
+#define InitCommonFORMAT L"#pragma once\n#define WIN32_LEAN_AND_MEAN \n#include <Windows.h>\n#ifndef CONSTANTS_H \n #define CONSTANTS_H \n"
 #define CommonFORMAT L"\t %s \n"
 #define CLOSECommonFORMAT L"#endif // CONSTANTS_H \n"
 //======================================================================
@@ -24,7 +27,7 @@ wchar_t TargetPath[FILENAME_MAX];
 #define ProxyFORMAT L"\t void %s; \n"
 
 #define ProxyCPPStart_FORMAT \
-    L"void Proxy::%s \n \
+    L"\nvoid Proxy::%s \n \
 { \n \
 \t stHeader header; \n \
 \t CLanServer *server; \n \
@@ -35,14 +38,18 @@ wchar_t TargetPath[FILENAME_MAX];
 \t \n \
 \t msg->PutData(&header,sizeof(stHeader)); \n\
 "
-#define ProxyCPPArg_FORMAT L" << %s"
+
+#define ProxyCPPArg_FORMAT L" << %s;\n"
+#define ProxyCPPArg_FORMAT2 L"\t msg->PutData(%s,%d);\n"
+#define ProxyCPPArg_FORMAT3 L"\t msg->PutData(%s,%s);\n"
+
 #define ProxyCPPClose_FORMAT \
     L"\
 \t short *pheaderlen = (short *)(msg->_frontPtr + offsetof(stHeader, sDataLen));\n\
 \t *pheaderlen = msg->_rearPtr - msg->_frontPtr - server->headerSize;\n\
 \t if (server->bEnCording)\n\
 \t \t msg->EnCoding(); \n \
-\t server->SendPacket(SessionID, msg, bBroadCast);\n};\n\n // msg\
+\t server->SendPacket(SessionID, msg, bBroadCast);\n};\n\n \
 "
 // Proxy 끝
 //======================================================================
@@ -52,8 +59,11 @@ wchar_t TargetPath[FILENAME_MAX];
 std::vector<wchar_t *> gDefineVec;
 
 std::vector<wchar_t *> gCommonVec; // Common.h 에 들어가야할 것들.
-std::vector<wchar_t *>
-    gRPCvec; // Proxy나 stub의 구분 없이. 함수명이 들어가있는 곳
+
+std::vector<wchar_t *> gRPCvec;          // 변환된 함수명이 들어가있는 곳
+std::vector<wchar_t *> gRPCvec_Notrance; // Proxy나 stub의 구분 없이. 함수명이 들어가있는 곳
+
+
 // 함수 선언부를 통해 매개변수들을 사용해야 함.
 std::vector<wchar_t *> packStartnum; // 임시 변수 저장
 
@@ -69,6 +79,40 @@ wchar_t *FuncMaker(wchar_t *left, wchar_t *right, wchar_t *limit,
 void MakeCommon();
 void MakeProxy();
 void MakeStub();
+
+void Replace_CustomeType(std::wstring &str, std::wstring target , std::wstring replace) 
+{
+
+    size_t pos;
+    {
+        // target'를 찾기.
+        pos = str.find(target);
+        while (pos != std::wstring::npos)
+        {
+ 
+            if (pos != std::wstring::npos)
+            {
+                size_t numStart = pos + target.size();
+                size_t numEnd = str.find(L'\'', numStart); // 닫는 따옴표
+                str.replace(pos, numEnd - pos + 1, replace); // 포함하여 교체
+            }
+            pos = str.find(target);
+        }
+    }
+    
+}
+long GetSize_ForSizeArray(const std::wstring &s)
+{
+    std::wistringstream iss(s);
+    std::wstring retval;
+    std::wstring tok;
+
+    while (std::getline(iss, tok, L'\''))
+    {
+        retval = tok;
+    }
+    return std::wcstol(retval.c_str(), nullptr, 10);
+}
 
 int main()
 {
@@ -307,6 +351,7 @@ wchar_t *GlobalPacketSplit(wchar_t *left, wchar_t *right, wchar_t *limit,
 wchar_t *FuncMaker(wchar_t *left, wchar_t *right, wchar_t *limit,
                    wchar_t **temp)
 {
+    
     left = right;
     // 세미콜론
     while (1)
@@ -322,10 +367,27 @@ wchar_t *FuncMaker(wchar_t *left, wchar_t *right, wchar_t *limit,
         __debugbreak();
     memcpy(*temp, left, (right - left) * sizeof(wchar_t));
     (*temp)[right - left] = L'\0';
+    std::wstring str(*temp);
+    std::wstring replace(L"WCHAR*");
 
+    Replace_CustomeType(str, needle1, replace); 
+    Replace_CustomeType(str, needle2, replace); 
     // void Fname (int a, int b , int c); 가 저장 됨.
-    gRPCvec.push_back(*temp);
 
+    size_t len = (str.size() + 1) * 2; 
+
+    wchar_t *ptr = (wchar_t *)malloc(len);
+    if (ptr == nullptr)
+        __debugbreak();
+
+    memcpy(ptr, str.c_str(), len);
+    ptr[len] = L'\0';
+
+    gRPCvec.push_back(ptr);
+    gRPCvec_Notrance.push_back(*temp);
+
+  
+    
     return right;
 }
 
@@ -340,7 +402,7 @@ void MakeCommon()
     FILE *file;
     wchar_t route[FILENAME_MAX];
 
-    StringCchPrintfW(route, FILENAME_MAX, TargetPath, L"Common.h");
+    StringCchPrintfW(route, FILENAME_MAX, TargetPath, L"CommonProtocol.h");
     _wfopen_s(&file, route, L"w ,ccs = UTF-16LE");
     if (file == nullptr)
         __debugbreak();
@@ -440,19 +502,21 @@ void MakeProxy()
             }
         }
 
+        size_t gRPCidx = 0;
+        size_t i = 0;
+        std::vector<wchar_t *> types;
+        std::vector<wchar_t *> words;
+
         for (wchar_t *data : gRPCvec)
         {
+          
             size_t rmData = wcslen(data);
             memcpy(buffer, data, wcslen(data) * sizeof(wchar_t));
             buffer[rmData] = L'\0';
 
             size_t oriLen = wcslen(data);
             size_t currentIdx = 0;
-
-            std::vector<wchar_t *> words;
-            words.clear();
-
-            size_t i = 0;
+            i = 0;
             while (1)
             {
 
@@ -471,8 +535,42 @@ void MakeProxy()
                     break;
             }
             buffer[currentIdx++] = L'\0';
-            wchar_t *left = buffer, *right = buffer;
-            wchar_t *limit = buffer + wcslen(buffer);
+            // 함수 구현부에 작성될 buffer;
+            wchar_t buffer2[BufferMax];
+            wchar_t *data= gRPCvec_Notrance[gRPCidx++];
+            
+            types.clear();
+            words.clear();
+            i = 0;
+
+            rmData = wcslen(data);
+            memcpy(buffer2, data, wcslen(data) * sizeof(wchar_t));
+            buffer2[rmData] = L'\0';
+
+            oriLen = wcslen(data);
+            currentIdx = 0;
+
+            while (1)
+            {
+
+                if (buffer2[i] == L'=')
+                {
+                    while (1)
+                    {
+                        if (buffer2[i] == L',' || buffer2[i] == L')')
+                            break;
+                        i++;
+                    }
+                    buffer2[currentIdx++] = L' ';
+                }
+                buffer2[currentIdx++] = buffer2[i++];
+                if (i >= oriLen)
+                    break;
+            }
+            buffer2[currentIdx++] = L'\0';
+
+            wchar_t *left = buffer2, *right = buffer2;
+            wchar_t *limit = buffer2 + wcslen(buffer2);
 
             bool bChk = false;
             size_t cnt = 0;
@@ -499,31 +597,54 @@ void MakeProxy()
                 if (*temp == L',')
                     continue;
                 cnt++;
+                if (cnt % 2 == 1)
+                    types.push_back(temp);
                 if (cnt % 2 == 0)
                     words.push_back(temp);
             }
-            wchar_t buffer2[BufferMax];
-
-            StringCchPrintfW(buffer2, BufferMax, ProxyCPPStart_FORMAT, buffer,
-                             L"byType");
+            StringCchPrintfW(buffer2, BufferMax, ProxyCPPStart_FORMAT, buffer);
             fwrite(buffer2, 2, wcslen(buffer2), file);
-
-            fwrite(L"\t *msg ", 2, wcslen(L"\t *msg "), file);
-
+        
+        
+        
             {
                 std::vector<wchar_t *>::iterator iter = words.end() - 2;
+                fwrite(L"\t *msg ", 2, wcslen(L"\t *msg "), file);
                 StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT, *iter);
                 fwrite(buffer, 2, wcslen(buffer), file);
             }
+            //
 
+            i = 2;
             for (std::vector<wchar_t *>::iterator iter = words.begin() + 2;
-                 iter != words.end() - 2; iter++)
+                    iter != words.end() - 2; iter++)
             {
-                StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT, *iter);
+                std::wstring temp(types[i]);
+
+                if (temp.find(needle1) != std::wstring::npos)
+                {
+                    long arraySize = GetSize_ForSizeArray(temp);
+                    StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT2,
+                                        words[i], arraySize);
+                }
+                else if (temp.find(needle2) != std::wstring::npos)
+                {
+                    long arraySize = GetSize_ForSizeArray(temp);
+                    StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT3,
+                                        words[i], words[i - 1]);
+                }
+                else
+                {
+
+                    fwrite(L"\t *msg ", 2, wcslen(L"\t *msg "), file);
+                    StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT, *iter);
+                }
                 fwrite(buffer, 2, wcslen(buffer), file);
+                i++;
             }
-            fwrite(L";\n", 2, wcslen(L";\n"), file);
             fwrite(ProxyCPPClose_FORMAT, 2, wcslen(ProxyCPPClose_FORMAT), file);
+            
+    
         }
 
         fclose(file);
@@ -541,12 +662,14 @@ class Stub\n{ \n public:\n\
 
 #define STUB_CPP_STARTFORMAT                                              \
     L"\nvoid Stub::PacketProc(ull SessionID, CMessage *msg, BYTE " \
-    L"byType)\n {\n 	char MessageBuffer[1000];\n\n\tswitch(byType)\n \t{\n"
+    L"byType)\n {\n\n\tswitch(byType)\n \t{\n"
 //  int a ;
 #define STUB_CPP_OPEN_FORMAT L"\tcase %s :\n \t{ \n"
 #define STUB_CPP_DEF_FORMAT L"\t\t %s %s ;\n"
-#define STUB_CPP_DEF_FORMAT2 L" >> %s"
-#define STUB_CPP_DEF_ARRFORMAT L"\t\t %s %s [%d] ;\n"
+#define STUB_CPP_DEF_FORMAT2 L" >> %s;\n"
+#define STUB_CPP_DEF_ARRFORMAT L"\t\t %s %s[%d] ;\n"
+#define STUB_CPP_DEF_ARRFORMAT2 L"\t\t msg->GetData(%s,%d);\n"
+#define STUB_CPP_DEF_ARRFORMAT3 L"\t\t msg->GetData(%s,%s);\n"
 
 #define STUB_CPP_DEF_ARRBUFFERSIZE 2000
 
@@ -632,7 +755,7 @@ void MakeStub()
 
         fwrite(STUB_CPP_STARTFORMAT, 2, wcslen(STUB_CPP_STARTFORMAT), file);
 
-        for (wchar_t *data : gRPCvec)
+        for (wchar_t *data : gRPCvec_Notrance)
         {
             size_t rmData = wcslen(data);
             memcpy(buffer, data, wcslen(data) * sizeof(wchar_t));
@@ -723,15 +846,23 @@ void MakeStub()
 
             {
                 int cnt = types.size() < words.size() - 2 ? types.size() : words.size() - 2;
-                for (int i = 1; i < cnt; i++)
+                for (int i = 2; i < cnt; i++)
                 {
                     {
                         std::wstring temp(types[i]);
 
-                        if (temp.compare(L"char*") == 0)
+                        if (temp.find(needle1) != std::wstring::npos)
                         {
+                            long arraySize = GetSize_ForSizeArray(temp);
                             StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_ARRFORMAT,
-                                             L"char", words[i], STUB_CPP_DEF_ARRBUFFERSIZE);
+                                             L"WCHAR", words[i], arraySize);
+                        }
+                        else if (temp.find(needle2) != std::wstring::npos)
+                        {
+                            long arraySize = GetSize_ForSizeArray(temp);
+                            StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_ARRFORMAT,
+                                             L"WCHAR", words[i], STUB_CPP_DEF_ARRBUFFERSIZE);
+
                         }
                         else
                         {
@@ -743,26 +874,37 @@ void MakeStub()
                     fwrite(buffer2, 2, wcslen(buffer2), file);
                 }
             }
-            fwrite(L"\t\t *msg", 2, wcslen(L"\t\t *msg"), file);
-
+            
+            i = 2;
             for (std::vector<wchar_t *>::iterator iter = words.begin() + 2;
                  iter != words.end() - 2; iter++)
             {
-                std::wstring temp(*iter);
-
-                if (temp.compare(L"MessageBuffer") == 0)
+                std::wstring temp(types[i]);
+                if (temp.find(needle1) != std::wstring::npos)
                 {
-                    StringCchPrintfW(buffer, BufferMax, STUB_CPP_DEF_FORMAT2,
-                                     *iter);
+                    long arraySize = GetSize_ForSizeArray(temp);
+
+                    StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_ARRFORMAT2,
+                                     words[i], arraySize);
+                }
+                else if (temp.find(needle2) != std::wstring::npos)
+                {
+                    long arraySize = GetSize_ForSizeArray(temp);
+
+                    StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_ARRFORMAT3,
+                                     words[i], words[i - 1]);
                 }
                 else
                 {
-                    StringCchPrintfW(buffer, BufferMax, STUB_CPP_DEF_FORMAT2,
+                    fwrite(L"\t\t *msg", 2, wcslen(L"\t\t *msg"), file);
+                    StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_FORMAT2,
                                      *iter);
+         
                 }
-                fwrite(buffer, 2, wcslen(buffer), file);
+                i++;
+                fwrite(buffer2, 2, wcslen(buffer2), file);
             }
-            fwrite(L";\n", 2, wcslen(L";\n"), file);
+          
 
             right = data;
             while (1)
