@@ -41,8 +41,8 @@ class CTestServer : public CLanServer
 {
   public:
     
-    virtual void EchoProcedure(ull sessionID, CMessage *msg, WCHAR *const const buffer, short len) final;
-    virtual void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccontNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey) final; // 동적 바인딩
+    virtual void EchoProcedure(ull SessionID, CMessage *msg, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType = en_PACKET_CS_CHAT_REQ_ECHO, BYTE bBroadCast = false) final;
+    virtual void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType = en_PACKET_CS_CHAT_REQ_LOGIN, BYTE bBroadCast = false) final; // 동적 바인딩
 
     void AllocPlayer(CMessage* msg);
     void DeletePlayer(CMessage* msg);

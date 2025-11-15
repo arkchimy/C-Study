@@ -30,7 +30,7 @@ wchar_t TargetPath[FILENAME_MAX];
     L"\nvoid Proxy::%s \n \
 { \n \
 \t stHeader header; \n \
-\t CLanServer *server; \n \
+\t CTestServer *server; \n \
 \t server = reinterpret_cast<CTestServer *>((char *)this - 8); \n \
 \n\
 \t header.byCode = 0x89; \n \
@@ -381,7 +381,7 @@ wchar_t *FuncMaker(wchar_t *left, wchar_t *right, wchar_t *limit,
         __debugbreak();
 
     memcpy(ptr, str.c_str(), len);
-    ptr[len] = L'\0';
+    ptr[len/2] = L'\0';
 
     gRPCvec.push_back(ptr);
     gRPCvec_Notrance.push_back(*temp);
@@ -662,7 +662,10 @@ class Stub\n{ \n public:\n\
 
 #define STUB_CPP_STARTFORMAT                                              \
     L"\nvoid Stub::PacketProc(ull SessionID, CMessage *msg, BYTE " \
-    L"byType)\n {\n\n\tswitch(byType)\n \t{\n"
+    L"byType)\n {\n \
+    \tCTestServer *server;\n \
+    \tserver = reinterpret_cast<CTestServer *>(this);\n \
+    \n\tswitch(byType)\n \t{\n"
 //  int a ;
 #define STUB_CPP_OPEN_FORMAT L"\tcase %s :\n \t{ \n"
 #define STUB_CPP_DEF_FORMAT L"\t\t %s %s ;\n"
@@ -673,7 +676,7 @@ class Stub\n{ \n public:\n\
 
 #define STUB_CPP_DEF_ARRBUFFERSIZE 2000
 
-#define STUB_CPP_FUNCTION_FORMAT L"\t\t%s"
+#define STUB_CPP_FUNCTION_FORMAT L"\t\tserver->%s"
 #define STUB_CPP_DEFCLOSE_FORMAT L"\t\t break; \n \t}\n"
 #define STUB_CPP_CLOSE_FORMAT L"\n \t}\n \n }\n"
 void MakeStub()
