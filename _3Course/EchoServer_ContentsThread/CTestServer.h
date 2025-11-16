@@ -40,13 +40,17 @@ struct CPlayer
 class CTestServer : public CLanServer
 {
   public:
-    
-    virtual void EchoProcedure(ull SessionID, CMessage *msg, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType = en_PACKET_CS_CHAT_REQ_ECHO, BYTE bBroadCast = false) final;
-    virtual void LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType = en_PACKET_CS_CHAT_REQ_LOGIN, BYTE bBroadCast = false) final; // 동적 바인딩
+    // Stub함수
+
+    virtual void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType = en_PACKET_CS_CHAT_REQ_LOGIN, BYTE bBroadCast = false) final; // 동적 바인딩
+    virtual void REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, BYTE byType = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE, BYTE bBroadCast = true) final;
+    virtual void REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType = en_PACKET_CS_CHAT_REQ_MESSAGE, BYTE bBroadCast = true) final;
+    virtual void HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType = en_PACKET_CS_CHAT__HEARTBEAT, BYTE bBroadCast = false) final;
+ public:
 
     void AllocPlayer(CMessage* msg);
     void DeletePlayer(CMessage* msg);
-
+ 
   public:
     CTestServer(int iEncording = false);
     virtual ~CTestServer();
@@ -118,4 +122,60 @@ class CTestServer : public CLanServer
       
     */
 
+};
+
+struct st_Sector_Pos
+{
+    st_Sector_Pos() = default;
+
+    st_Sector_Pos(int iX, int iY)
+    {
+        _iX = iX / dfSECTOR_Size;
+        _iY = iY / dfSECTOR_Size;
+    }
+    bool operator<(const st_Sector_Pos &other) const
+    {
+        if (this->_iX != other._iX)
+            return this->_iX < other._iX;
+        return this->_iY < other._iY;
+    }
+    bool operator==(const st_Sector_Pos &other) const
+    {
+        return this->_iX == other._iX && this->_iY == other._iY;
+    }
+    int _iX, _iY;
+};
+struct st_Sector_Around
+{
+    st_Sector_Around()
+    {
+        // Around.reserve(6);
+    }
+    std::set<st_Sector_Pos> Around;
+};
+
+#include <algorithm>
+
+#define SectorMax dfRANGE_MOVE_BOTTOM / dfSECTOR_Size
+
+class SectorManager
+{
+  public:
+    static void GetSectorAround(int iX, int iY,
+                                st_Sector_Around *pSectorAround)
+    {
+
+        for (int row = -1; row <= 1; row++)
+        {
+            for (int column = -1; column <= 1; column++)
+            {
+                int rx = std::clamp(iX + row, 0, SectorMax - 1);
+                int ry = std::clamp(iY + column, 0, SectorMax - 1);
+                st_Sector_Pos temp;
+                temp._iX = rx;
+                temp._iY = ry;
+                pSectorAround->Around.insert(temp);
+            }
+        }
+    }
 };

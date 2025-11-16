@@ -114,24 +114,27 @@ unsigned ContentsThread(void *arg)
             case en_PACKET_Player_Delete:
                 server->DeletePlayer(msg);
                 break;
-
+            case en_PACKET_CS_CHAT_REQ_LOGIN:
+                server->PacketProc(l_sessionID, msg, type);
+                break;
             default:
-                //if (server->SessionID_hash.find(l_sessionID) == server->SessionID_hash.end())
-                //{
-                //    // Login Not Recv
-                //    stTlsObjectPool<CMessage>::Release(msg);
-                //    server->Disconnect(l_sessionID);
-                //}
-                //else
+                if (server->SessionID_hash.find(l_sessionID) == server->SessionID_hash.end())
+                {
+                    // Login Not Recv
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    server->Disconnect(l_sessionID);
+                }
+                else
                     server->PacketProc(l_sessionID, msg,type);
             }
 
             f = server->m_ContentsQ._frontPtr;
             useSize -= 8;
         }
+        DWORD currentTime;
         // 하트비트 부분
         {
-            DWORD currentTime;
+
             DWORD msgInterval;
             CPlayer *player;
 
@@ -144,19 +147,17 @@ unsigned ContentsThread(void *arg)
                 player = element.second;
 
                 msgInterval = currentTime - player->m_Timer;
-                if (msgInterval >= 5000)
+          /*      if (msgInterval >= 50000)
                 {
                     server->Disconnect(player->m_sessionID);
-                }
+                }*/
             }
         }
         // 하트비트 부분
         {
-            DWORD currentTime;
+   
             DWORD disTime;
             CPlayer *player;
-
-            currentTime = timeGetTime();
 
             //AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
             for (auto element : server->AccountNo_hash)
@@ -164,10 +165,10 @@ unsigned ContentsThread(void *arg)
                 player = element.second;
   
                 disTime = currentTime - player->m_Timer;
-                if (disTime >= 40000)
+  /*              if (disTime >= 40000)
                 {
                     server->Disconnect(player->m_sessionID);
-                }
+                }*/
             }
         }
     }
@@ -175,12 +176,7 @@ unsigned ContentsThread(void *arg)
     return 0;
 }
 
-void CTestServer::EchoProcedure(ull SessionID, CMessage *msg, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType , BYTE bBroadCast )
-{
-    //해당 ID가 어느 섹터에 있는지, 보낼 대상을 특정하는 Logic
-    Proxy::EchoProcedure(SessionID, msg, MessageLen, MessageBuffer, byType, bBroadCast);
-}
-void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType , BYTE bBroadCast )
+void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType, BYTE bBroadCast)
 {
     CPlayer *player;
 
@@ -196,8 +192,9 @@ void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, 
     // Alloc을 받았다면 prePlayer_hash에 추가되어있을 것이다.
     if (prePlayer_hash.find(SessionID) == prePlayer_hash.end())
     {
+        Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
         //없다는 것은 내가 만든 절차를 따르지않았음을 의미.
-        stTlsObjectPool<CMessage>::Release(msg);
+        //stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
         return;
     }
@@ -206,8 +203,9 @@ void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, 
 
     if (player->m_State != en_State::Session)
     {
+        Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
         // 로그인 패킷을 여러번 보낸 경우.
-        stTlsObjectPool<CMessage>::Release(msg);
+        //stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
         player_pool.Release(player);
         return;
@@ -216,32 +214,145 @@ void CTestServer::LoginProcedure(ull SessionID, CMessage *msg, INT64 AccountNo, 
     // 중복 접속 문제
     if (SessionID_hash.find(AccountNo) != SessionID_hash.end())
     {
+        Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
+
         // 중복 로그인 이면 둘 다 끊기
-        stTlsObjectPool<CMessage>::Release(msg);
+        //stTlsObjectPool<CMessage>::Release(msg);
 
         Disconnect(SessionID);
-
         // 이 경우때문에 결국 Player에 SessionID가 필요함.
         Disconnect(AccountNo_hash[AccountNo]->m_sessionID);
 
-        SessionID_hash.erase(AccountNo_hash[AccountNo]->m_sessionID);
-        AccountNo_hash.erase(AccountNo_hash[AccountNo]->m_sessionID);
-
-        player_pool.Release(player);
-        player_pool.Release(AccountNo_hash[AccountNo]);
         return;
     }
     // 여기까지 와야 Player로 승격.
-    player->m_State = en_State::Player;
+    //player = prePlayer_hash[SessionID];
+    //prePlayer_hash.erase(SessionID);
 
+    player->m_State = en_State::Player;
+    player->m_AccountNo = AccountNo;
+
+    memcpy(player->m_ID, ID,20);
+    memcpy(player->m_Nickname, Nickname, 20);
+    memcpy(player->m_SessionKey, SessionKey, 64);
+
+    memcpy(player->m_SessionKey, SessionKey, sizeof(player->m_SessionKey));
+
+    SessionID_hash[SessionID] = player;
+    AccountNo_hash[AccountNo] = player;
+    
     m_TotalPlayers++; // Player 카운트
     m_prePlayerCount--;
 
     {
         //Login응답.
-        Proxy::LoginProcedure(SessionID, msg, AccountNo, ID, Nickname, SessionKey, byType, bBroadCast);
+        Proxy::RES_LOGIN(SessionID, msg, true, AccountNo );
     }
     
+    SessionUnLock(SessionID);
+}
+void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, BYTE byType , BYTE bBroadCast ) 
+{
+    CPlayer *player;
+
+    if (SessionLock(SessionID) == false)
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+    
+    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+    {
+        __debugbreak();
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+    player = SessionID_hash[SessionID];
+    if (player->m_AccountNo != AccountNo)
+    {
+
+        Disconnect(SessionID);
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+
+    g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
+
+    player->iSectorX = SectorX;
+    player->iSectorY = SectorY;
+    g_Sector[player->iSectorY][player->iSectorX].insert(SessionID );
+
+    Proxy::RES_SECTOR_MOVE(SessionID, msg, AccountNo, SectorX, SectorY);
+    SessionUnLock(SessionID);
+}
+void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType , BYTE bBroadCast )
+{
+    CPlayer *player;
+    if (SessionLock(SessionID) == false)
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+
+    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+    {
+        __debugbreak();
+        Disconnect(SessionID);
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+    player = SessionID_hash[SessionID];
+    if (player->m_AccountNo != AccountNo)
+    {
+
+        Disconnect(SessionID);
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+
+    Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
+    msg->iUseCnt = 0;
+
+    int SectorX = player->iSectorX;
+    int SectorY = player->iSectorY;
+
+    st_Sector_Around AroundSectors;
+    SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
+
+    if (bBroadCast)
+    {
+        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        {
+            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+            {
+                _interlockedincrement64(&msg->iUseCnt);
+   
+            }
+        }
+        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        {
+            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+            {
+                UnitCast(id, msg);
+            }
+        }
+    }
+    SessionUnLock(SessionID);
+}
+
+void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBroadCast)
+{
+    CPlayer *player;
+    if (SessionLock(SessionID) == false)
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+    player = SessionID_hash[SessionID];
+    player->m_Timer = timeGetTime();
+
+    Proxy::HEARTBEAT(SessionID, msg);
+
     SessionUnLock(SessionID);
 }
 
@@ -258,6 +369,7 @@ void CTestServer::AllocPlayer(CMessage *msg)
     if (SessionLock(SessionID) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
+        Disconnect(SessionID); // ?
         return;
     }
     //
@@ -274,7 +386,10 @@ void CTestServer::AllocPlayer(CMessage *msg)
     // prePlayer_hash 는 Login을 기다리는 Session임.
     // LoginPacket을 받았다면 ;
     player->m_Timer = timeGetTime();
+ 
     player->m_sessionID = SessionID;
+    player->m_State = en_State::Session;
+
     m_prePlayerCount++;
     SessionUnLock(SessionID);
     
@@ -293,7 +408,10 @@ void CTestServer::DeletePlayer(CMessage *msg)
     {
         // Player라면
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        {
+            // 이 상황이 무슨 상황일까.
             __debugbreak();
+        }
      
         player = SessionID_hash[SessionID];
         SessionID_hash.erase(SessionID);
@@ -310,11 +428,12 @@ void CTestServer::DeletePlayer(CMessage *msg)
         prePlayer_hash.erase(SessionID);
         m_prePlayerCount--;
     }
-
+    stTlsObjectPool<CMessage>::Release(msg);
     player_pool.Release(player);
 
 
 }
+
 
 CTestServer::CTestServer(int iEncording)
     : CLanServer(iEncording)
@@ -415,7 +534,9 @@ bool CTestServer::OnAccept(ull SessionID)
         
         *msg << (unsigned short)en_PACKET_Player_Alloc;
         msg->ownerID = SessionID;
-        msg->iUseCnt = 1;
+        if (_interlockedexchange64(&msg->iUseCnt, 1) != 0)
+            __debugbreak();
+        
 
         OnRecv(SessionID, msg);
     }
@@ -434,7 +555,8 @@ void CTestServer::OnRelease(ull SessionID)
 
         *msg << (unsigned short)en_PACKET_Player_Delete;
         msg->ownerID = SessionID;
-        msg->iUseCnt = 1;
+        if (_interlockedexchange64(&msg->iUseCnt, 1) != 0)
+            __debugbreak();
 
         OnRecv(SessionID, msg);
     }

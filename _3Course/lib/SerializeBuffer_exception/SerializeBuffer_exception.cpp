@@ -57,7 +57,7 @@ void CMessage::EnCoding( )
     SerializeBufferSize len;
     BYTE RK;
     BYTE total = 0;
-    int current = 0;
+    int current = 1;
 
     BYTE P = 0;
     BYTE E = 0;
@@ -84,17 +84,17 @@ void CMessage::EnCoding( )
     }
     memcpy(local_Front, &total, sizeof(total));
 
-    //HexLog();
-    for (; &local_Front[current] != _rearPtr; current++)
+    HexLog(en_Tag::ENCODE_BEFORE);
+    for (; &local_Front[current - 1] != _rearPtr; current++)
     {
-        BYTE D1 = (local_Front)[current];
+        BYTE D1 = (local_Front)[current - 1];
         BYTE b = (P + RK + current);
 
         P = D1 ^ b;
         E = P ^ (E + K + current);
-        local_Front[current] = E;
+        local_Front[current - 1] = E;
     }
-    //HexLog(en_Tag::ENCODE);
+    HexLog(en_Tag::ENCODE);
 }
 
 bool CMessage::DeCoding( )
@@ -102,14 +102,14 @@ bool CMessage::DeCoding( )
     BYTE P1 = 0, P2;
     BYTE E1 = 0, E2;
     BYTE D1 = 0, D2;
-    BYTE total = 0;
+    char total = 0;
     BYTE RK;
     char *local_Front;
 
     // 디코딩의 msg는 링버퍼에서 꺼낸 데이터로 내가 작성하는
     SerializeBufferSize len;
-    int current = 0;
-
+    int current = 1;
+    //HexLog(en_Tag::DECODE_BEFORE);
     // struct stHeader
     //{
     //  public:
@@ -133,14 +133,14 @@ bool CMessage::DeCoding( )
 
     // E2 ^ (E1 + K + 2) = P2
     // P2 ^ (P1 + RK + 2) = D2
-    for (; &local_Front[current] != _rearPtr; current++)
+    for (; &local_Front[current - 1] != _rearPtr; current++)
     {
-        E2 = local_Front[current];
+        E2 = local_Front[current - 1];
         P2 = E2 ^ (E1 + K + current);
         E1 = E2;
         D2 = P2 ^ (P1 + RK + current);
         P1 = P2;
-        local_Front[current] = D2;
+        local_Front[current - 1] = D2;
     }
 
     for (SerializeBufferSize i = 1; i < len; i++)
@@ -150,8 +150,9 @@ bool CMessage::DeCoding( )
   
     if (local_Front[0] != total)
     {
+        __debugbreak();
         HexLog(en_Tag::_ERROR);
-        
+        HexLog(en_Tag::DECODE);
         return false;
     }
     return true;

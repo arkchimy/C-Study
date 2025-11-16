@@ -162,7 +162,7 @@ struct CMessage
     ull ownerID;
     LONG64 iUseCnt = 0;
 
-    BYTE K = 0xa9; // 고정 키 
+    BYTE K = 0x32; // 고정 키 
   
     inline static HANDLE s_BufferHeap;
 };

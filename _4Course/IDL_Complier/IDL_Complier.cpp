@@ -33,7 +33,7 @@ wchar_t TargetPath[FILENAME_MAX];
 \t CTestServer *server; \n \
 \t server = reinterpret_cast<CTestServer *>((char *)this - 8); \n \
 \n\
-\t header.byCode = 0x89; \n \
+\t header.byCode = 0x77; \n \
 \t msg->~CMessage(); \n \
 \t \n \
 \t msg->PutData(&header,sizeof(stHeader)); \n\
@@ -464,6 +464,10 @@ void MakeProxy()
 
         for (wchar_t *data : gRPCvec)
         {
+            std::wstring str(data);
+            if (str.find(L"REQ") != std::wstring::npos)
+                continue;
+
             StringCchPrintfW(buffer, BufferMax, ProxyFORMAT, data);
             fwrite(buffer, 2, wcslen(buffer), file);
         }
@@ -602,6 +606,9 @@ void MakeProxy()
                 if (cnt % 2 == 0)
                     words.push_back(temp);
             }
+            std::wstring str(buffer);
+            if (str.find(L"REQ") != std::wstring::npos)
+                continue;
             StringCchPrintfW(buffer2, BufferMax, ProxyCPPStart_FORMAT, buffer);
             fwrite(buffer2, 2, wcslen(buffer2), file);
         
@@ -719,6 +726,9 @@ void MakeStub()
 
         for (wchar_t *data : gRPCvec)
         {
+            std::wstring str(data);
+            if (str.find(L"RES") != std::wstring::npos)
+                continue;
             StringCchPrintfW(buffer, BufferMax, STUB_H_DEF_FORMAT, data);
             fwrite(buffer, 2, wcslen(buffer), file);
         }
@@ -843,6 +853,9 @@ void MakeStub()
             }
             wchar_t buffer2[BufferMax];
 
+            std::wstring str(wordvals[0]);
+            if (str.find(L"RES") != std::wstring::npos)
+                continue;
             StringCchPrintfW(buffer2, BufferMax, STUB_CPP_OPEN_FORMAT,
                              wordvals[0]);
             fwrite(buffer2, 2, wcslen(buffer2), file);

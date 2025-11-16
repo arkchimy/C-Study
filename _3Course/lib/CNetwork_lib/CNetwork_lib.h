@@ -87,7 +87,8 @@ class CLanServer : public Stub, public  Proxy
 
     void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
                     int iSectorX = 0, int iSectorY = 0);
-    void UnitCast(ull SessionID, CMessage *msg, size_t size);
+    void UnitCast(ull SessionID, CMessage *msg);
+    void BroadCast(ull SessionID, CMessage *msg, WORD SectorX, WORD SectorY);
 
     void RecvPacket(class clsSession &session);
 

@@ -571,7 +571,8 @@ CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
         msg->HexLog();
         return nullptr;
     }
-    msg->iUseCnt = 1;
+    if (_interlockedexchange64(&msg->iUseCnt, 1) != 0)
+        __debugbreak();
     return msg;
 }
 
@@ -755,14 +756,15 @@ void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
     switch (SendType)
     {
     case 0:
-        msg->iUseCnt = 1;
-        UnitCast(SessionID, msg, msg->_size);
+        UnitCast(SessionID, msg);
         break;
-    
+    //case 1:
+    //    BroadCast(SessionID, msg, iSectorX, iSectorY);
+    //    break;
     }
       
 }
-void CLanServer::UnitCast(ull SessionID, CMessage *msg, size_t size)
+void CLanServer::UnitCast(ull SessionID, CMessage *msg)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
     ull Local_ioCount;
@@ -833,6 +835,10 @@ void CLanServer::UnitCast(ull SessionID, CMessage *msg, size_t size)
     // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
         ReleaseSession(SessionID);
+}
+void CLanServer::BroadCast(ull SessionID, CMessage *msg , WORD SectorX, WORD SectorY)
+{
+
 }
 void CLanServer::RecvPacket(clsSession &session)
 {
