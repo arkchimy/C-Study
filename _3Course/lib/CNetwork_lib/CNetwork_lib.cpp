@@ -571,8 +571,7 @@ CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
         msg->HexLog();
         return nullptr;
     }
-    if (_interlockedexchange64(&msg->iUseCnt, 1) != 0)
-        __debugbreak();
+
     return msg;
 }
 
@@ -756,6 +755,8 @@ void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
     switch (SendType)
     {
     case 0:
+        if (_interlockedexchange64(&msg->iUseCnt, 1) != 0)
+            __debugbreak();
         UnitCast(SessionID, msg);
         break;
     //case 1:
