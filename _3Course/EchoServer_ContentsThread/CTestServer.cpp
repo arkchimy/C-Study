@@ -212,7 +212,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     }
 
     // 중복 접속 문제
-    if (SessionID_hash.find(AccountNo) != SessionID_hash.end())
+    if (AccountNo_hash.find(AccountNo) != AccountNo_hash.end())
     {
         Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
 
@@ -311,7 +311,6 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
     }
 
     Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
-    msg->iUseCnt = 0;
 
     int SectorX = player->iSectorX;
     int SectorY = player->iSectorY;
@@ -325,6 +324,9 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         {
             for (ull id : g_Sector[targetSector._iY][targetSector._iX])
             {
+                if (id == SessionID)
+                    continue;
+
                 _interlockedincrement64(&msg->iUseCnt);
    
             }
@@ -403,6 +405,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
     ull SessionID;
     CPlayer *player;
     SessionID = msg->ownerID;
+
 
     if (prePlayer_hash.find(SessionID) == prePlayer_hash.end())
     {
@@ -534,10 +537,7 @@ bool CTestServer::OnAccept(ull SessionID)
         
         *msg << (unsigned short)en_PACKET_Player_Alloc;
         msg->ownerID = SessionID;
-        if (_interlockedexchange64(&msg->iUseCnt, 1) != 0)
-            __debugbreak();
         
-
         OnRecv(SessionID, msg);
     }
 
@@ -555,8 +555,7 @@ void CTestServer::OnRelease(ull SessionID)
 
         *msg << (unsigned short)en_PACKET_Player_Delete;
         msg->ownerID = SessionID;
-        if (_interlockedexchange64(&msg->iUseCnt, 1) != 0)
-            __debugbreak();
+
 
         OnRecv(SessionID, msg);
     }

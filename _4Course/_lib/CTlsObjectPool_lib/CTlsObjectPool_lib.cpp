@@ -124,6 +124,7 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
         __debugbreak();
     CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%10s %10s : %08p %10s %08p %10s %llu",
                                    L"Alloc ", L"Node ", node, L"PoolAddress ", pool->releasePool, L"m_size", pool->allocPool->m_size);
+   
     return node;
 }
 

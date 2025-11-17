@@ -46,13 +46,7 @@ CMessage::~CMessage()
     _rearPtr = _begin;
     _end = _begin + _size;
 
-    if (iUseCnt != 0)
-    {
-        __debugbreak();
-        HexLog();
-    }
-
-
+    _interlockedexchange64(&iUseCnt, 1);
 }
 
 void CMessage::EnCoding( )
@@ -83,16 +77,16 @@ void CMessage::EnCoding( )
     //};
     memcpy(_begin + offsetof(stHeader, byRandKey), &RK, sizeof(BYTE));
 
-    if (local_Front[1] == 0x06)
-        bDebug = true;
+    //if (local_Front[1] == 0x06)
+    //    bDebug = true;
 
     for (SerializeBufferSize i = 1; i < len; i++)
     {
         total += local_Front[i];
     }
     memcpy(local_Front, &total, sizeof(total));
-    if (bDebug)
-        HexLog(en_Tag::ENCODE_BEFORE);
+    //if (bDebug)
+    //    HexLog(en_Tag::ENCODE_BEFORE);
     for (; &local_Front[current - 1] != _rearPtr; current++)
     {
         BYTE D1 = (local_Front)[current - 1];
@@ -102,8 +96,8 @@ void CMessage::EnCoding( )
         E = P ^ (E + K + current);
         local_Front[current - 1] = E;
     }
-    if (bDebug)
-        HexLog(en_Tag::ENCODE);
+    //if (bDebug)
+     //   HexLog(en_Tag::ENCODE);
 }
 
 bool CMessage::DeCoding( )
@@ -129,6 +123,7 @@ bool CMessage::DeCoding( )
     //    BYTE byCheckSum;
 
     //};
+    //HexLog(en_Tag::DECODE_BEFORE);
     RK = *(_begin + offsetof(stHeader, byRandKey));
 
     //HexLog();
@@ -164,6 +159,7 @@ bool CMessage::DeCoding( )
         HexLog(en_Tag::DECODE);
         return false;
     }
+    //HexLog(en_Tag::DECODE);
     return true;
 }
 

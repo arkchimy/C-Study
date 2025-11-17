@@ -632,7 +632,7 @@ void MakeProxy()
                 {
                     long arraySize = GetSize_ForSizeArray(temp);
                     StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT2,
-                                        words[i], arraySize);
+                                        words[i], arraySize * 2);
                 }
                 else if (temp.find(needle2) != std::wstring::npos)
                 {
@@ -871,7 +871,7 @@ void MakeStub()
                         {
                             long arraySize = GetSize_ForSizeArray(temp);
                             StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_ARRFORMAT,
-                                             L"WCHAR", words[i], arraySize);
+                                             L"WCHAR", words[i], arraySize );
                         }
                         else if (temp.find(needle2) != std::wstring::npos)
                         {
@@ -901,7 +901,7 @@ void MakeStub()
                     long arraySize = GetSize_ForSizeArray(temp);
 
                     StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_ARRFORMAT2,
-                                     words[i], arraySize);
+                                     words[i], arraySize * 2);
                 }
                 else if (temp.find(needle2) != std::wstring::npos)
                 {
