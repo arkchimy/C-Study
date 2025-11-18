@@ -65,6 +65,18 @@ class CTestServer : public CLanServer
 
     virtual LONG64 GetPlayerCount() { return m_TotalPlayers; }
 
+    
+    LONG64 prePlayer_hash_size = 0;
+    LONG64 AccountNo_hash_size = 0;
+    LONG64 SessionID_hash_size = 0;
+
+    LONG64 GetprePlayer_hash() { return prePlayer_hash_size; }
+    LONG64 GetAccountNo_hash() { return AccountNo_hash_size; }
+    LONG64 GetSessionID_hash() { return SessionID_hash_size; }
+
+
+
+
     SRWLOCK srw_ContentQ;
 
     CRingBuffer m_ContentsQ = CRingBuffer(s_ContentsQsize, 1); // Pool에서 할당하지않음
@@ -77,7 +89,7 @@ class CTestServer : public CLanServer
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
 
     int m_maxSessions = 0;   
-    int m_maxPlayers = 7000;   
+    int m_maxPlayers = 10000;   
 
     LONG64 m_prePlayerCount = 0;
     LONG64 m_TotalPlayers = 0; // 현재 Player의 Cnt

@@ -107,6 +107,8 @@ struct stTlsObjectPoolManager
 
     ManagerPool fullPools;
     ManagerPool emptyPools;
+
+    LONG64 m_TotalCount;
 };
 
 /*

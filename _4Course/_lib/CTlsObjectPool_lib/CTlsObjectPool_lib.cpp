@@ -136,15 +136,24 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
     CMessage *msg;
     LONG64 iUseCnt;
 
+    static LONG64 ReleaseCnt = 0;
+    LONG64 localReleaseCnt;
+
+
     msg = reinterpret_cast<CMessage *>(node);
     
     iUseCnt = InterlockedDecrement64(&msg->iUseCnt);
+
 
     // UseCnt를 잘못 감소 시킨 경우 
     if (iUseCnt < 0)
         __debugbreak();
     if (iUseCnt != 0)
         return;
+    localReleaseCnt = InterlockedIncrement64(&ReleaseCnt);
+
+    CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%15s %08llu ",
+                                   L"CMessage Release : ", localReleaseCnt);
 
     if (s_tlsIdx == TLS_OUT_OF_INDEXES)
     {
