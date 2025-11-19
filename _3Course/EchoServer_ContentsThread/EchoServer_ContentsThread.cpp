@@ -69,23 +69,39 @@ int main()
             {
                 SetEvent(EchoServer.m_ServerOffEvent);
             }
-            else if (GetAsyncKeyState('A') || GetAsyncKeyState('a'))
-                Profiler::SaveAsLog(buffer);
-            else if (GetAsyncKeyState('D') || GetAsyncKeyState('d'))
+            if (_kbhit())
             {
-                Profiler::Reset();
+                char ch = _getch();
+                if (ch =='A' || ch == 'a' )
+                {
+                    CSystemLog::GetInstance()->SaveAsLog();
+                    Profiler::SaveAsLog(buffer);
+                }
+                if (ch =='D' || ch == 'd' )
+                {
+                    Profiler::Reset();
+                }
+                if (ch == '1' )
+                {
+                    
+                    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
+                    printf("ERROR_Mode\n");
+                }
+                if (ch == '2' )
+                {
+                    
+                    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_TargetMode);
+                    printf("DEBUG_TargetMode\n");
+                }
+                if (ch == '3' )
+                {
+                    
+                    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
+                    printf("DEBUG_Mode\n");
+                }
+
             }
-            else if (GetAsyncKeyState(VK_UP))
-            {
-                CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
-                printf("DEBUG_Mode\n");
-            }
-                
-            else if (GetAsyncKeyState(VK_DOWN))
-            {
-                CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
-                printf("ERROR_Mode\n");
-            }
+           
             
         
         }

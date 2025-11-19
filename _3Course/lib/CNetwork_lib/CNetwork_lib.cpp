@@ -139,6 +139,9 @@ unsigned AcceptThread(void *arg)
         }
 
         clsSession& session = server->sessions_vec[idx];
+        if (session.m_sendBuffer.m_size != 0)
+            __debugbreak();
+
         stsessionID.idx = idx;
         stsessionID.seqNumber = session_id++;
 
@@ -749,13 +752,13 @@ void CLanServer::SessionUnLock(ull SessionID)
         ReleaseSession(SessionID);
 }
 
-void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
+void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType, INT64 Account,
                             int iSectorX, int iSectorY)
 {
     switch (SendType)
     {
     case 0:
-        UnitCast(SessionID, msg);
+        UnitCast(SessionID, msg, Account);
         break;
     //case 1:
     //    BroadCast(SessionID, msg, iSectorX, iSectorY);
@@ -763,7 +766,7 @@ void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
     }
       
 }
-void CLanServer::UnitCast(ull SessionID, CMessage *msg)
+void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
     ull Local_ioCount;
@@ -819,6 +822,15 @@ void CLanServer::UnitCast(ull SessionID, CMessage *msg)
 
         session.m_sendBuffer.Push(*ppMsg);
         profile.End(L"LFQ_Push");
+
+
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+                                       L"%-20s %12s %05lld  %12s %05llu %12s %05llu %10s %05llu",
+                                       L"UnitCast  ",
+                                       L"Account:", Account,
+                                       L"SessiondID:", SessionID,
+                                       L"SessiondIndex:", SessionID >> 47,
+                                       L"Socket :", session.m_sock);
     }
 
     // PQCS를 시도.

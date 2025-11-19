@@ -5,10 +5,104 @@
 #include "CSystemLog_lib.h"
 #include "../../../error_log.h"
 #include <strsafe.h>
+#include <thread>
+#define DebugVectorSize 100000
+LONG64 m_seqNumber = 0;
+SRWLOCK g_srw_DebugQlock;
+// Debug용도
+struct stDebugInfo
+{
+    const WCHAR *szType;
+    en_LOG_LEVEL LogLevel;
+    const WCHAR *szStringFormat;
+    std::wstring LogWstring;
+};
+
+std::vector<stDebugInfo> m_TargetDebugVector(DebugVectorSize);
+
+unsigned LogThread(void *arg)
+{
+    //argArr[0] = &m_DebugQ;
+    //argArr[1] = m_LogThreadEvent;
+    HANDLE *hArg = (HANDLE *)arg;
+
+   CRingBuffer *ptrDebugQ = (CRingBuffer *)hArg[0];
+
+    FILE *debugFile;
+   m_TargetDebugVector.resize(DebugVectorSize);
+
+    static int idx = 0;
+
+    while (1)
+    {
+        
+        DeBugHeader header;
+        while (ptrDebugQ->Peek(&header, sizeof(DeBugHeader)) == sizeof(DeBugHeader))
+        {
+
+            std::wstring str;
+            wchar_t buffer[1000];
+            ringBufferSize useSize = ptrDebugQ->GetUseSize();
+            if (useSize < header.len + sizeof(DeBugHeader))
+                break;
+
+            ptrDebugQ->Dequeue(&header, sizeof(DeBugHeader));
+            ptrDebugQ->Dequeue(buffer, header.len);
+
+            //m_TargetDebugVector[idx % 100] = buffer;
+            idx++;
+
+        }
+        //while (ptrDebugQ->empty() == false)
+        //{
+        //    std::wstring str;
+        //    AcquireSRWLockExclusive(&g_srw_DebugQlock);
+        //    if (ptrDebugQ->empty() == false)
+        //    {
+        //        str = ptrDebugQ->front();
+        //        ptrDebugQ->pop();
+        //    }
+
+        //    ReleaseSRWLockExclusive(&g_srw_DebugQlock);
+
+        //    fwrite(str.c_str(), 2, wcslen(str.c_str()), debugFile);
+        //}
+
+    }
+
+}
+void CSystemLog::SaveAsLog()
+{
+    FILE *debugFile;
+reWfopen:
+    _wfopen_s(&debugFile, L"DebugFile.txt", L"a+ , ccs = UTF-16LE");
+    if (debugFile == nullptr)
+    {
+        goto reWfopen;
+    }
+
+    DeBugHeader header;
+    for (int i = 0; i < DebugVectorSize; i++)
+    {
+        fwrite(m_TargetDebugVector[i].LogWstring.c_str(), 2, wcslen(m_TargetDebugVector[i].LogWstring.c_str()), debugFile);
+    }
+    fclose(debugFile);
+}
 
 CSystemLog::CSystemLog()
 {
-    InitializeSRWLock(&srw_lock);
+    // 소멸자에서 제거하기. 하기싫음 말고
+
+    InitializeSRWLock(&srw_Errorlock);
+    InitializeSRWLock(&g_srw_DebugQlock);
+
+    m_LogThreadEvent = CreateEvent(nullptr, 0, 0, nullptr);
+
+    hArgArr[0] = &m_DebugQ;
+    hArgArr[1] = m_LogThreadEvent;
+    
+    //m_LogThread = (HANDLE)_beginthreadex(nullptr, 0, LogThread, hArgArr, 0, nullptr);
+
 }
 
 // 에러 발생 시 이중으로 Log를 작성하여 에러상황을 알려보는 시도.
@@ -55,11 +149,12 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
         {
             L"SYSTEM",
             L"ERROR",
+            L"Target",
             L"DEBUG",
             };
 
     WCHAR LogHeaderBuffer[FILENAME_MAX * 2];
-    WCHAR LogPayLoadBuffer[FILENAME_MAX];
+    WCHAR LogWstring[FILENAME_MAX];
     WCHAR LogFileName[FILENAME_MAX];
 
     HRESULT cchRetval;
@@ -69,9 +164,54 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
     LONG64 local_SeqNumber;
 
     FILE *LogFile;
+    static LONG64 TargetDebugSeq = 0;
 
+    
     if (LogLevel > m_Log_Level)
+    {
         return;
+    }
+    
+    if (LogLevel == en_LOG_LEVEL::DEBUG_TargetMode)
+    {
+        // DeBug  가 아닐 때  DeBug 모드가 발생하면, 메모리 Log라도 작성하자.
+        //if (LogLevel == en_LOG_LEVEL::DEBUG_TargetMode)
+     
+        SYSTEMTIME stNowTime;
+   
+        GetLocalTime(&stNowTime);
+
+        if (GetLogFileName(szType, FILENAME_MAX, stNowTime, LogFileName) == false)
+        {
+            __debugbreak();
+            return;
+        }
+
+        StringCchPrintfW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), format,
+                         szType, stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay,
+                         stNowTime.wHour, stNowTime.wMinute, stNowTime.wMilliseconds,
+                         Logformat[(DWORD)LogLevel], TargetDebugSeq, GetCurrentThreadId());
+
+        m_TargetDebugVector[TargetDebugSeq % DebugVectorSize].LogLevel = LogLevel;
+        m_TargetDebugVector[TargetDebugSeq % DebugVectorSize].szStringFormat = szStringFormat;
+        m_TargetDebugVector[TargetDebugSeq % DebugVectorSize].szType = szType;
+   
+        va_start(va, szStringFormat);
+        cchRetval = StringCchVPrintfW(LogWstring, sizeof(LogWstring) / sizeof(wchar_t), szStringFormat, va);
+        va_end(va);
+
+        StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogWstring);
+
+        DWORD idx = wcslen(LogHeaderBuffer);
+        LogHeaderBuffer[idx] = L'\n';
+        LogHeaderBuffer[idx + 1] = 0;
+
+        m_TargetDebugVector[TargetDebugSeq % DebugVectorSize].LogWstring = LogHeaderBuffer;
+        TargetDebugSeq++;
+
+        return;
+        
+    }
 
     local_SeqNumber = _InterlockedIncrement64(&m_seqNumber);
 
@@ -91,7 +231,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
     //[Battle] [2015-09-11 19:00:00 / DEBUG / 000000001] 로그문자열.
 
     va_start(va, szStringFormat);
-    cchRetval = StringCchVPrintfW(LogPayLoadBuffer, sizeof(LogPayLoadBuffer) / sizeof(wchar_t), szStringFormat, va);
+    cchRetval = StringCchVPrintfW(LogWstring, sizeof(LogWstring) / sizeof(wchar_t), szStringFormat, va);
     va_end(va);
 
     if (cchRetval != S_OK)
@@ -99,25 +239,29 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
         ERROR_FILE_LOG(L"StringCchVPrintfW.txt", L"StringCchVPrintfW Error");
     }
 
-    StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogPayLoadBuffer);
+    StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogWstring);
 
     DWORD idx = wcslen(LogHeaderBuffer);
     LogHeaderBuffer[idx] = L'\n';
     LogHeaderBuffer[idx + 1] = 0;
 
-    AcquireSRWLockExclusive(&srw_lock);
-    _wfopen_s(&LogFile, LogFileName, L"a+ , ccs = UTF-16LE");
 
-    if (LogFile == nullptr)
+    // Lock 걸고 들어감.
     {
-        ERROR_FILE_LOG(L"FileOpen_Error.txt", L"_wfopen_s Error");
-        ReleaseSRWLockExclusive(&srw_lock);
-        return;
+        AcquireSRWLockExclusive(&srw_Errorlock);
+        _wfopen_s(&LogFile, LogFileName, L"a+ , ccs = UTF-16LE");
+
+        if (LogFile == nullptr)
+        {
+            ERROR_FILE_LOG(L"FileOpen_Error.txt", L"_wfopen_s Error");
+            ReleaseSRWLockExclusive(&srw_Errorlock);
+            return;
+        }
+        fwrite(LogHeaderBuffer, 2, wcslen(LogHeaderBuffer), LogFile);
+        fclose(LogFile);
     }
 
-    fwrite(LogHeaderBuffer, 2, wcslen(LogHeaderBuffer), LogFile);
-    fclose(LogFile);
-    ReleaseSRWLockExclusive(&srw_lock);
+    ReleaseSRWLockExclusive(&srw_Errorlock);
 }
 
 void CSystemLog::LogHex(WCHAR *szType, en_LOG_LEVEL LogLevel, WCHAR *szLog, BYTE *pByte, int iByteLen)

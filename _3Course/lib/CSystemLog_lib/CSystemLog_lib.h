@@ -4,15 +4,28 @@
 
 #include <Windows.h>
 #include <iostream>
+#include <queue>
+
+#include "../MT_CRingBuffer_lib/MT_CRingBuffer_lib.h"
+
 enum class en_LOG_LEVEL : DWORD
 {
     SYSTEM_Mode = 0,
     ERROR_Mode,
+    DEBUG_TargetMode,
     DEBUG_Mode,
+
     MAX,
+};
+
+struct DeBugHeader
+{
+    short len;
 };
 class CSystemLog
 {
+  private:
+    CSystemLog();
   public:
     static CSystemLog *GetInstance(); // Initalization 되어있는 SRWLOCK 객체를 넘겨 줄것.
 
@@ -22,14 +35,20 @@ class CSystemLog
     void Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *szStringFormat, ...);
     void LogHex(WCHAR *szType, en_LOG_LEVEL LogLevel, WCHAR *szLog, BYTE *pByte, int iByteLen);
 
+    void SaveAsLog();
   private:
-    CSystemLog();
     BOOL GetLogFileName(const wchar_t *const filename, size_t strlen, SYSTEMTIME &stNowTime, __out wchar_t *const out);
 
   public:
-    SRWLOCK srw_lock;
+    SRWLOCK srw_Errorlock;
 
-    LONG64 m_seqNumber = 0;
+    //LogThread에게 전해주는 용도
+    HANDLE hArgArr[2];
+    CRingBuffer m_DebugQ = CRingBuffer(80000);
+    HANDLE m_LogThreadEvent;
+
+
+    HANDLE m_LogThread;
 
     en_LOG_LEVEL m_Log_Level = en_LOG_LEVEL::ERROR_Mode;
 };

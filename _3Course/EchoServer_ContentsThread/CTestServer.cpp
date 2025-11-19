@@ -281,7 +281,10 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         //Login응답.
         Proxy::RES_LOGIN(SessionID, msg, true, AccountNo );
     }
-
+    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+                                   L"%-20s %05lld %12s %05llu  ",
+                                   L"Login - Accept : ", AccountNo,
+                                   L"현재들어온ID:", SessionID);
     SessionUnLock(SessionID);
 }
 void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, BYTE byType , BYTE bBroadCast ) 
@@ -370,6 +373,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
     st_Sector_Around AroundSectors;
     SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
 
+
     if (bBroadCast)
     {
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
@@ -391,10 +395,9 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
                 if (SessionID_hash.find(id) != SessionID_hash.end())
                 {
                     player = SessionID_hash[id];
-                    if (player->m_State == en_State::Session)
-                        __debugbreak();
+                    UnitCast(id, msg, player->m_AccountNo);
                 }
-                UnitCast(id, msg);
+  
             }
         }
     }
@@ -427,6 +430,10 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
     player = SessionID_hash[SessionID];
     player->m_Timer = timeGetTime();
 
+    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+                                   L"%-20s %12s %05llu %12s %05llu ",
+                                   L"HEARTBEAT Send : ",
+                                   L"현재들어온ID:", SessionID);
     Proxy::HEARTBEAT(SessionID, msg);
 
     SessionUnLock(SessionID);
@@ -511,6 +518,12 @@ void CTestServer::DeletePlayer(CMessage *msg)
             g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
 
             player->m_State = en_State::DisConnect;
+
+            CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+                                           L"%-20s %05lld %12s %05llu  ",
+                                           L"LogOut - Accept : ", player->m_AccountNo,
+                                           L"현재들어온ID:", SessionID);
+
             player_pool.Release(player);
         }
         
@@ -522,7 +535,13 @@ void CTestServer::DeletePlayer(CMessage *msg)
         m_prePlayerCount--;
 
         player->m_State = en_State::DisConnect;
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+                                       L"%-20s %05lld %12s %05llu  ",
+                                       L"LoginBeforeOut - WastAccept : ", player->m_AccountNo,
+                                       L"현재들어온ID:", SessionID);
+
         player_pool.Release(player);
+
 
     }
 
