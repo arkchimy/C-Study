@@ -211,7 +211,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
         //없다는 것은 내가 만든 절차를 따르지않았음을 의미.
 
-        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
                                        L"%-20s %05lld %12s %05llu %12s %05llu ",
                                        L"LoginError - prePlayer_hash not found : ", AccountNo,
                                        L"현재들어온ID:", SessionID);
@@ -392,12 +392,17 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
             for (ull id : g_Sector[targetSector._iY][targetSector._iX])
             {
                 //여기가 문제인것 같은데. 
+             /*   if (SessionLock(id) == false)
+                {
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    continue;
+                }*/
                 if (SessionID_hash.find(id) != SessionID_hash.end())
                 {
                     player = SessionID_hash[id];
                     UnitCast(id, msg, player->m_AccountNo);
                 }
-  
+                //SessionUnLock(id);
             }
         }
     }
@@ -477,6 +482,12 @@ void CTestServer::AllocPlayer(CMessage *msg)
     prePlayer_hash[SessionID] = player;
     // prePlayer_hash 는 Login을 기다리는 Session임.
     // LoginPacket을 받았다면 ;
+    // 
+    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+                                L"%-20s %12s %05llu %12s %05llu ",
+                                L"AllocPlayer SessionLock Failed : ",
+                                L"현재들어온ID:", SessionID);
+
     player->m_Timer = timeGetTime();
  
     player->m_sessionID = SessionID;
@@ -530,6 +541,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
     }
     else
     {
+        // Accept 이후  DeletePlayer가 LoginPacket보다 먼저 옴.
         player = prePlayer_hash[SessionID];
         prePlayer_hash.erase(SessionID);
         m_prePlayerCount--;
@@ -580,7 +592,7 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
-float CTestServer::OnRecv(ull sessionID, CMessage *msg)
+float CTestServer::OnRecv(ull SessionID, CMessage *msg)
 {
     // double CurrentQ;
     ringBufferSize ContentsUseSize;
@@ -602,7 +614,8 @@ float CTestServer::OnRecv(ull sessionID, CMessage *msg)
         // 포인터를 넣고
         CMessage **ppMsg;
         ppMsg = &msg;
-        (*ppMsg)->ownerID = sessionID;
+        InterlockedExchange(&msg->ownerID, SessionID);
+      
 
         if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
             __debugbreak();
@@ -647,7 +660,7 @@ bool CTestServer::OnAccept(ull SessionID)
         msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
         
         *msg << (unsigned short)en_PACKET_Player_Alloc;
-        msg->ownerID = SessionID;
+        InterlockedExchange(&msg->ownerID, SessionID);
         
         OnRecv(SessionID, msg);
     }
@@ -665,7 +678,7 @@ void CTestServer::OnRelease(ull SessionID)
         msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
 
         *msg << (unsigned short)en_PACKET_Player_Delete;
-        msg->ownerID = SessionID;
+        InterlockedExchange(&msg->ownerID, SessionID);
 
 
         OnRecv(SessionID, msg);

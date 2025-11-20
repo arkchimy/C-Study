@@ -141,15 +141,18 @@ unsigned AcceptThread(void *arg)
         clsSession& session = server->sessions_vec[idx];
         if (session.m_sendBuffer.m_size != 0)
             __debugbreak();
+        //Session 초기화 부분.
+        {
+            stsessionID.idx = idx;
+            stsessionID.seqNumber = session_id++;
 
-        stsessionID.idx = idx;
-        stsessionID.seqNumber = session_id++;
+            InterlockedExchange(&session.m_sock, client_sock);
+            InterlockedExchange(&session.m_blive, 1);
+            InterlockedExchange(&session.m_flag, 0);
 
-        InterlockedExchange(&session.m_sock, client_sock);
-        InterlockedExchange(&session.m_blive, 1);
-        InterlockedExchange(&session.m_flag, 0);
-        InterlockedExchange(&session.m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
-        InterlockedExchange(&session.m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+            InterlockedExchange(&session.m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+            InterlockedExchange(&session.m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
+        }
 
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
@@ -162,6 +165,10 @@ unsigned AcceptThread(void *arg)
         // AllocMsg의 처리가 너무 많이 발생한다면 False를 반환.
         if (server->OnAccept(session.m_SeqID.SeqNumberAndIdx) == false)
         {
+            CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                           L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
+                                           L"OnAcceptRelease", L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
+
             server->DecrementIoCountAndMaybeDeleteSession(session);
             continue;
         }
@@ -541,7 +548,9 @@ void CLanServer::DecrementIoCountAndMaybeDeleteSession(clsSession &session)
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) != 0)
             return;
-        
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
+                                       L"OnAcceptRelease", L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
         ReleaseSession(session.m_SeqID.SeqNumberAndIdx);
     }
 }

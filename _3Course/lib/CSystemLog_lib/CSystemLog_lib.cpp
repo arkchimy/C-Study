@@ -6,7 +6,7 @@
 #include "../../../error_log.h"
 #include <strsafe.h>
 #include <thread>
-#define DebugVectorSize 100000
+#define DebugVectorSize 500000
 LONG64 m_seqNumber = 0;
 SRWLOCK g_srw_DebugQlock;
 // Debug용도
