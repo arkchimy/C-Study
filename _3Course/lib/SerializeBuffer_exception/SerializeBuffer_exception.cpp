@@ -65,7 +65,7 @@ void CMessage::EnCoding( )
     RK = rand() % UCHAR_MAX;
 
     local_Front = _begin + offsetof(stHeader, byCheckSum);
-    len = _rearPtr - local_Front;
+    len = SerializeBufferSize(_rearPtr - local_Front);
 
     //struct stHeader
     //{
@@ -87,9 +87,10 @@ void CMessage::EnCoding( )
     memcpy(local_Front, &total, sizeof(total));
     //if (bDebug)
     //    HexLog(en_Tag::ENCODE_BEFORE);
+
     for (; &local_Front[current - 1] != _rearPtr; current++)
     {
-        BYTE D1 = (local_Front)[current - 1];
+        BYTE D1 = local_Front[current - 1];
         BYTE b = (P + RK + current);
 
         P = D1 ^ b;
@@ -190,7 +191,6 @@ BOOL CMessage::ReSize()
 {
     // 직렬화 버퍼는 넣고 뺴고는 하나의 쓰레드에서 할 것으로 예상이 된다.
     SerializeBufferSize UseSize;
-    char *swap_begin;
 
     _size = en_BufferSize::MaxSize;
 

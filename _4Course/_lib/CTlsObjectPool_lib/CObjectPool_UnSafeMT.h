@@ -29,8 +29,9 @@ class CObjectPool_UnSafeMT
     };
     struct stNode
     {
+        stNode() :next(nullptr) {}
         T data;
-        stNode *next;
+        stNode *next = nullptr;
     };
 
   public:
@@ -38,6 +39,7 @@ class CObjectPool_UnSafeMT
     {
         m_Top = &m_Dummy; // Dummy m_Dummy
         m_Dummy.next = &m_Dummy;
+        m_AllocatedCount = 0;
     }
     ~CObjectPool_UnSafeMT()
     {
@@ -116,7 +118,7 @@ class CObjectPool_UnSafeMT
     PVOID m_Top;
     stNode m_Dummy;
 
-    DWORD m_AllocatedCount; // 밖에 돌아다니고있는 Node들의 Cnt
+    DWORD m_AllocatedCount = 0; // 밖에 돌아다니고있는 Node들의 Cnt
     bool m_blimite = false;
     ll seqNumber = -1;
     ll m_size = 0;

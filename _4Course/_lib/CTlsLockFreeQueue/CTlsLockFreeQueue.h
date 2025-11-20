@@ -139,6 +139,7 @@ bool CTlsLockFreeQueue<T>::Pop(__out T &outData)
     if (local_Size < 0)
     {
         _interlockedincrement64(&m_size);
+        outData = T();
         return false;
     }
     static ull PopCnt = 0;

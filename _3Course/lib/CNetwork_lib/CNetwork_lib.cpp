@@ -81,14 +81,13 @@ unsigned AcceptThread(void *arg)
     ull session_id = 0;
     ull idx;
 
-    clsSession *session;
     CLanServer *server;
 
     int addrlen;
     stSessionId stsessionID;
-    ull local_IoCount;
 
-    LONG64 localAllocCnt;
+
+
     /* arg 에 대해서
      * arg[0] 에는 클라이언트에게 연결시킬 hIOCP의 HANDLE을 넣기.
      * arg[1] 에는 listen_sock의 주소를 넣기
@@ -130,9 +129,10 @@ unsigned AcceptThread(void *arg)
             if (server->m_SessionIdxStack.m_size == 0)
             {
                 closesocket(client_sock);
+                
                 // 추가적으로 구현해야되는 부분이 존재함.
                 //  DisConnect 행위
-                __debugbreak();
+                InterlockedIncrement(&server->iDisCounnectCount);
                 continue;
             }
             server->m_SessionIdxStack.Pop(idx);
@@ -146,9 +146,9 @@ unsigned AcceptThread(void *arg)
             stsessionID.idx = idx;
             stsessionID.seqNumber = session_id++;
 
-            InterlockedExchange(&session.m_sock, client_sock);
-            InterlockedExchange(&session.m_blive, 1);
-            InterlockedExchange(&session.m_flag, 0);
+            session.m_sock = client_sock;
+            session.m_blive = true;
+            session.m_flag = 0;
 
             InterlockedExchange(&session.m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
             InterlockedExchange(&session.m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
@@ -211,8 +211,7 @@ unsigned WorkerThread(void *arg)
     clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
 
     ull local_IoCount;
-    Profiler profile;
-
+ 
     while (server->bOn)
     {
         // 지역변수 초기화
@@ -408,7 +407,7 @@ bool CLanServer::Disconnect(const ull SessionID)
     clsSession &session = sessions_vec[SessionID >> 47];
 
     ull Local_ioCount;
-    ull seqID;
+
 
     // session의 보장 장치.
     Local_ioCount = InterlockedIncrement(&session.m_ioCount);
@@ -474,7 +473,7 @@ LONG64 CLanServer::Get_IdxStack()
 void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
 {
     stHeader header;
-    ringBufferSize useSize,deQsize;
+    ringBufferSize useSize;
     float qPersentage;
     ull SeqID;
     char *f, *r, *b;
@@ -566,7 +565,7 @@ void CLanServer::DecrementIoCountAndMaybeDeleteSession(clsSession &session)
     }
 }
 
-CMessage *CLanServer::CreateMessage(clsSession &session, class stHeader &header)
+CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header)
 {
     // TODO : Header를 읽고, 생성하고
 
@@ -613,7 +612,7 @@ char *CLanServer::CreateLoginMessage()
 
 void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 {
-    ringBufferSize useSize, directDQSize;
+    ringBufferSize useSize;
 
     DWORD bufCnt;
     int send_retval = 0;
@@ -669,7 +668,6 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
  
     }
 
-    ull msgAddr;
     bufCnt = 0;
 
     Profiler profile;
@@ -678,7 +676,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     while (session.m_sendBuffer.Pop(msg))
     {
         wsaBuf[bufCnt].buf = msg->_frontPtr;
-        wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
+        wsaBuf[bufCnt].len = ULONG (msg->_rearPtr - msg->_frontPtr);
 
         session.m_sendOverlapped.msgs[bufCnt] = msg;
         bufCnt++;
@@ -994,7 +992,6 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
     ull local_IoCount;
-    DWORD CancelRetval;
 
     // TODO : JumpTable이 만들어지는가?
     switch (LastError)

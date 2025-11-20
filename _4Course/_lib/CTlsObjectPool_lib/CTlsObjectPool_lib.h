@@ -108,7 +108,7 @@ struct stTlsObjectPoolManager
     ManagerPool fullPools;
     ManagerPool emptyPools;
 
-    LONG64 m_TotalCount;
+    LONG64 m_TotalCount = 0;
 };
 
 /*
@@ -204,15 +204,6 @@ struct stTlsObjectPool
             swap = pool->allocPool;
             pool->allocPool = instance.GetFullPool(swap);
             return pool->allocPool->Alloc();
-
-            /*swap = pool->allocPool;
-            if (pool->releasePool->m_size == 0)
-            {
-                pool->allocPool = instance.GetFullPool(swap);
-                return pool->allocPool->Alloc();
-            }
-            pool->allocPool = pool->releasePool;
-            pool->releasePool = swap;*/
         }
         PVOID node = pool->allocPool->Alloc();
         
@@ -253,20 +244,6 @@ struct stTlsObjectPool
 
             return;
         }
-
-        /*
-           //메모리가 계속 증가할것이다.
-        if (pool->releasePool->m_size == tlsPool_init_Capacity)
-           {
-               swap = pool->releasePool;
-               if (pool->allocPool->m_size == tlsPool_init_Capacity)
-               {
-                   pool->releasePool = instance.GetEmptyPool(swap);
-                   return;
-               }
-               pool->releasePool = pool->allocPool;
-               pool->allocPool = swap;
-           }*/
     }
 
     inline static stTlsObjectPoolManager<T> instance;

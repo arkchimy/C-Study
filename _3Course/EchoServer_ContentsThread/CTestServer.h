@@ -24,14 +24,14 @@ enum class en_State : int
 struct CPlayer
 {
     en_State m_State = en_State::Max;
-    ull m_sessionID;
+    ull m_sessionID = 0;
 
-    DWORD m_Timer;
-    INT64 m_AccountNo;
+    DWORD m_Timer = 0;
+    INT64 m_AccountNo = 0;
 
-    WCHAR m_ID[20];
-    WCHAR m_Nickname[20];
-    char m_SessionKey[64];
+    WCHAR m_ID[20]{0};
+    WCHAR m_Nickname[20]{0};
+    char m_SessionKey[64]{0};
 
     int iSectorX = 0;
     int iSectorY = 0;
@@ -55,6 +55,7 @@ class CTestServer : public CLanServer
     CTestServer(int iEncording = false);
     virtual ~CTestServer();
 
+    void Update();
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
 

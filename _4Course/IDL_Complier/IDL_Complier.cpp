@@ -664,11 +664,11 @@ class Stub\n{ \n public:\n\
 "
 #define STUB_H_DEF_FORMAT L"\t virtual void %s {}\n"
 #define STUB_H_CLOSEFORMAT                                             \
-    L"\t void PacketProc(ull SessionID, CMessage *msg, BYTE " \
+    L"\t void PacketProc(ull SessionID, CMessage *msg, WORD " \
     L"byType); \n};\n"
 
 #define STUB_CPP_STARTFORMAT                                              \
-    L"\nvoid Stub::PacketProc(ull SessionID, CMessage *msg, BYTE " \
+    L"\nvoid Stub::PacketProc(ull SessionID, CMessage *msg, WORD " \
     L"byType)\n {\n \
     \tCTestServer *server;\n \
     \tserver = reinterpret_cast<CTestServer *>(this);\n \

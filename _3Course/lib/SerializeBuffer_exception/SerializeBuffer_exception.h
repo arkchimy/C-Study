@@ -153,7 +153,7 @@ struct CMessage
     void HexLog(en_Tag tag = en_Tag::NORMAL, const wchar_t *filename = L"SerializeBuffer_hex.txt");
     SerializeBufferSize _size = en_BufferSize::bufferSize;
 
-    char _begin[MaxSize];
+    char _begin[MaxSize]{0};
     char *_end = nullptr;
 
     char *_frontPtr = nullptr;

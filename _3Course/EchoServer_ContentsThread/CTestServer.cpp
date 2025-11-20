@@ -66,16 +66,10 @@ unsigned MonitorThread(void *arg)
 }
 unsigned ContentsThread(void *arg)
 {
-    size_t addr;
-    CMessage *msg, *peekMessage;
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-    char *f, *r;
-    HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
     DWORD hSignalIdx;
-    ringBufferSize useSize, DeQSisze;
-    ull l_sessionID;
-    stHeader header;
-    WORD type;
+    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+    HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
+
     // bool 이 좋아보임.
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
@@ -91,100 +85,8 @@ unsigned ContentsThread(void *arg)
         if (hSignalIdx - WAIT_OBJECT_0 == 1)
             break;
 
-        f = server->m_ContentsQ._frontPtr;
-        r = server->m_ContentsQ._rearPtr;
+        server->Update();
 
-        useSize = server->m_ContentsQ.GetUseSize(f, r);
-
-        server->prePlayer_hash_size = server->prePlayer_hash.size();
-        server->AccountNo_hash_size = server->AccountNo_hash.size();
-        server->SessionID_hash_size = server->SessionID_hash.size();
-
-        // msg  크기 메세지 하나에 8Byte
-        while (useSize >= 8)
-        {
-
-            DeQSisze = server->m_ContentsQ.Dequeue(&addr, sizeof(size_t));
-            if (DeQSisze != sizeof(size_t))
-                __debugbreak();
-
-            msg = (CMessage *)addr;
-            l_sessionID = msg->ownerID;
-
-            *msg >> type;
-
-            switch (type)
-            {
-            //현재 미 사용중
-            case en_PACKET_Player_Alloc:
-                server->AllocPlayer(msg);
-                break;
-
-            case en_PACKET_Player_Delete:
-                server->DeletePlayer(msg);
-                break;
-            case en_PACKET_CS_CHAT_REQ_LOGIN:
-                server->PacketProc(l_sessionID, msg, type);
-                break;
-            default:
-                if (server->SessionID_hash.find(l_sessionID) == server->SessionID_hash.end())
-                {
-                    // Login Not Recv
-                    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                                   L"%-20s %12s %05llu %12s %05llu ",
-                                                   L"HEARTBEAT SessionID_hash not Found : ",
-                                                   L"현재들어온ID:", l_sessionID);
-
-                    stTlsObjectPool<CMessage>::Release(msg);
-                    server->Disconnect(l_sessionID);
-                }
-                else
-                    server->PacketProc(l_sessionID, msg,type);
-            }
-
-            f = server->m_ContentsQ._frontPtr;
-            useSize -= 8;
-        }
-        DWORD currentTime;
-        // 하트비트 부분
-        {
-
-            DWORD msgInterval;
-            CPlayer *player;
-
-            currentTime = timeGetTime();
-
-
-            // prePlayer_hash 는 LoginPacket을 대기하는 Session
-            for (auto element : server->prePlayer_hash)
-            {
-                player = element.second;
-
-                msgInterval = currentTime - player->m_Timer;
-          /*      if (msgInterval >= 50000)
-                {
-                    server->Disconnect(player->m_sessionID);
-                }*/
-            }
-        }
-        // 하트비트 부분
-        {
-   
-            DWORD disTime;
-            CPlayer *player;
-
-            //AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
-            for (auto element : server->AccountNo_hash)
-            {
-                player = element.second;
-  
-                disTime = currentTime - player->m_Timer;
-  /*              if (disTime >= 40000)
-                {
-                    server->Disconnect(player->m_sessionID);
-                }*/
-            }
-        }
     }
 
     return 0;
@@ -579,6 +481,115 @@ CTestServer::~CTestServer()
 {
 }
 
+void CTestServer::Update()
+{
+
+    size_t addr;
+    CMessage *msg;
+
+    char *f, *r;
+
+    ringBufferSize useSize, DeQSisze;
+    ull l_sessionID;
+
+    WORD type;
+
+    f = m_ContentsQ._frontPtr;
+    r = m_ContentsQ._rearPtr;
+
+    useSize = m_ContentsQ.GetUseSize(f, r);
+
+    prePlayer_hash_size = prePlayer_hash.size();
+    AccountNo_hash_size = AccountNo_hash.size();
+    SessionID_hash_size = SessionID_hash.size();
+
+    // msg  크기 메세지 하나에 8Byte
+    while (useSize >= 8)
+    {
+
+        DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
+        if (DeQSisze != sizeof(size_t))
+            __debugbreak();
+
+        msg = (CMessage *)addr;
+        l_sessionID = msg->ownerID;
+
+        *msg >> type;
+
+        switch (type)
+        {
+        // 현재 미 사용중
+        case en_PACKET_Player_Alloc:
+            AllocPlayer(msg);
+            break;
+
+        case en_PACKET_Player_Delete:
+            DeletePlayer(msg);
+            break;
+        case en_PACKET_CS_CHAT_REQ_LOGIN:
+            PacketProc(l_sessionID, msg, type);
+            break;
+        default:
+            if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
+            {
+                // Login Not Recv
+                CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %12s %05llu %12s %05llu ",
+                                               L"HEARTBEAT SessionID_hash not Found : ",
+                                               L"현재들어온ID:", l_sessionID);
+
+                stTlsObjectPool<CMessage>::Release(msg);
+                Disconnect(l_sessionID);
+            }
+            else
+                PacketProc(l_sessionID, msg, type);
+        }
+
+        f = m_ContentsQ._frontPtr;
+        useSize -= 8;
+    }
+
+    DWORD currentTime;
+    // LoginPacket을 대기하는 하트비트 부분
+    {
+
+        DWORD msgInterval;
+        CPlayer *player;
+
+        currentTime = timeGetTime();
+
+        // prePlayer_hash 는 LoginPacket을 대기하는 Session
+        for (auto& element : prePlayer_hash)
+        {
+            player = element.second;
+
+            msgInterval = currentTime - player->m_Timer;
+            /*      if (msgInterval >= 50000)
+                  {
+                      server->Disconnect(player->m_sessionID);
+                  }*/
+        }
+    }
+    // LoginPacket을 받아서 승격된 하트비트 부분
+    {
+
+        DWORD disTime;
+        CPlayer *player;
+
+        // AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
+        for (auto& element : AccountNo_hash)
+        {
+            player = element.second;
+
+            disTime = currentTime - player->m_Timer;
+            /*              if (disTime >= 40000)
+                          {
+                              server->Disconnect(player->m_sessionID);
+                          }*/
+        }
+    }
+}
+
 BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
 {
     BOOL retval;
@@ -640,9 +651,8 @@ bool CTestServer::OnAccept(ull SessionID)
     // Accept의 요청이 밀리고 있다고한다면, 그 이후에 Accept로 들어오는 Session을 끊겠다.
     // m_AllocMsgCount 처리량을 보여주는 변수.
 
-    float qPersentage;
     LONG64 localAllocCnt;
-    LONG64 local_IoCount;
+
     clsSession &session = sessions_vec[SessionID >> 47];
 
     localAllocCnt = _InterlockedIncrement64(&m_AllocMsgCount);

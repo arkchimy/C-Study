@@ -74,7 +74,7 @@ class CLanServer : public Stub, public  Proxy
     void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
 
     void DecrementIoCountAndMaybeDeleteSession(clsSession &session);
-    CMessage *CreateMessage(class clsSession &session, class stHeader &header);
+    CMessage *CreateMessage(class clsSession &session, struct stHeader &header);
     // CMessage *CreateLoginMessage();
     char *CreateLoginMessage();
 

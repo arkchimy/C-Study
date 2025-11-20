@@ -156,7 +156,10 @@
   <ItemGroup>
     <ClCompile Include="clsSession.cpp" />
     <ClCompile Include="CNetwork_lib.cpp" />
-    <ClCompile Include="Proxy.cpp" />
+    <ClCompile Include="Proxy.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4244;</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4244;</DisableSpecificWarnings>
+    </ClCompile>
     <ClCompile Include="Stub.cpp" />
   </ItemGroup>
   <ItemGroup>
