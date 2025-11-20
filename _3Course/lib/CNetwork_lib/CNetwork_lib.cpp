@@ -321,7 +321,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     int buflen;
     DWORD lProcessCnt;
     DWORD bind_retval;
-
+    HRESULT hr;
     SOCKADDR_IN serverAddr;
 
     m_tlsIdxForTPS = TlsAlloc();
@@ -381,8 +381,19 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     bOn = true;
 
     m_hAccept = (HANDLE)_beginthreadex(nullptr, 0, AcceptThread, &AcceptArg, 0, nullptr);
+    RT_ASSERT(m_hAccept != nullptr);
+    hr = SetThreadDescription(m_hAccept, L"\tAcceptThread");
+    RT_ASSERT(!FAILED(hr));
+
     for (int i = 0; i < WorkerCreateCnt; i++)
+    {
         m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
+        RT_ASSERT(m_hThread[i] != nullptr);
+        std::wstring name = L"\tWorkerThread" + std::to_wstring(i);
+
+        hr = SetThreadDescription(m_hThread[i], name.c_str());
+        RT_ASSERT(!FAILED(hr));
+    }
 
     return true;
 }

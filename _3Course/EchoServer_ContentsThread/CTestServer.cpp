@@ -582,12 +582,20 @@ CTestServer::~CTestServer()
 BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
 {
     BOOL retval;
+    HRESULT hr;
 
     m_maxSessions = maxSessions;
 
     retval = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
     hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
+    RT_ASSERT(hContentsThread != nullptr);
+    hr = SetThreadDescription(hContentsThread, L"\tContentsThread");
+    RT_ASSERT(!FAILED(hr));
+
     hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
+    RT_ASSERT(hMonitorThread != nullptr);
+    hr = SetThreadDescription(hMonitorThread, L"\tMonitorThread");
+    RT_ASSERT(!FAILED(hr));
 
     return retval;
 }
