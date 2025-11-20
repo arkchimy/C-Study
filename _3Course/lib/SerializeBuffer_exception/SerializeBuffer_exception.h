@@ -72,7 +72,7 @@ struct CMessage
     {
         if (_end < _rearPtr + sizeof(data))
         {
-            if (_size == en_BufferSize::bufferSize && _end < _rearPtr + sizeof(data) < en_BufferSize::MaxSize)
+            if (_size == en_BufferSize::bufferSize && (size_t)_rearPtr + sizeof(data) < en_BufferSize::MaxSize)
             {
                 ReSize();
                 HexLog(en_Tag::_ERROR);
@@ -95,7 +95,7 @@ struct CMessage
         size_t len = strlen(str);
         if (_end < _rearPtr + len)
         {
-            if (_size == en_BufferSize::bufferSize && _end < _rearPtr + len < en_BufferSize::MaxSize)
+            if (_size == en_BufferSize::bufferSize && size_t(_rearPtr + len) < en_BufferSize::MaxSize)
             {
                 ReSize();
                 HexLog(en_Tag::_ERROR);

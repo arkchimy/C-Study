@@ -26,9 +26,10 @@ void clsSession::Release()
     {
         stTlsObjectPool<CMessage>::Release(msg);
     }
-    while (m_SendMsg.Pop(msg))
+
     {
-        stTlsObjectPool<CMessage>::Release(msg);
+        ZeroMemory(&m_recvOverlapped, sizeof(OVERLAPPED));
+        ZeroMemory(&m_sendOverlapped, sizeof(OVERLAPPED));
     }
     m_recvBuffer.ClearBuffer();
 }

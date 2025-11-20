@@ -614,10 +614,17 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     ull local_IoCount;
     CMessage *msg;
 
-    while (session.m_SendMsg.Pop(msg))
+    for (DWORD i = 0; i < session.m_sendOverlapped.msgCnt; i++)
     {
-        stTlsObjectPool<CMessage>::Release(msg);
+        stTlsObjectPool<CMessage>::Release(session.m_sendOverlapped.msgs[i]);
     }
+    
+    {
+        session.m_sendOverlapped.msgCnt = 0;
+        ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+     
+    }
+
 
     useSize = (ringBufferSize)session.m_sendBuffer.m_size;
     TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
@@ -635,6 +642,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
                 if (_InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
                 {
                     ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+             
                     InterlockedIncrement(&session.m_ioCount);
                     PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
                 }
@@ -647,6 +655,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     {
         ZeroMemory(wsaBuf, sizeof(wsaBuf));
         ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+ 
     }
 
     ull msgAddr;
@@ -654,18 +663,18 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
     Profiler profile;
     profile.Start(L"LFQ_Pop");
+    
     while (session.m_sendBuffer.Pop(msg))
     {
-
-        session.m_SendMsg.Push(msg);
-
         wsaBuf[bufCnt].buf = msg->_frontPtr;
-        wsaBuf[bufCnt].len = SerializeBufferSize(msg->_rearPtr - msg->_frontPtr);
+        wsaBuf[bufCnt].len = msg->_rearPtr - msg->_frontPtr;
 
+        session.m_sendOverlapped.msgs[bufCnt] = msg;
         bufCnt++;
     }
     profile.End(L"LFQ_Pop");
 
+     session.m_sendOverlapped.msgCnt = bufCnt;
     arrTPS[TPSidx] += bufCnt;
 
     if (session.m_blive)
@@ -846,6 +855,8 @@ void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
     if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
     {
         ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+
+
         local_IoCount = InterlockedIncrement(&session.m_ioCount);
 
         PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
