@@ -82,8 +82,9 @@ unsigned MonitorThread(void *arg)
         printf("%20s %10lld \n", "SessionNum :", server->GetSessionCount());
         printf("%20s %10lld \n", "PacketPool :", stTlsObjectPool<CMessage>::instance.m_TotalCount);
 
-        printf("%20s %10lld \n", "UpdateMessage_Queue :", server->getNetworkMsgCount());
-        printf("%20s %10lld \n", "UpdateMessage_Pool  :", server->m_UpdateMessage_Queue);
+        printf("%20s %10lld \n", "UpdateMessage_Queue :", server->m_UpdateMessage_Queue);
+        printf("%20s %10lld \n", "UpdateMessage_Pool :", server->getNetworkMsgCount());
+    
 
         printf("%20s %10lld \n", "prePlayer Count:", server->GetprePlayer_hash());
         printf("%20s %10lld \n", "Player Count:", server->GetPlayerCount());
@@ -157,6 +158,7 @@ unsigned ContentsThread(void *arg)
                                        L"This is ContentsThread");
     }
     ringBufferSize ContentsUseSize;
+    char *f, *r;
 
     while (1)
     {
@@ -165,9 +167,11 @@ unsigned ContentsThread(void *arg)
             break;
       
         server->Update();
-
-        ContentsUseSize = server->m_ContentsQ.GetUseSize();
-        server->m_UpdateMessage_Queue = ContentsUseSize / 8;
+        f = server->m_ContentsQ._frontPtr;
+        r = server->m_ContentsQ._rearPtr;
+        
+        ContentsUseSize = server->m_ContentsQ.GetUseSize(f,r);
+        server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
 
         server->prePlayer_hash_size = server->prePlayer_hash.size();
         server->AccountNo_hash_size = server->AccountNo_hash.size();
