@@ -261,6 +261,8 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 
     prePlayer_hash.erase(SessionID);
 
+    player->m_Timer = timeGetTime();
+
     m_TotalPlayers++; // Player 카운트
     m_prePlayerCount--;
 
@@ -429,8 +431,8 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
                                    L"%-20s %12s %05llu %12s %05llu ",
                                    L"HEARTBEAT Send : ",
                                    L"현재들어온ID:", SessionID);
-    //Proxy::HEARTBEAT(SessionID, msg);
-    //m_RecvMsgArr[en_PACKET_CS_CHAT__HEARTBEAT]++;
+
+    stTlsObjectPool<CMessage>::Release(msg);
     SessionUnLock(SessionID);
 }
 
@@ -640,8 +642,6 @@ void CTestServer::Update()
 
         DWORD msgInterval;
         CPlayer *player;
-
-        currentTime = timeGetTime();
 
         // prePlayer_hash 는 LoginPacket을 대기하는 Session
         for (auto& element : prePlayer_hash)
