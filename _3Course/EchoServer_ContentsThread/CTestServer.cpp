@@ -627,6 +627,9 @@ void CTestServer::Update()
             }
             else
             {   // Client Message
+                CPlayer *player = SessionID_hash[l_sessionID];
+
+                player->m_Timer = timeGetTime();
                 PacketProc(l_sessionID, msg, type);
                 m_RecvMsgArr[type]++;
             }
