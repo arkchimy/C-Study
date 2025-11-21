@@ -98,9 +98,10 @@ class CLanServer : public Stub, public  Proxy
 
     LONG64 GetSessionCount();
     virtual LONG64 GetPlayerCount() { return 0; } // Contents에서 구현하기.
-    LONG64 GetReleaseSessions();
     LONG64 Get_IdxStack();
 
+    ull getTotalAccept() { return m_TotalAccept; }
+    ull getNetworkMsgCount() { return m_NetworkMsgCount; }
     int getAcceptTPS();
     int getRecvMessageTPS();
     int getSendMessageTPS();
@@ -128,18 +129,19 @@ class CLanServer : public Stub, public  Proxy
     std::vector<class clsSession> sessions_vec;
 
     CLockFreeStack<ull> m_SessionIdxStack; // 반환된 Idx를 Stack형식으로
-
-    // CLockFreeQueue<clsSession *> m_ReleaseSessions;
-    CLockFreeStack<clsSession *> m_ReleaseSessions;
     int m_WorkThreadCnt = 0; // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
-    DWORD m_tlsIdxForTPS = 0;
-    LONG64 *arrTPS = nullptr; //  idx 0 : Contents , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
+
+    DWORD m_tlsIdxForTPS = 0; // Start에서 초기화
+    LONG64 *arrTPS = nullptr; //  idx 0 : AcceptTps , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
 
     HANDLE WorkerArg[2]{0}; // WorkerThread __beginthreadex 매개변수
     HANDLE AcceptArg[3]{0}; // AcceptThread __beginthreadex 매개변수
     
-    static CSystemLog *systemLog;
+    //static CSystemLog *systemLog;
 
+    ull m_TotalAccept = 0;
     LONG64 m_AllocMsgCount = 0;
+    LONG64 m_NetworkMsgCount = 0;
+
     int m_AllocLimitCnt = 10000;
 };

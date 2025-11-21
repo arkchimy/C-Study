@@ -67,6 +67,16 @@ class CTestServer : public CLanServer
     virtual LONG64 GetPlayerCount() { return m_TotalPlayers; }
 
     
+    //Debuging 정보
+    ////////////////////////////////////////////////////////////////////////
+
+    LONG64 m_UpdateMessage_Queue; // Update 이후 남아있는 Msg의 수.
+    LONG64 m_UpdateTPS;
+    LONG64 m_RecvTPS;           // OnRecv를 통한 RecvTPS 측정
+
+    LONG64 *m_RecvMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; // Update에서 ContentsQ에서 빼는 MsgTPS
+    //LONG64 *m_SendMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; // 
+
     LONG64 prePlayer_hash_size = 0;
     LONG64 AccountNo_hash_size = 0;
     LONG64 SessionID_hash_size = 0;
@@ -75,7 +85,7 @@ class CTestServer : public CLanServer
     LONG64 GetAccountNo_hash() { return AccountNo_hash_size; }
     LONG64 GetSessionID_hash() { return SessionID_hash_size; }
 
-
+    ///////////////////////////////////////////////////////////////////////
 
 
     SRWLOCK srw_ContentQ;
@@ -96,6 +106,7 @@ class CTestServer : public CLanServer
     LONG64 m_TotalPlayers = 0; // 현재 Player의 Cnt
     int m_State_Session = 0; // 아직 Player가 되지못한 Session의 Cnt
 
+    
 
 
     /*

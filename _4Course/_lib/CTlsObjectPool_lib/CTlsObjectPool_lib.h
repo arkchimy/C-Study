@@ -130,9 +130,16 @@ struct stTlsObjectPool
 
     stTlsObjectPool()
     {
+        LONG64 currentTotalCnt;
         allocPool = new ObjectPoolType<T>();
         allocPool->Initalize(tlsPool_init_Capacity);
         assert(allocPool != nullptr);
+
+        do
+        {
+            currentTotalCnt = instance.m_TotalCount;
+
+        } while (InterlockedCompareExchange64(&instance.m_TotalCount, currentTotalCnt + tlsPool_init_Capacity, currentTotalCnt) != currentTotalCnt);
 
         CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p -  TLSAlloc",
                                        L"[ Create New FullPool ]", allocPool);

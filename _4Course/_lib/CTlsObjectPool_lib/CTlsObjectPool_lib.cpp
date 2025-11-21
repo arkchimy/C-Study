@@ -12,6 +12,7 @@ template <>
 ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetFullPool(ObjectPoolType<CMessage> *emptyStack)
 {
     ObjectPoolType<CMessage> *retval;
+    LONG64 currentTotalCnt;
 
     emptyPools.Push(emptyStack);
 
@@ -25,11 +26,21 @@ ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetFullPool(ObjectP
             retval->Initalize(tlsPool_init_Capacity);
             CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
                                             L"[ Change Empty => FullPool ]", retval);
+            do
+            {
+                currentTotalCnt = m_TotalCount;
+
+            } while (InterlockedCompareExchange64(&m_TotalCount, currentTotalCnt + tlsPool_init_Capacity, currentTotalCnt) != currentTotalCnt);
         }
         else
         {
             retval = new ObjectPoolType<CMessage>();
             retval->Initalize(tlsPool_init_Capacity);
+            do
+            {
+                currentTotalCnt = m_TotalCount;
+
+            } while (InterlockedCompareExchange64(&m_TotalCount, currentTotalCnt + tlsPool_init_Capacity, currentTotalCnt) != currentTotalCnt);
 
             CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
                                             L"[ Create New FullPool ]", retval);

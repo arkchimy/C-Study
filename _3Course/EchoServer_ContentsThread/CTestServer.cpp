@@ -6,9 +6,14 @@
 #include <thread>
 #include "../lib/CNetwork_lib/Proxy.h"
 
+#pragma comment(lib, "Winmm.lib")
+
 extern SRWLOCK srw_Log;
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
+
+void MsgTypePrint(WORD type, LONG64 val);
+
 unsigned MonitorThread(void *arg)
 {
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
@@ -17,49 +22,106 @@ unsigned MonitorThread(void *arg)
 
     DWORD wait_retval;
 
+    LONG64 UpdateTPS ;
+    LONG64 before_UpdateTPS = 0;
+
+    LONG64 RecvTPS ;
+    LONG64 before_RecvTPS = 0;
+
     LONG64 *arrTPS;
     LONG64 *before_arrTPS;
 
-    arrTPS = new LONG64[server->m_WorkThreadCnt + 1];
+    arrTPS = new LONG64[server->m_WorkThreadCnt + 1]; //Accept + 1
     before_arrTPS = new LONG64[server->m_WorkThreadCnt + 1];
     ZeroMemory(arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
     ZeroMemory(before_arrTPS, sizeof(LONG64) * (server->m_WorkThreadCnt + 1));
 
+    LONG64 RecvMsgArr[en_PACKET_CS_CHAT__Max]{0,};
+    LONG64 before_RecvMsgArr[en_PACKET_CS_CHAT__Max]{0,};
+
+
+    // 얘는 signal 말고 전역변수로 끄자.
+
+    timeBeginPeriod(1);
+
+    DWORD currentTime = timeGetTime();
+    DWORD nextTime; // 내가 목표로하는 이상적인 시간.
+    nextTime = currentTime;
+
     while (1)
     {
-        wait_retval = WaitForSingleObject(hWaitHandle, 1000);
-
-        if (wait_retval != WAIT_OBJECT_0)
+        nextTime += 1000;
         {
-            for (int i = 0; i <= server->m_WorkThreadCnt; i++)
-            {
-                arrTPS[i] = server->arrTPS[i] - before_arrTPS[i];
-                before_arrTPS[i] = server->arrTPS[i];
-            }
+            LONG64 old_UpdateTPS = server->m_UpdateTPS;
+            UpdateTPS = old_UpdateTPS - before_UpdateTPS;
+            before_UpdateTPS = old_UpdateTPS;
+        }
+        for (int i = 0; i <= server->m_WorkThreadCnt; i++)
+        {
+            LONG64 old_arrTPS = server->arrTPS[i];
+            arrTPS[i] = old_arrTPS - before_arrTPS[i];
+            before_arrTPS[i] = old_arrTPS;
+        }
 
-            printf(" ==================================\n ");
-            printf("%20s %5lld \n", "Total_Sessions:", server->GetSessionCount());
-            printf("%20s %5lld \n", "prePlayerCount:", server->m_prePlayerCount);
-            printf("%20s %5lld \n", "Total_Players:", server->GetPlayerCount());
+        printf(" ==================================\n ");
+        printf("%20s %10lld \n", "SessionNum :", server->GetSessionCount());
+        printf("%20s %10lld \n", "PacketPool :", stTlsObjectPool<CMessage>::instance.m_TotalCount);
 
-            printf("%20s %5lld \n", "prePlayer_hash_size:", server->GetprePlayer_hash());
-            printf("%20s %5lld \n", "AccountNo_hash_size:", server->GetAccountNo_hash());
-            printf("%20s %5lld \n", "SessionID_hash_size:", server->GetSessionID_hash());
+        printf("%20s %10lld \n", "UpdateMessage_Pool :", server->getNetworkMsgCount());
+        printf("%20s %10lld \n", "UpdateMessage_Queue  :", server->m_UpdateMessage_Queue);
 
-            printf (" ==================================\n ");
+        printf("%20s %10lld \n", "prePlayer Count:", server->GetprePlayer_hash());
+        printf("%20s %10lld \n", "Player Count:", server->GetPlayerCount());
 
-            printf(" Total iDisCounnectCount: %llu\n", server->iDisCounnectCount);
-            printf(" IdxStack Size: %lld\n", server->Get_IdxStack());
-            printf(" ReleaseSessions Size: %lld\n", server->GetReleaseSessions());
 
-            printf(" Accept TPS : %lld\n", arrTPS[0]);
+        printf("%20s %10lld \n", "AccountNo_hash_size:", server->GetAccountNo_hash());
+        printf("%20s %10lld \n", "SessionID_hash_size:", server->GetSessionID_hash());
 
+
+
+        printf (" ==================================\n ");
+
+        printf(" Total iDisCounnectCount: %llu\n", server->iDisCounnectCount);
+
+        printf(" TotalAccept : %llu\n", server->getTotalAccept());
+        printf(" Accept TPS : %lld\n", arrTPS[0]);
+
+        printf(" Update  TPS : %lld\n", UpdateTPS);
+        //Update TPS : - Update 처리 초당 횟수
+        //Recv TPS : - 초당 Recv 메시지 수
+        //Send TPS : -초당 Send 메시지 수
+        //메시지별 수신 TPS
+
+        {
+            LONG64 old_RecvTPS = server->m_RecvTPS;
+            RecvTPS = old_RecvTPS - before_RecvTPS;
+            before_RecvTPS = old_RecvTPS;
+            printf(" Recv TPS : %lld\n", RecvTPS);
+        }
+        {
+            LONG64 sum = 0;
             for (int i = 1; i <= server->m_WorkThreadCnt; i++)
             {
-                printf(" Send TPS : %lld\n", arrTPS[i]);
+                sum += arrTPS[i];
+                //printf(" Send TPS : %lld\n", arrTPS[i]);
             }
-            printf(" ==================================\n");
+            printf(" Send TPS : %lld\n", sum);
         }
+
+        printf(" ==================================\n");
+
+        // 메세지 별
+        for (int i = 1; i < en_PACKET_CS_CHAT__Max - 1; i++)
+        {
+            LONG64 old_RecvMsg = server->m_RecvMsgArr[i];
+            RecvMsgArr[i] = old_RecvMsg - before_RecvMsgArr[i];
+            before_RecvMsgArr[i] = old_RecvMsg;
+            MsgTypePrint(i, RecvMsgArr[i]);
+        }
+
+        currentTime = timeGetTime();
+        if (nextTime > currentTime)
+            Sleep(nextTime - currentTime);
     }
 
     return 0;
@@ -79,14 +141,22 @@ unsigned ContentsThread(void *arg)
                                        L"%-20s ",
                                        L"This is ContentsThread");
     }
+    ringBufferSize ContentsUseSize;
+
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
         if (hSignalIdx - WAIT_OBJECT_0 == 1)
             break;
-
+      
         server->Update();
 
+        ContentsUseSize = server->m_ContentsQ.GetUseSize();
+        server->m_UpdateMessage_Queue = ContentsUseSize / 8;
+
+        server->prePlayer_hash_size = server->prePlayer_hash.size();
+        server->AccountNo_hash_size = server->AccountNo_hash.size();
+        server->SessionID_hash_size = server->SessionID_hash.size();
     }
 
     return 0;
@@ -182,6 +252,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     {
         //Login응답.
         Proxy::RES_LOGIN(SessionID, msg, true, AccountNo );
+        m_RecvMsgArr[en_PACKET_CS_CHAT_RES_LOGIN]++;
     }
     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
                                    L"%-20s %05lld %12s %05llu  ",
@@ -230,6 +301,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     g_Sector[player->iSectorY][player->iSectorX].insert(SessionID );
 
     Proxy::RES_SECTOR_MOVE(SessionID, msg, AccountNo, SectorX, SectorY);
+    m_RecvMsgArr[en_PACKET_CS_CHAT_RES_SECTOR_MOVE]++;
     SessionUnLock(SessionID);
 }
 void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType , BYTE bBroadCast )
@@ -303,6 +375,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
                 {
                     player = SessionID_hash[id];
                     UnitCast(id, msg, player->m_AccountNo);
+                    m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]++;
                 }
                 //SessionUnLock(id);
             }
@@ -342,7 +415,7 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
                                    L"HEARTBEAT Send : ",
                                    L"현재들어온ID:", SessionID);
     Proxy::HEARTBEAT(SessionID, msg);
-
+    m_RecvMsgArr[en_PACKET_CS_CHAT__HEARTBEAT]++;
     SessionUnLock(SessionID);
 }
 
@@ -499,10 +572,6 @@ void CTestServer::Update()
 
     useSize = m_ContentsQ.GetUseSize(f, r);
 
-    prePlayer_hash_size = prePlayer_hash.size();
-    AccountNo_hash_size = AccountNo_hash.size();
-    SessionID_hash_size = SessionID_hash.size();
-
     // msg  크기 메세지 하나에 8Byte
     while (useSize >= 8)
     {
@@ -521,10 +590,12 @@ void CTestServer::Update()
         // 현재 미 사용중
         case en_PACKET_Player_Alloc:
             AllocPlayer(msg);
+            _InterlockedDecrement64(&m_NetworkMsgCount);
             break;
 
         case en_PACKET_Player_Delete:
             DeletePlayer(msg);
+            _InterlockedDecrement64(&m_NetworkMsgCount);
             break;
         case en_PACKET_CS_CHAT_REQ_LOGIN:
             PacketProc(l_sessionID, msg, type);
@@ -542,11 +613,15 @@ void CTestServer::Update()
                 Disconnect(l_sessionID);
             }
             else
+            {   // Client Message
                 PacketProc(l_sessionID, msg, type);
+                m_RecvMsgArr[type]++;
+            }
         }
-
+      
         f = m_ContentsQ._frontPtr;
         useSize -= 8;
+        m_UpdateTPS++;
     }
 
     DWORD currentTime;
@@ -641,6 +716,8 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg)
 
         profile.End(L"ContentsQ_Enqueue");
         SetEvent(m_ContentsEvent);
+        //
+        _interlockedincrement64(&m_RecvTPS);
     }
 
     return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
@@ -672,6 +749,7 @@ bool CTestServer::OnAccept(ull SessionID)
         return false;
     }
 
+
     {
         CMessage *msg;
         
@@ -679,8 +757,9 @@ bool CTestServer::OnAccept(ull SessionID)
         
         *msg << (unsigned short)en_PACKET_Player_Alloc;
         InterlockedExchange(&msg->ownerID, SessionID);
-        
+        //TODO : 실패의 경우의 수
         OnRecv(SessionID, msg);
+        _InterlockedIncrement64(&m_NetworkMsgCount);
     }
 
    
@@ -698,9 +777,26 @@ void CTestServer::OnRelease(ull SessionID)
         *msg << (unsigned short)en_PACKET_Player_Delete;
         InterlockedExchange(&msg->ownerID, SessionID);
 
-
+        _InterlockedIncrement64(&m_NetworkMsgCount);
         OnRecv(SessionID, msg);
     }
 
 }
 
+void MsgTypePrint(WORD type, LONG64 val)
+{
+    //0 은 ㄴㄴ
+    static const char *Msgformat[en_PACKET_CS_CHAT__Max] = {
+        "",
+        "en_PACKET_CS_CHAT_REQ_LOGIN",
+        "en_PACKET_CS_CHAT_RES_LOGIN",
+        "en_PACKET_CS_CHAT_REQ_SECTOR_MOVE",
+        "en_PACKET_CS_CHAT_RES_SECTOR_MOVE",
+        "en_PACKET_CS_CHAT_REQ_MESSAGE",
+        "en_PACKET_CS_CHAT_RES_MESSAGE",
+        "en_PACKET_CS_CHAT__HEARTBEAT",
+
+    };
+    printf("%20s : %05llu\n", Msgformat[type], val);
+
+}

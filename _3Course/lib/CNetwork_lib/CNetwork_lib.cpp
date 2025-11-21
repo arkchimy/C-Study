@@ -8,7 +8,7 @@
 #include <list>
 #include <thread>
 
-CSystemLog *CLanServer::systemLog = CSystemLog::GetInstance();
+
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
 
@@ -122,8 +122,8 @@ unsigned AcceptThread(void *arg)
             ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Error ");
             continue;
         }
-        server->arrTPS[0]++; //Accept TPS 측정
 
+        server->m_TotalAccept++;
         {
 
             if (server->m_SessionIdxStack.m_size == 0)
@@ -138,6 +138,7 @@ unsigned AcceptThread(void *arg)
             server->m_SessionIdxStack.Pop(idx);
         }
 
+        server->arrTPS[0]++; // Accept TPS 측정
         clsSession& session = server->sessions_vec[idx];
         if (session.m_sendBuffer.m_size != 0)
             __debugbreak();
@@ -460,10 +461,7 @@ LONG64 CLanServer::GetSessionCount()
     return m_SessionCount;
 }
 
-LONG64 CLanServer::GetReleaseSessions()
-{
-    return m_ReleaseSessions.m_size;
-}
+
 
 LONG64 CLanServer::Get_IdxStack()
 {
