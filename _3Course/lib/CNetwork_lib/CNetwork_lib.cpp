@@ -122,7 +122,7 @@ unsigned AcceptThread(void *arg)
             ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Error ");
             continue;
         }
-
+        server->arrTPS[0]++; // Accept TPS 측정
         server->m_TotalAccept++;
         {
 
@@ -138,7 +138,7 @@ unsigned AcceptThread(void *arg)
             server->m_SessionIdxStack.Pop(idx);
         }
 
-        server->arrTPS[0]++; // Accept TPS 측정
+
         clsSession& session = server->sessions_vec[idx];
         if (session.m_sendBuffer.m_size != 0)
             __debugbreak();
@@ -353,6 +353,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     setsockopt(m_listen_sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
     setsockopt(m_listen_sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&noDelay, sizeof(noDelay));
+    bNoDelay = noDelay;
 
     bind_retval = bind(m_listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
     if (bind_retval != 0)
@@ -427,6 +428,8 @@ bool CLanServer::Disconnect(const ull SessionID)
                                        L"HANDLE : ", session.m_sock,
                                        L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
                                        L"LocalseqID :", SessionID, L"LocalseqIndx : ", SessionID >> 47);
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        
         return false;
     }
 

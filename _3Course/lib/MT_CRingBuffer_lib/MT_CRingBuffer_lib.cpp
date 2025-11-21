@@ -24,6 +24,7 @@ CRingBuffer::CRingBuffer(ringBufferSize iBufferSize, bool ContensQBuffer)
         __debugbreak();
     }
     _end = _begin + iBufferSize;
+    _size = iBufferSize;
     ClearBuffer();
 }
 

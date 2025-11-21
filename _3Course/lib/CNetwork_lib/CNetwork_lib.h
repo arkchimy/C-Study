@@ -121,6 +121,7 @@ class CLanServer : public Stub, public  Proxy
     bool bZeroCopy = false;
     bool bOn = false;
     bool bEnCording = false;
+    int bNoDelay = false;
 
     LONG64 m_SessionCount = 0;
     ull iDisCounnectCount = 0;
@@ -136,8 +137,6 @@ class CLanServer : public Stub, public  Proxy
 
     HANDLE WorkerArg[2]{0}; // WorkerThread __beginthreadex 매개변수
     HANDLE AcceptArg[3]{0}; // AcceptThread __beginthreadex 매개변수
-    
-    //static CSystemLog *systemLog;
 
     ull m_TotalAccept = 0;
     LONG64 m_AllocMsgCount = 0;

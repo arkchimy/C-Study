@@ -48,6 +48,14 @@ unsigned MonitorThread(void *arg)
     DWORD nextTime; // 내가 목표로하는 이상적인 시간.
     nextTime = currentTime;
 
+    ////ServerInfo
+
+        int workthreadCnt = server->m_WorkThreadCnt;
+        bool ZeroCopy = server->bZeroCopy;
+        int MaxSessions = server->sessions_vec.size();
+        int maxPlayers = server->m_maxPlayers;
+        int bNoDelay = server->bNoDelay;
+
     while (1)
     {
         nextTime += 1000;
@@ -56,19 +64,26 @@ unsigned MonitorThread(void *arg)
             UpdateTPS = old_UpdateTPS - before_UpdateTPS;
             before_UpdateTPS = old_UpdateTPS;
         }
-        for (int i = 0; i <= server->m_WorkThreadCnt; i++)
+        for (int i = 0; i <= workthreadCnt; i++)
         {
             LONG64 old_arrTPS = server->arrTPS[i];
             arrTPS[i] = old_arrTPS - before_arrTPS[i];
             before_arrTPS[i] = old_arrTPS;
         }
+        printf(" ==================================\n ");
+        printf("%20s %10d \n", "WorkerThread Cnt :", workthreadCnt);
+        printf("%20s %10d \n", "ZeroCopy  :", ZeroCopy);
+        printf("%20s %10d \n", "Nodelay  :", bNoDelay);
+        printf("%20s %10d \n", "ContentsQSize  :", server->m_ContentsQ._size);
+        printf("%20s %10d \n", "MaxSessions  :", MaxSessions);
+        printf("%20s %10d \n", "maxPlayers  :", maxPlayers);
 
         printf(" ==================================\n ");
         printf("%20s %10lld \n", "SessionNum :", server->GetSessionCount());
         printf("%20s %10lld \n", "PacketPool :", stTlsObjectPool<CMessage>::instance.m_TotalCount);
 
-        printf("%20s %10lld \n", "UpdateMessage_Pool :", server->getNetworkMsgCount());
-        printf("%20s %10lld \n", "UpdateMessage_Queue  :", server->m_UpdateMessage_Queue);
+        printf("%20s %10lld \n", "UpdateMessage_Queue :", server->getNetworkMsgCount());
+        printf("%20s %10lld \n", "UpdateMessage_Pool  :", server->m_UpdateMessage_Queue);
 
         printf("%20s %10lld \n", "prePlayer Count:", server->GetprePlayer_hash());
         printf("%20s %10lld \n", "Player Count:", server->GetPlayerCount());
@@ -111,7 +126,7 @@ unsigned MonitorThread(void *arg)
         printf(" ==================================\n");
 
         // 메세지 별
-        for (int i = 1; i < en_PACKET_CS_CHAT__Max - 1; i++)
+        for (int i = 3; i < en_PACKET_CS_CHAT__Max - 1; i++)
         {
             LONG64 old_RecvMsg = server->m_RecvMsgArr[i];
             RecvMsgArr[i] = old_RecvMsg - before_RecvMsgArr[i];
@@ -414,8 +429,8 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
                                    L"%-20s %12s %05llu %12s %05llu ",
                                    L"HEARTBEAT Send : ",
                                    L"현재들어온ID:", SessionID);
-    Proxy::HEARTBEAT(SessionID, msg);
-    m_RecvMsgArr[en_PACKET_CS_CHAT__HEARTBEAT]++;
+    //Proxy::HEARTBEAT(SessionID, msg);
+    //m_RecvMsgArr[en_PACKET_CS_CHAT__HEARTBEAT]++;
     SessionUnLock(SessionID);
 }
 
@@ -567,13 +582,9 @@ void CTestServer::Update()
 
     WORD type;
 
-    f = m_ContentsQ._frontPtr;
-    r = m_ContentsQ._rearPtr;
-
-    useSize = m_ContentsQ.GetUseSize(f, r);
 
     // msg  크기 메세지 하나에 8Byte
-    while (useSize >= 8)
+    while (m_ContentsQ.GetUseSize() != 0)
     {
 
         DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
@@ -619,13 +630,11 @@ void CTestServer::Update()
             }
         }
       
-        f = m_ContentsQ._frontPtr;
-        useSize -= 8;
         m_UpdateTPS++;
     }
 
     DWORD currentTime;
-    // LoginPacket을 대기하는 하트비트 부분
+    //// LoginPacket을 대기하는 하트비트 부분
     {
 
         DWORD msgInterval;
@@ -639,13 +648,13 @@ void CTestServer::Update()
             player = element.second;
 
             msgInterval = currentTime - player->m_Timer;
-            /*      if (msgInterval >= 50000)
-                  {
-                      server->Disconnect(player->m_sessionID);
-                  }*/
+            if (msgInterval >= 3000)
+            {
+                Disconnect(player->m_sessionID);
+            }
         }
     }
-    // LoginPacket을 받아서 승격된 하트비트 부분
+    //// LoginPacket을 받아서 승격된 하트비트 부분
     {
 
         DWORD disTime;
@@ -657,10 +666,10 @@ void CTestServer::Update()
             player = element.second;
 
             disTime = currentTime - player->m_Timer;
-            /*              if (disTime >= 40000)
-                          {
-                              server->Disconnect(player->m_sessionID);
-                          }*/
+            if (disTime >= 40000)
+            {
+                Disconnect(player->m_sessionID);
+            }
         }
     }
 }

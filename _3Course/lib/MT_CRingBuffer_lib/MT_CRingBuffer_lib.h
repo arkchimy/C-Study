@@ -45,5 +45,6 @@ class CRingBuffer
 
     char *_frontPtr;
     char *_rearPtr;
+    ringBufferSize _size;
     inline static ringBufferSize s_BufferSize = 2048;
 };
