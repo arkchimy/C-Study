@@ -634,6 +634,7 @@ void CTestServer::Update()
     }
 
     DWORD currentTime;
+    currentTime = timeGetTime();
     //// LoginPacket을 대기하는 하트비트 부분
     {
 
