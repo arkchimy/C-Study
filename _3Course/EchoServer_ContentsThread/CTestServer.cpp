@@ -232,6 +232,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     // 중복 접속 문제
     if (AccountNo_hash.find(AccountNo) != AccountNo_hash.end())
     {
+        
         Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
 
         // 중복 로그인 이면 둘 다 끊기
@@ -518,8 +519,13 @@ void CTestServer::DeletePlayer(CMessage *msg)
             SessionID_hash.erase(SessionID);
 
             if (AccountNo_hash.find(player->m_AccountNo) == AccountNo_hash.end())
+            {
+          
                 __debugbreak();
+            }
+            
             AccountNo_hash.erase(player->m_AccountNo);
+            
             m_TotalPlayers--;
 
             g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
@@ -656,7 +662,7 @@ void CTestServer::Update()
             player = element.second;
 
             msgInterval = currentTime - player->m_Timer;
-            if (msgInterval >= 3000)
+            if (msgInterval >= 5000)
             {
                 Disconnect(player->m_sessionID);
             }
