@@ -20,8 +20,6 @@
 #include "stHeader.h"
 
 
-
-
 using ull = unsigned long long;
 
 class st_WSAData
