@@ -54,16 +54,16 @@ int main()
 
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
-        CTestServer EchoServer(ContentsThreadCnt,iEnCording);
+        CTestServer *EchoServer = new CTestServer(ContentsThreadCnt, iEnCording);
 
-        EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+        EchoServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
         CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
         CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
         while (1)
         {
             if (GetAsyncKeyState(VK_ESCAPE))
             {
-                SetEvent(EchoServer.m_ServerOffEvent);
+                SetEvent(EchoServer->m_ServerOffEvent);
             }
             if (_kbhit())
             {

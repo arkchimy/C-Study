@@ -493,37 +493,41 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
     st_Sector_Around AroundSectors;
     SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
 
-    
+    LONG64 SendCnt = 0;
     if (bBroadCast)
     {
+
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
         {
             AcquireSRWLockShared(&srw_Sectors[targetSector._iY][targetSector._iX]);
-            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
-            {
-                if (id == SessionID)
-                    continue;
-
-                msg->iUseCnt++;
-            }
         }
-
 
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
         {
             for (ull id : g_Sector[targetSector._iY][targetSector._iX])
             {
-                AcquireSRWLockShared(&srw_SessionID_Hash);
+                SendCnt++;
+            }
+        }
+        InterlockedExchange64(&msg->iUseCnt, SendCnt);
+
+        AcquireSRWLockShared(&srw_SessionID_Hash);
+        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        {
+            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+            {
+                
                 if (SessionID_hash.find(id) != SessionID_hash.end())
                 {
                     player = SessionID_hash[id];
                     UnitCast(id, msg, player->m_AccountNo);
                     InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
                 }
-                ReleaseSRWLockShared(&srw_SessionID_Hash);
+                
                 // SessionUnLock(id);
             }
         }
+        ReleaseSRWLockShared(&srw_SessionID_Hash);
 
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
         {

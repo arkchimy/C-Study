@@ -73,8 +73,6 @@ class CLanServer : public Stub, public  Proxy
 
     void DecrementIoCountAndMaybeDeleteSession(clsSession &session);
     CMessage *CreateMessage(class clsSession &session, struct stHeader &header);
-    // CMessage *CreateLoginMessage();
-    char *CreateLoginMessage();
 
     // void RecvComplete(class clsSession *const session, DWORD transferred);
     void RecvComplete(class clsSession &session, DWORD transferred);

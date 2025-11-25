@@ -126,7 +126,7 @@ unsigned AcceptThread(void *arg)
         server->m_TotalAccept++;
         {
 
-            if (server->m_SessionIdxStack.m_size == 0)
+            if (server->m_SessionIdxStack.Pop(idx) == false)
             {
                 closesocket(client_sock);
                 
@@ -135,7 +135,7 @@ unsigned AcceptThread(void *arg)
                 InterlockedIncrement(&server->iDisCounnectCount);
                 continue;
             }
-            server->m_SessionIdxStack.Pop(idx);
+
         }
 
 
@@ -586,17 +586,6 @@ CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header
     return msg;
 }
 
-char *CLanServer::CreateLoginMessage()
-{
-    static short header = 0x0008;
-    static ull PayLoad = 0x7fffffffffffffff;
-    static char msg[10];
-
-    memcpy(msg, &header, sizeof(header));
-    memcpy(msg + sizeof(header), &PayLoad, sizeof(PayLoad));
-
-    return msg;
-}
 
 
 void CLanServer::SendComplete(clsSession &session, DWORD transferred)
@@ -666,13 +655,17 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     {
         wsaBuf[bufCnt].buf = msg->_frontPtr;
         wsaBuf[bufCnt].len = ULONG (msg->_rearPtr - msg->_frontPtr);
-
+        
         session.m_sendOverlapped.msgs[bufCnt] = msg;
         bufCnt++;
+        if (bufCnt == 500)
+        {
+            break;
+        }
     }
     profile.End(L"LFQ_Pop");
-
-     session.m_sendOverlapped.msgCnt = bufCnt;
+    
+    session.m_sendOverlapped.msgCnt = bufCnt;
     arrTPS[TPSidx] += bufCnt;
 
     if (session.m_blive)

@@ -122,7 +122,7 @@ class CTestServer : public CLanServer
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
 
     int m_maxSessions = 0;
-    int m_maxPlayers = 10000;
+    int m_maxPlayers = 20000;
 
     LONG64 m_prePlayerCount = 0;
     LONG64 m_TotalPlayers = 0; // 현재 Player의 Cnt
@@ -156,7 +156,7 @@ class CTestServer : public CLanServer
                 [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
 
     // Sector마다 Lock이 존재.
-    SRWLOCK srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
+    inline static SRWLOCK srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
                 [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
 
     /*
