@@ -485,6 +485,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         Disconnect(SessionID);
         stTlsObjectPool<CMessage>::Release(msg);
         SessionUnLock(SessionID);
+        ReleaseSRWLockShared(&srw_SessionID_Hash);
         return;
     }
     // TODO : Broad Cast  방식 수정하기.
@@ -494,6 +495,8 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
     SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
 
     LONG64 SendCnt = 0;
+    std::list<ull> sendID;
+
     if (bBroadCast)
     {
 
@@ -508,29 +511,38 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
             {
                 if (SessionID_hash.find(id) != SessionID_hash.end())
                 {
+                    sendID.push_back(id);
                     SendCnt++;
                 }
             }
         }
         InterlockedExchange64(&msg->iUseCnt, SendCnt);
 
-   
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        for (ull id : sendID)
         {
-            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
-            {
-                
-                if (SessionID_hash.find(id) != SessionID_hash.end())
-                {
-                    player = SessionID_hash[id];
-                    UnitCast(id, msg, player->m_AccountNo);
-                    SendCnt--;
-                    InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
-                }
-                
-                // SessionUnLock(id);
-            }
+            player = SessionID_hash[id];
+            UnitCast(id, msg, player->m_AccountNo);
+            SendCnt--;
+            InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
         }
+        //TODO : 이유 찾기
+  
+        //for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        //{
+        //    for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+        //    {
+        //        
+        //        if (SessionID_hash.find(id) != SessionID_hash.end())
+        //        {
+        //            player = SessionID_hash[id];
+        //            UnitCast(id, msg, player->m_AccountNo);
+        //            SendCnt--;
+        //            InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
+        //        }
+        //        
+        //        // SessionUnLock(id);
+        //    }
+        //}
         if (SendCnt != 0)
             __debugbreak();
 
