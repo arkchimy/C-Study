@@ -489,19 +489,6 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         f = session.m_recvBuffer._frontPtr;
         r = session.m_recvBuffer._rearPtr;
 
-        // ContentsQ의 상황이 어떤지를 체크.
-        qPersentage = OnRecv(SessionID, nullptr);
-        if (qPersentage >= 75.f)
-        {
-            Disconnect(SessionID);
-            CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
-                                           L"%-20s %10s %05f %10s %08llu",
-                                           L"ContentsQ Full",
-                                           L"qPersentage : ", qPersentage,
-                                           L"TargetID : ", SessionID);
-            return;
-        }
-    
     }
     // Header의 크기만큼을 확인.
    

@@ -63,7 +63,8 @@ class CTestServer : public CLanServer
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
 
-    virtual float OnRecv(ull SessionID, CMessage *msg) override;
+    virtual float OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
+
     virtual bool OnAccept(ull SessionID) override;
     virtual void OnRelease(ull SessionID) override;
 
@@ -102,10 +103,11 @@ class CTestServer : public CLanServer
 
     ////////////////////////////////////////////////////////////////////
     ////////////////////////// BalanceThread //////////////////////////
-    // 
-    // // PlayerAlloc과  LoginPacket을 처리하는 Q  Balance Thread
+    //
+    std::vector<std::pair<DWORD, int>> balanceVec;
+
     HANDLE hBalanceThread; 
-    SRWLOCK srw_BalanceQ; 
+    SRWLOCK srw_BalanceQ;  // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
     HANDLE hBalanceEvent; // EnQ를 알려주는 이벤트
     CRingBuffer m_BalanceQ = CRingBuffer(s_ContentsQsize, 1); 
     
@@ -137,16 +139,8 @@ class CTestServer : public CLanServer
     // TODO: 특정 인원이상 안늘어나게 조치.
     CObjectPool_UnSafeMT<CPlayer> player_pool;
 
-    //  3가지 Hash_Table을 전부 잠그는 구조.
-    // 잘게 잡을 경우 OnRecv에서는 SessionHash만 필요, Shared에 성공하였을때
-    // Login Pack이 왔을떄 preHash를 잡고 SessionHash를 대기,
-    // OnRecv는 msg를 BalanceQ에 잘못 보내는 형태가 존재하지만, LoginPack을 처리하지않았는데 메세지가 오는 현상이 이상.
-    // 따라서 잘게 잡아도 될듯?
+    SRWLOCK srw_SessionID_Hash; // SessionID_hash 소유권. OnRecv , BalanceThread에서 접근
 
-    SRWLOCK srw_SessionID_Hash; // SessionID_hash 소유권.
-    SRWLOCK srw_prePlayer_hash; // prePlayer_hash 소유권.
-
-    
     // Account   Key , Player접근.
     std::unordered_map<ull, CPlayer *> AccountNo_hash; // 중복 접속을 제거하는 용도
 

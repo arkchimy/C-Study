@@ -91,7 +91,7 @@ class CLanServer : public Stub, public  Proxy
     void RecvPacket(class clsSession &session);
 
     virtual bool OnAccept(ull SessionID) = 0;
-    virtual float OnRecv(ull SessionID, struct CMessage *msg) = 0;
+    virtual float OnRecv(ull SessionID, struct CMessage *msg, bool bBalanceQ = false) = 0;
     virtual void OnRelease(ull SessionID) = 0;
 
     LONG64 GetSessionCount();
