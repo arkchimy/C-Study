@@ -622,10 +622,11 @@ void CTestServer::DeletePlayer(CMessage *msg)
 }
 
 CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
-    : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0)
+    : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0), hBalanceThread(0)
 {
 
-    InitializeSRWLock(&srw_SessionID_Hash);
+    InitializeSRWLock(&srw_SessionID_Hash);// SessionID_hash 소유권.
+    InitializeSRWLock(&srw_prePlayer_hash);// prePlayer_hash 소유권.
 
     // BalanceThread를 위한 정보 초기화.
     {
@@ -743,6 +744,9 @@ void CTestServer::BalanceUpdate()
 
         *msg >> type;
 
+        // prePlayer의 증가, 삭제를 담당.
+        // Player_hash의 증가 , 삭제를 담당.
+
         switch (type)
         {
         // 현재 미 사용중
@@ -751,7 +755,9 @@ void CTestServer::BalanceUpdate()
             _InterlockedDecrement64(&m_NetworkMsgCount);
             break;
         // TODO : 끊김과 직전의 메세지가 처리가 되지않을 수 있음.  순서가 달라져서 
-        // 이렇게 하면 PlayerHash와 
+        // 이렇게 하면 PlayerHash와 prePlayerHash는 ContentsThread에서는 접근할 일이 없음. 
+        // TODO : WorkerThread는 어떤가?
+
         case en_PACKET_Player_Delete:
             DeletePlayer(msg);
             _InterlockedDecrement64(&m_NetworkMsgCount);
