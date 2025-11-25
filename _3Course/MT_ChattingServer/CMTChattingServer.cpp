@@ -524,13 +524,16 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
                 {
                     player = SessionID_hash[id];
                     UnitCast(id, msg, player->m_AccountNo);
+                    SendCnt--;
                     InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
                 }
                 
                 // SessionUnLock(id);
             }
         }
-   
+        if (SendCnt != 0)
+            __debugbreak();
+
         ReleaseSRWLockShared(&srw_SessionID_Hash);
 
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
@@ -804,11 +807,14 @@ void CTestServer::Update()
 
             if (SessionID_hash.find(l_sessionID) != SessionID_hash.end())
                 player = SessionID_hash[l_sessionID];
-
-            ReleaseSRWLockShared(&srw_SessionID_Hash);
-            if (player == nullptr)
+            else
+            {
+                stTlsObjectPool<CMessage>::Release(msg);
+                ReleaseSRWLockShared(&srw_SessionID_Hash);
                 continue;
-
+            }
+            ReleaseSRWLockShared(&srw_SessionID_Hash);
+  
             InterlockedExchange(&player->m_Timer, timeGetTime());
 
             PacketProc(l_sessionID, msg, type);
