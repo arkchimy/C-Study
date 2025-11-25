@@ -284,7 +284,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
         // 없다는 것은 내가 만든 절차를 따르지않았음을 의미.
 
-        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-20s %05lld %12s %05llu %12s %05llu ",
                                        L"LoginError - prePlayer_hash not found : ", AccountNo,
                                        L"현재들어온ID:", SessionID);
@@ -612,13 +612,6 @@ void CTestServer::AllocPlayer(CMessage *msg)
     if (SessionLock(SessionID) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
-
-        // CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-        //                                L"%-20s %12s %05llu %12s %05llu ",
-        //                                L"AllocPlayer SessionLock Failed : ",
-        //                                L"현재들어온ID:", SessionID);
-
-        Disconnect(SessionID); // ?
         return;
     }
     //
@@ -629,6 +622,12 @@ void CTestServer::AllocPlayer(CMessage *msg)
         // TODO : 이 경우에는 끊기보다는 유예를 둬야하나?
 
         stTlsObjectPool<CMessage>::Release(msg);
+
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                       L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                       L"Player is Fulled : ", 0,
+                                       L"현재들어온ID:", SessionID);
+
         Disconnect(SessionID);
         SessionUnLock(SessionID);
         return;
@@ -750,9 +749,12 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
         {
             balanceVec.emplace_back(i, 0);
             m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
-            InitializeSRWLock(&m_ContentsQMap[&m_CotentsQ_vec[i]].first);
+            m_ContentsQMap[&m_CotentsQ_vec[i]];
+
             m_ContentsQMap[&m_CotentsQ_vec[i]].second = CreateEvent(nullptr, false, false, nullptr);
         }
+        for (DWORD i = 0; i < ContentsThreadCnt; i++)
+            InitializeSRWLock(&m_ContentsQMap[&m_CotentsQ_vec[i]].first);
     }
 
 
@@ -928,6 +930,10 @@ void CTestServer::BalanceUpdate()
             msgInterval = currentTime - playerTime;
             if (msgInterval >= 5000 && playerTime < currentTime)
             {
+                CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                               L"TimeOver_prePlayer : ", player->m_AccountNo,
+                                               L"현재들어온ID:", player->m_sessionID);
                 Disconnect(player->m_sessionID);
             }
         }
@@ -949,6 +955,10 @@ void CTestServer::BalanceUpdate()
 
             if (msgInterval >= 40000 && playerTime < currentTime)
             {
+                CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                               L"TimeOver_Player : ", player->m_AccountNo,
+                                               L"현재들어온ID:", player->m_sessionID);
                 Disconnect(player->m_sessionID);
             }
         }
