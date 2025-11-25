@@ -25,6 +25,7 @@ enum class en_State : int
 
 struct CPlayer
 {
+    DWORD m_ContentsQIdx = 0;
     en_State m_State = en_State::Max;
     ull m_sessionID = 0;
 
@@ -54,7 +55,7 @@ class CTestServer : public CLanServer
     void DeletePlayer(CMessage *msg);
 
   public:
-    CTestServer(int iEncording = false);
+    CTestServer(DWORD ContentsThreadCnt = 1, int iEncording = false);
     virtual ~CTestServer();
 
     void Update();
@@ -86,12 +87,32 @@ class CTestServer : public CLanServer
     LONG64 GetSessionID_hash() { return SessionID_hash_size; }
 
     ///////////////////////////////////////////////////////////////////////
+    ////////////////////////// ContentsThread //////////////////////////
+    // 
+    //ContentsThread 만큼 reSize함.
+    DWORD m_ContentsThreadCnt;  // 생성자를 통해 받은 ContentsQ 개수 .
 
-    SRWLOCK srw_ContentQ;
+    std::vector<HANDLE> hContentsThread_vec; // HANDLE of ContentThread 
+    ull m_ContentsThreadIdX = -1;  // ContentsThread가 생성시에 Interlock으로 1씩 증가.
 
-    CRingBuffer m_ContentsQ = CRingBuffer(s_ContentsQsize, 1); // Pool에서 할당하지않음
+    // 메세지 Q의 주소로 Lock과 SetEvent를할 HANDLE을 가져 옴.
+    std::vector<CRingBuffer> m_CotentsQ_vec; // ContentsQ vec
+    std::map<CRingBuffer *, std::pair<SRWLOCK, HANDLE>> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
+
+    ////////////////////////////////////////////////////////////////////
+    ////////////////////////// BalanceThread //////////////////////////
+    // 
+    // // PlayerAlloc과  LoginPacket을 처리하는 Q  Balance Thread
+
+    SRWLOCK srw_BalanceQ; 
+    HANDLE hBalanceEvent; 
+    CRingBuffer m_BalanceQ = CRingBuffer(s_ContentsQsize, 1); 
+    
+
+
+
     inline static ringBufferSize s_ContentsQsize;
-    HANDLE hContentsThread = 0;
+    
     HANDLE hMonitorThread = 0;
 
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
@@ -120,6 +141,7 @@ class CTestServer : public CLanServer
 
     // SessionID Key , Player접근.
     std::unordered_map<ull, CPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
+    SRWLOCK srw_SessionID_Hash;
 
     // SessionID Key , Player접근.
     std::unordered_map<ull, CPlayer *> prePlayer_hash; // 중복 접속을 제거하는 용도

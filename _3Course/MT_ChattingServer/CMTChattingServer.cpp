@@ -6,7 +6,6 @@
 #include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
 
 #include "../lib/CNetwork_lib/Proxy.h"
-
 #include "../lib/CNetwork_lib/Stub.h"
 
 #include <thread>
@@ -82,7 +81,7 @@ unsigned MonitorThread(void *arg)
         printf("%20s %10d \n", "WorkerThread Cnt :", workthreadCnt);
         printf("%20s %10d \n", "ZeroCopy  :", ZeroCopy);
         printf("%20s %10d \n", "Nodelay  :", bNoDelay);
-        printf("%20s %10d \n", "ContentsQSize  :", server->m_ContentsQ._size);
+        printf("%20s %10d \n", "ContentsQSize  :", server->s_ContentsQsize);
         printf("%20s %10d \n", "MaxSessions  :", MaxSessions);
         printf("%20s %10d \n", "maxPlayers  :", maxPlayers);
 
@@ -146,20 +145,40 @@ unsigned MonitorThread(void *arg)
 
     return 0;
 }
+//arg[0] pServer
+//arg[1] pContentsQ
+
+
+thread_local ull tls_ContentsQIdx;  // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
 unsigned ContentsThread(void *arg)
 {
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-    HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
+
+    CRingBuffer *CotentsQ;
+    HANDLE local_ContentsEvent;
+
+
+
+    {
+        tls_ContentsQIdx = InterlockedIncrement(&server->m_ContentsThreadIdX);
+        CotentsQ = &server->m_CotentsQ_vec[tls_ContentsQIdx];
+        local_ContentsEvent = server->m_ContentsQMap[CotentsQ].second;
+    }
+
+    HANDLE hWaitHandle[2] = {local_ContentsEvent, server->m_ServerOffEvent};
 
     // bool 이 좋아보임.
     {
+        std::wstring ContentsThreadName;
+        WCHAR* DS;
+        GetThreadDescription(GetCurrentThread(), &DS);
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-20s ",
-                                       L"This is ContentsThread");
+                                       DS);
         CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-20s ",
-                                       L"This is ContentsThread");
+                                       DS);
     }
     ringBufferSize ContentsUseSize;
     char *f, *r;
@@ -171,10 +190,11 @@ unsigned ContentsThread(void *arg)
             break;
 
         server->Update();
-        f = server->m_ContentsQ._frontPtr;
-        r = server->m_ContentsQ._rearPtr;
 
-        ContentsUseSize = server->m_ContentsQ.GetUseSize(f, r);
+        f = CotentsQ->_frontPtr;
+        r = CotentsQ->_rearPtr;
+
+        ContentsUseSize = CotentsQ->GetUseSize(f, r);
         server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
 
         server->prePlayer_hash_size = server->prePlayer_hash.size();
@@ -556,17 +576,36 @@ void CTestServer::DeletePlayer(CMessage *msg)
     stTlsObjectPool<CMessage>::Release(msg);
 }
 
-CTestServer::CTestServer(int iEncording)
-    : CLanServer(iEncording)
+CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
+    : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt)
 {
-    InitializeSRWLock(&srw_ContentQ);
+    // BalanceThread를 위한 정보 초기화.
+    {
+        InitializeSRWLock(&srw_BalanceQ);
+        hBalanceEvent = CreateEvent(nullptr, false, false, nullptr);
+    }
 
-    m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
+    //    std::map<CRingBuffer *, SRWLOCK> m_SrwMap;\
+          각 메세지 Q에 대해서 SRWLOCK을 획득하는 자료구조 초기화 하기.
+    {
+        m_CotentsQ_vec.reserve(ContentsThreadCnt);
+        hContentsThread_vec.reserve(ContentsThreadCnt);
+        
+        for (int i = 0; i < ContentsThreadCnt; i++)
+        {
+            m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
+            InitializeSRWLock(&m_ContentsQMap[&m_CotentsQ_vec[i]].first);
+            m_ContentsQMap[&m_CotentsQ_vec[i]].second = CreateEvent(nullptr, false, false, nullptr);
+        }
+    }
+
+
+    // TODO : Sector마다  Lock 생성하기.
+
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
 
-    // TODO : 한계치를 정하는 함수 구현하기
     player_pool.Initalize(m_maxPlayers);
-    player_pool.Limite_Lock(); // Pool이 늘어나지않음.
+    player_pool.Limite_Lock(); // Pool이 더 이상 늘어나지않음.
 }
 
 CTestServer::~CTestServer()
@@ -586,11 +625,12 @@ void CTestServer::Update()
 
     WORD type;
 
+    CRingBuffer* CotentsQ = &m_CotentsQ_vec[tls_ContentsQIdx];
     // msg  크기 메세지 하나에 8Byte
-    while (m_ContentsQ.GetUseSize() != 0)
+    while (CotentsQ->GetUseSize() != 0)
     {
 
-        DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
+        DeQSisze = CotentsQ->Dequeue(&addr, sizeof(size_t));
         if (DeQSisze != sizeof(size_t))
             __debugbreak();
 
@@ -683,14 +723,19 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 {
     BOOL retval;
     HRESULT hr;
-
+    
     m_maxSessions = maxSessions;
 
     retval = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
-    hContentsThread = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
-    RT_ASSERT(hContentsThread != nullptr);
-    hr = SetThreadDescription(hContentsThread, L"\tContentsThread");
-    RT_ASSERT(!FAILED(hr));
+    for (DWORD i =0; i < m_ContentsThreadCnt; i++)
+    {
+        std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
+
+        hContentsThread_vec[i] = (HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr);
+        RT_ASSERT(hContentsThread_vec[i] != nullptr);
+        hr = SetThreadDescription(hContentsThread_vec[i], ContentsThreadName.c_str());
+        RT_ASSERT(!FAILED(hr));
+    }
 
     hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
     RT_ASSERT(hMonitorThread != nullptr);
@@ -704,35 +749,72 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg)
 {
     // double CurrentQ;
     ringBufferSize ContentsUseSize;
+    CMessage **ppMsg;
+    CRingBuffer *TargetQ; //  Q 가 많아졌으므로 Q를 찾아오기.
+    HANDLE hMsgQueuedEvent; // Q에 데이터가 들어왔음을 알림.
+    SRWLOCK *pSrw;
+    
+    std::wstring ProfileName; 
 
-    stSRWLock srw(&srw_ContentQ);
+    
 
-    ContentsUseSize = m_ContentsQ.GetUseSize();
-    if (msg == nullptr)
+    // Session의 정보 확인하기.
     {
-        // ContentsQ 상태 확인용
-        return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
+        AcquireSRWLockShared(&srw_SessionID_Hash);
+        // 없다면 LoginPacket을 받은 적이 없는 것.
+        //  LoginPacket으로 예상하고 BalanceQ에 넣자.
+
+        // 해당 HashMap에 대한 Lock을 소유해야 함.
+
+        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        {
+            TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
+            pSrw = &srw_BalanceQ;
+            hMsgQueuedEvent = hBalanceEvent;
+            ProfileName = L"EnQueue_BalanceQ";
+        }
+        else
+        {
+            CPlayer *player = SessionID_hash[SessionID];
+            TargetQ = &m_CotentsQ_vec[player->m_ContentsQIdx];
+            pSrw = &m_ContentsQMap[TargetQ].first;
+            hMsgQueuedEvent = m_ContentsQMap[TargetQ].second;
+            ProfileName = L"EnQueue_CotentsQ" + std::to_wstring(player->m_ContentsQIdx);
+        }
+
+        ReleaseSRWLockShared(&srw_SessionID_Hash);
+    }
+    // 단순히 크기를 구하는 용도로 호출 되었다면. Persent만 구하고 바로 리턴
+    {
+        if (msg == nullptr)
+        {
+            // ContentsQ 상태 확인용
+            ContentsUseSize = TargetQ->GetUseSize();
+            return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
+        }
     }
 
     {
+
+        stSRWLock srw(pSrw);
         Profiler profile;
 
-        profile.Start(L"ContentsQ_Enqueue");
-
-        // 포인터를 넣고
-        CMessage **ppMsg;
         ppMsg = &msg;
-        InterlockedExchange(&msg->ownerID, SessionID);
+        
+        {
+            profile.Start(ProfileName.c_str());
+            // 내가 넣은 msg인데 여기에 없으면 ( X )
+            if (TargetQ->Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
+                __debugbreak();
 
-        if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
-            __debugbreak();
+            profile.End(ProfileName.c_str());
+            SetEvent(hMsgQueuedEvent);
+        }
 
-        profile.End(L"ContentsQ_Enqueue");
-        SetEvent(m_ContentsEvent);
-        //
         _interlockedincrement64(&m_RecvTPS);
-    }
 
+        ContentsUseSize = TargetQ->GetUseSize();
+    }
     return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
 }
 

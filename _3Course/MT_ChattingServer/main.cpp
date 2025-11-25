@@ -15,7 +15,7 @@ int main()
 
     int iZeroCopy;
     int iEnCording;
-    int WorkerThreadCnt;
+    int WorkerThreadCnt ,ContentsThreadCnt;
     int reduceThreadCount;
     int NoDelay;
     int maxSessions;
@@ -40,9 +40,11 @@ int main()
         parser.GetValue(L"NoDelay", NoDelay);
         parser.GetValue(L"MaxSessions", maxSessions);
 
+        parser.GetValue(L"ContentsThreadCnt", ContentsThreadCnt);
         parser.GetValue(L"RingBufferSize", iRingBufferSize);
         parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
         parser.GetValue(L"EnCording", iEnCording);
+
 
         CRingBuffer::s_BufferSize = iRingBufferSize;
     }
@@ -52,7 +54,7 @@ int main()
 
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
-        CTestServer EchoServer(iEnCording);
+        CTestServer EchoServer(ContentsThreadCnt,iEnCording);
 
         EchoServer.Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
         CSystemLog::GetInstance()->SetDirectory(L"SystemLog");

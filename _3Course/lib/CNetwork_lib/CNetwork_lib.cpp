@@ -476,13 +476,13 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     stHeader header;
     ringBufferSize useSize;
     float qPersentage;
-    ull SeqID;
+    ull SessionID;
     char *f, *r, *b;
 
     {
         session.m_recvBuffer.MoveRear(transferred);
 
-        SeqID = session.m_SeqID.SeqNumberAndIdx;
+        SessionID = session.m_SeqID.SeqNumberAndIdx;
 
         
         b = session.m_recvBuffer._begin;
@@ -490,15 +490,15 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         r = session.m_recvBuffer._rearPtr;
 
         // ContentsQ의 상황이 어떤지를 체크.
-        qPersentage = OnRecv(SeqID, nullptr);
+        qPersentage = OnRecv(SessionID, nullptr);
         if (qPersentage >= 75.f)
         {
-            Disconnect(SeqID);
+            Disconnect(SessionID);
             CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
                                            L"%-20s %10s %05f %10s %08llu",
                                            L"ContentsQ Full",
                                            L"qPersentage : ", qPersentage,
-                                           L"TargetID : ", SeqID);
+                                           L"TargetID : ", SessionID);
             return;
         }
     
@@ -521,24 +521,26 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         if (bEnCording)
             msg->DeCoding();
 
+        InterlockedExchange(&msg->ownerID, SessionID);
+
         msg->_frontPtr = msg->_frontPtr + headerSize;
         // PayLoad를 읽고 무엇인가 처리하는 Logic이 NetWork에 들어가선 안된다.
 
         {
             Profiler profile;
             profile.Start(L"OnRecv");
-            qPersentage = OnRecv(SeqID, msg);
+            qPersentage = OnRecv(SessionID, msg);
             profile.End(L"OnRecv");
         }
 
         if (qPersentage >= 75.0)
         {
-            Disconnect(SeqID);
+            Disconnect(SessionID);
             CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
                                            L"%-20s %10s %05f %10s %08llu",
                                            L"ContentsQ Full",
                                            L"qPersentage : ", qPersentage,
-                                           L"TargetID : ", SeqID);
+                                           L"TargetID : ", SessionID);
             return ;
         }
 
@@ -594,7 +596,6 @@ CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header
         msg->HexLog();
         return nullptr;
     }
-
     return msg;
 }
 
