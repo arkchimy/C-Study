@@ -3,7 +3,7 @@
 #include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
 #include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
 
-
+//TODO : main이 왜 스택이 큰지 확인하기.
 int main()
 {
     CDump::SetHandlerDump();

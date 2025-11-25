@@ -731,6 +731,9 @@ void CTestServer::BalanceUpdate()
     WORD type;
 
     CRingBuffer *CotentsQ = &m_BalanceQ;
+
+
+    
     // msg  크기 메세지 하나에 8Byte
     while (CotentsQ->GetUseSize() != 0)
     {
