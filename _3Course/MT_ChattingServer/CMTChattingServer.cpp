@@ -681,11 +681,13 @@ void CTestServer::DeletePlayer(CMessage *msg)
                 __debugbreak();
             }
 
-            AccountNo_hash.erase(player->m_AccountNo);
+            AccountNo_hash.erase(player->m_AccountNo);  
 
             m_TotalPlayers--;
 
+            AcquireSRWLockExclusive(&srw_Sectors[player->iSectorY][player->iSectorX]);
             g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
+            ReleaseSRWLockExclusive(&srw_Sectors[player->iSectorY][player->iSectorX]);
 
             player->m_State = en_State::DisConnect;
 
