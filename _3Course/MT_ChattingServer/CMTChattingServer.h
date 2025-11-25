@@ -59,6 +59,7 @@ class CTestServer : public CLanServer
     virtual ~CTestServer();
 
     void Update();
+    void BalanceUpdate();
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
 
@@ -103,9 +104,9 @@ class CTestServer : public CLanServer
     ////////////////////////// BalanceThread //////////////////////////
     // 
     // // PlayerAlloc과  LoginPacket을 처리하는 Q  Balance Thread
-
+    HANDLE hBalanceThread; 
     SRWLOCK srw_BalanceQ; 
-    HANDLE hBalanceEvent; 
+    HANDLE hBalanceEvent; // EnQ를 알려주는 이벤트
     CRingBuffer m_BalanceQ = CRingBuffer(s_ContentsQsize, 1); 
     
 
@@ -149,6 +150,10 @@ class CTestServer : public CLanServer
     // SessionID 를 삽입
     inline static std::set<ull>
         g_Sector[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
+                [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
+
+    // Sector마다 Lock이 존재.
+    SRWLOCK srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
                 [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
 
     /*

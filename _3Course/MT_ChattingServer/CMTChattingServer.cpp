@@ -24,8 +24,6 @@ unsigned MonitorThread(void *arg)
 
     HANDLE hWaitHandle = {server->m_ServerOffEvent};
 
-    DWORD wait_retval;
-
     LONG64 UpdateTPS;
     LONG64 before_UpdateTPS = 0;
 
@@ -148,6 +146,53 @@ unsigned MonitorThread(void *arg)
 //arg[0] pServer
 //arg[1] pContentsQ
 
+unsigned BalanceThread(void *arg)
+{
+    DWORD hSignalIdx;
+    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+
+    CRingBuffer *CotentsQ;
+    HANDLE local_ContentsEvent;
+
+    {
+        CotentsQ = &server->m_BalanceQ;
+        local_ContentsEvent = server->hBalanceEvent;
+    }
+
+    HANDLE hWaitHandle[2] = {local_ContentsEvent, server->m_ServerOffEvent};
+
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"BalanceThread");
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"BalanceThread");
+    }
+    ringBufferSize ContentsUseSize;
+    char *f, *r;
+
+    while (1)
+    {
+        hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
+        if (hSignalIdx - WAIT_OBJECT_0 == 1)
+            break;
+
+        server->BalanceUpdate();
+
+        f = CotentsQ->_frontPtr;
+        r = CotentsQ->_rearPtr;
+
+        ContentsUseSize = CotentsQ->GetUseSize(f, r);
+        server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
+
+        server->prePlayer_hash_size = server->prePlayer_hash.size();
+        server->AccountNo_hash_size = server->AccountNo_hash.size();
+        server->SessionID_hash_size = server->SessionID_hash.size();
+    }
+
+    return 0;
+}
 
 thread_local ull tls_ContentsQIdx;  // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
 unsigned ContentsThread(void *arg)
@@ -577,21 +622,24 @@ void CTestServer::DeletePlayer(CMessage *msg)
 }
 
 CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
-    : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt)
+    : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0)
 {
+
+    InitializeSRWLock(&srw_SessionID_Hash);
+
     // BalanceThread를 위한 정보 초기화.
     {
         InitializeSRWLock(&srw_BalanceQ);
         hBalanceEvent = CreateEvent(nullptr, false, false, nullptr);
     }
 
-    //    std::map<CRingBuffer *, SRWLOCK> m_SrwMap;\
-          각 메세지 Q에 대해서 SRWLOCK을 획득하는 자료구조 초기화 하기.
+    //    std::map<CRingBuffer *, SRWLOCK> m_SrwMap;
+    //    각 메세지 Q에 대해서 SRWLOCK을 획득하는 자료구조 초기화 하기.
     {
         m_CotentsQ_vec.reserve(ContentsThreadCnt);
         hContentsThread_vec.reserve(ContentsThreadCnt);
         
-        for (int i = 0; i < ContentsThreadCnt; i++)
+        for (DWORD i = 0; i < ContentsThreadCnt; i++)
         {
             m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
             InitializeSRWLock(&m_ContentsQMap[&m_CotentsQ_vec[i]].first);
@@ -601,6 +649,13 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
 
 
     // TODO : Sector마다  Lock 생성하기.
+    for (DWORD w = 0; w < dfRANGE_MOVE_BOTTOM / dfSECTOR_Size; w++)
+    {
+        for (DWORD h = 0; h < dfRANGE_MOVE_BOTTOM / dfSECTOR_Size; h++)
+        {
+            InitializeSRWLock(&srw_Sectors[w][h]);
+        }
+    }
 
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
 
@@ -618,14 +673,63 @@ void CTestServer::Update()
     size_t addr;
     CMessage *msg;
 
-    char *f, *r;
-
-    ringBufferSize useSize, DeQSisze;
+    ringBufferSize  DeQSisze;
     ull l_sessionID;
 
     WORD type;
 
     CRingBuffer* CotentsQ = &m_CotentsQ_vec[tls_ContentsQIdx];
+    // msg  크기 메세지 하나에 8Byte
+    while (CotentsQ->GetUseSize() != 0)
+    {
+
+        DeQSisze = CotentsQ->Dequeue(&addr, sizeof(size_t));
+        if (DeQSisze != sizeof(size_t))
+            __debugbreak();
+
+        msg = (CMessage *)addr;
+        l_sessionID = msg->ownerID;
+
+        *msg >> type;
+
+        // LoginPacket이 안오는 경우가 존재하지않음.
+            //if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
+            //{
+            //    // Login Not Recv
+            //    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+            //                                    L"%-20s %12s %05llu %12s %05llu ",
+            //                                    L"HEARTBEAT SessionID_hash not Found : ",
+            //                                    L"현재들어온ID:", l_sessionID);
+            //    stTlsObjectPool<CMessage>::Release(msg);
+            //    Disconnect(l_sessionID);
+            //}
+            //else
+
+        { // Client Message
+            CPlayer *player = SessionID_hash[l_sessionID];
+
+            player->m_Timer = timeGetTime();
+            PacketProc(l_sessionID, msg, type);
+            
+            _interlockeddecrement64(&m_RecvMsgArr[type]);
+        }
+        
+        _interlockeddecrement64(&m_UpdateTPS);
+    }
+
+}
+
+void CTestServer::BalanceUpdate()
+{
+    size_t addr;
+    CMessage *msg;
+
+    ringBufferSize DeQSisze;
+    ull l_sessionID;
+
+    WORD type;
+
+    CRingBuffer *CotentsQ = &m_BalanceQ;
     // msg  크기 메세지 하나에 8Byte
     while (CotentsQ->GetUseSize() != 0)
     {
@@ -646,7 +750,8 @@ void CTestServer::Update()
             AllocPlayer(msg);
             _InterlockedDecrement64(&m_NetworkMsgCount);
             break;
-
+        // TODO : 끊김과 직전의 메세지가 처리가 되지않을 수 있음.  순서가 달라져서 
+        // 이렇게 하면 PlayerHash와 
         case en_PACKET_Player_Delete:
             DeletePlayer(msg);
             _InterlockedDecrement64(&m_NetworkMsgCount);
@@ -654,29 +759,12 @@ void CTestServer::Update()
         case en_PACKET_CS_CHAT_REQ_LOGIN:
             PacketProc(l_sessionID, msg, type);
             break;
+
         default:
-            if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
-            {
-                // Login Not Recv
-                CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                               L"%-20s %12s %05llu %12s %05llu ",
-                                               L"HEARTBEAT SessionID_hash not Found : ",
-                                               L"현재들어온ID:", l_sessionID);
-
-                stTlsObjectPool<CMessage>::Release(msg);
-                Disconnect(l_sessionID);
-            }
-            else
-            { // Client Message
-                CPlayer *player = SessionID_hash[l_sessionID];
-
-                player->m_Timer = timeGetTime();
-                PacketProc(l_sessionID, msg, type);
-                m_RecvMsgArr[type]++;
-            }
+            //TODO : 공격이 아닌상황에서 올수 없음.
+            __debugbreak();
         }
 
-        m_UpdateTPS++;
     }
 
     DWORD currentTime;
@@ -699,6 +787,7 @@ void CTestServer::Update()
             }
         }
     }
+
     //// LoginPacket을 받아서 승격된 하트비트 부분
     {
 
@@ -717,6 +806,9 @@ void CTestServer::Update()
             }
         }
     }
+
+
+
 }
 
 BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
@@ -727,6 +819,8 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     m_maxSessions = maxSessions;
 
     retval = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
+    hBalanceThread = (HANDLE)_beginthreadex(nullptr, 0, BalanceThread, this, 0, nullptr);
+
     for (DWORD i =0; i < m_ContentsThreadCnt; i++)
     {
         std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
