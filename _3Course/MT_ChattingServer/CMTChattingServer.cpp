@@ -470,7 +470,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
     SectorX = player->iSectorX;
     SectorY = player->iSectorY;
 
-    ReleaseSRWLockShared(&srw_SessionID_Hash);
+    
 
     if (player->m_AccountNo != AccountNo)
     {
@@ -506,12 +506,15 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         {
             for (ull id : g_Sector[targetSector._iY][targetSector._iX])
             {
-                SendCnt++;
+                if (SessionID_hash.find(id) != SessionID_hash.end())
+                {
+                    SendCnt++;
+                }
             }
         }
         InterlockedExchange64(&msg->iUseCnt, SendCnt);
 
-        AcquireSRWLockShared(&srw_SessionID_Hash);
+   
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
         {
             for (ull id : g_Sector[targetSector._iY][targetSector._iX])
@@ -527,6 +530,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
                 // SessionUnLock(id);
             }
         }
+   
         ReleaseSRWLockShared(&srw_SessionID_Hash);
 
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
