@@ -1015,17 +1015,17 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
     
     std::wstring ProfileName; 
 
-    
-
-    // Session의 정보 확인하기.
+    if (bBalanceQ)
     {
-        
-        // 없다면 LoginPacket을 받은 적이 없는 것.
-        //  LoginPacket으로 예상하고 BalanceQ에 넣자.
-
-        // 해당 HashMap에 대한 Lock을 소유해야 함.
-
-        if (bBalanceQ)
+        TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
+        pSrw = &srw_BalanceQ;
+        hMsgQueuedEvent = hBalanceEvent;
+        ProfileName = L"EnQueue_BalanceQ";
+    }
+    else
+    {
+        AcquireSRWLockShared(&srw_SessionID_Hash);
+        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
             TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
             pSrw = &srw_BalanceQ;
@@ -1034,30 +1034,20 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
         }
         else
         {
-            AcquireSRWLockShared(&srw_SessionID_Hash);
-            if (SessionID_hash.find(SessionID) == SessionID_hash.end())
-            {
-                TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
-                pSrw = &srw_BalanceQ;
-                hMsgQueuedEvent = hBalanceEvent;
-                ProfileName = L"EnQueue_BalanceQ";
-            }
-            else
-            {
-                CPlayer *player = SessionID_hash[SessionID];
+            CPlayer *player = SessionID_hash[SessionID];
 
-                TargetQ = &m_CotentsQ_vec[player->m_ContentsQIdx];
-                pSrw = &m_ContentsQMap[TargetQ].first;
-                hMsgQueuedEvent = m_ContentsQMap[TargetQ].second;
-                ProfileName = L"EnQueue_CotentsQ" + std::to_wstring(player->m_ContentsQIdx);
+            TargetQ = &m_CotentsQ_vec[player->m_ContentsQIdx];
+            pSrw = &m_ContentsQMap[TargetQ].first;
+            hMsgQueuedEvent = m_ContentsQMap[TargetQ].second;
+            ProfileName = L"EnQueue_CotentsQ" + std::to_wstring(player->m_ContentsQIdx);
 
                
-            }
-            ReleaseSRWLockShared(&srw_SessionID_Hash);
         }
+        ReleaseSRWLockShared(&srw_SessionID_Hash);
+    }
 
         
-    }
+    
 
     {
 
@@ -1087,14 +1077,10 @@ bool CTestServer::OnAccept(ull SessionID)
 {
     // Accept의 요청이 밀리고 있다고한다면, 그 이후에 Accept로 들어오는 Session을 끊겠다.
     // m_AllocMsgCount 처리량을 보여주는 변수.
-
     LONG64 localAllocCnt;
-
     clsSession &session = sessions_vec[SessionID >> 47];
 
-    localAllocCnt = _InterlockedIncrement64(&m_AllocMsgCount);
-
-    // Alloc Message가 너무 쏟아진다면 인큐를 안함.
+    localAllocCnt = _InterlockedIncrement64(&m_AllocMsgCount); // Alloc Message가 너무 쏟아진다면 인큐를 안함.
     if (localAllocCnt > m_AllocLimitCnt)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
