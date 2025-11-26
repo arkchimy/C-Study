@@ -90,11 +90,6 @@ unsigned MonitorThread(void *arg)
         printf("%20s %10lld \n", "Player Count:", server->GetPlayerCount());
 
 
-        printf("%20s %10lld \n", "AccountNo_hash_size:", server->GetAccountNo_hash());
-        printf("%20s %10lld \n", "SessionID_hash_size:", server->GetSessionID_hash());
-
-
-
         printf (" ==================================\n ");
 
         printf(" Total iDisCounnectCount: %llu\n", server->iDisCounnectCount);
@@ -709,7 +704,7 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
-float CTestServer::OnRecv(ull SessionID, CMessage *msg)
+float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
 {
     // double CurrentQ;
     ringBufferSize ContentsUseSize;
@@ -745,6 +740,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg)
 
     return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
 }
+
 
 bool CTestServer::OnAccept(ull SessionID)
 {
