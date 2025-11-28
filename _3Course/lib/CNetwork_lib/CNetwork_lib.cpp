@@ -119,8 +119,8 @@ unsigned AcceptThread(void *arg)
         client_sock = accept(listen_sock, (sockaddr *)&addr, &addrlen);
         if (client_sock == INVALID_SOCKET)
         {
-            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"INVALID_SOCKET");
-            continue;
+            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET");
+            break;
         }
         server->arrTPS[0]++; // Accept TPS 측정
         server->m_TotalAccept++;
@@ -178,6 +178,7 @@ unsigned AcceptThread(void *arg)
 
         server->DecrementIoCountAndMaybeDeleteSession(session);       
     }
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"AcceptThread Terminated %d", 0);
     return 0;
 }
 
@@ -225,6 +226,8 @@ unsigned WorkerThread(void *arg)
 
         GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
 
+        if (transferred == 0 && overlapped == nullptr && key == 0)
+            break;
         if (overlapped == nullptr)
         {
             CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
@@ -287,8 +290,7 @@ unsigned WorkerThread(void *arg)
             server->ReleaseSession(seqID);
         }
     }
-    printf("WorkerThreadID : %d  return '0' \n", GetCurrentThreadId());
-
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThreadID Terminated %d", 0);
     return 0;
 }
 
@@ -309,7 +311,7 @@ CLanServer::CLanServer(bool EnCoding)
 }
 CLanServer::~CLanServer()
 {
-    closesocket(m_listen_sock);
+    //closesocket(m_listen_sock);
 }
 
 BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
@@ -398,6 +400,9 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
 void CLanServer::Stop()
 {
+    closesocket(m_listen_sock);
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock", GetLastError());
+    CloseHandle(m_hIOCP);
 }
 
 bool CLanServer::Disconnect(const ull SessionID)

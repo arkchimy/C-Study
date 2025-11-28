@@ -67,6 +67,9 @@ int main()
         {
             if (GetAsyncKeyState(VK_ESCAPE))
             {
+                CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
+                CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
+                ChattingServer->Stop();
                 SetEvent(ChattingServer->m_ServerOffEvent);
                 break;
             }
@@ -103,7 +106,7 @@ int main()
             }
         }
 
-        Sleep(1000);
+        Sleep(10000);
     }
    
 }

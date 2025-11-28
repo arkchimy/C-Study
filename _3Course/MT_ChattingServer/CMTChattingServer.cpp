@@ -188,8 +188,7 @@ void BalanceThread(void *arg)
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
-        if (hSignalIdx - WAIT_OBJECT_0 == 1)
-            break;
+
 
         server->BalanceUpdate();
 
@@ -202,6 +201,21 @@ void BalanceThread(void *arg)
         server->prePlayer_hash_size = server->prePlayer_hash.size();
         server->AccountNo_hash_size = server->AccountNo_hash.size();
         server->SessionID_hash_size = server->SessionID_hash.size();
+
+           if (hSignalIdx - WAIT_OBJECT_0 == 1 
+               && server->prePlayer_hash_size == 0 
+               && server->AccountNo_hash_size == 0 
+               && server->SessionID_hash_size == 0 
+               && ContentsUseSize == 0)
+            break;
+        else if (hSignalIdx - WAIT_OBJECT_0 == 1)
+        {
+            CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"BalanceThread wait Player Exit %lld  %lld %lld",
+                                           server->prePlayer_hash_size,
+                                           server->AccountNo_hash_size,
+                                           server->SessionID_hash_size);
+        }
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"BalanceThread Terminated %d", 0);
     //return 0;
@@ -246,8 +260,10 @@ void ContentsThread(void *arg)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
         if (hSignalIdx - WAIT_OBJECT_0 == 1)
+        {
+            server->Update();
             break;
-
+        }
         server->Update();
 
         f = CotentsQ->_frontPtr;
@@ -732,7 +748,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0), hBalanceThread(0)
 {
     HRESULT hr;
-    pBalanceThread = std::move(std::thread (&BalanceThread, this));
+    pBalanceThread = std::thread (&BalanceThread, this);
     hr = SetThreadDescription(pBalanceThread.native_handle(), L"\tBalanceThread");
     RT_ASSERT(!FAILED(hr));
 
@@ -750,7 +766,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
     {
         std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
 
-        hContentsThread_vec[i] = (std::thread(ContentsThread,this));
+        hContentsThread_vec[i] = std::move(std::thread(ContentsThread, this));
         RT_ASSERT(hContentsThread_vec[i].native_handle() != nullptr);
 
         hr = SetThreadDescription(hContentsThread_vec[i].native_handle(), ContentsThreadName.c_str());
@@ -787,7 +803,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
         }
     }
 
-    m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
+    m_ServerOffEvent = CreateEvent(nullptr, true, false, nullptr);
 
     player_pool.Initalize(m_maxPlayers);
     player_pool.Limite_Lock(); // Pool이 더 이상 늘어나지않음.
@@ -797,9 +813,11 @@ CTestServer::~CTestServer()
 {
     pBalanceThread.join(); // Balance
 
+    CloseHandle(pBalanceThread.native_handle());
     for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
     {
         hContentsThread_vec[i].join();
+        CloseHandle(hContentsThread_vec[i].native_handle());
     }
 }
 
@@ -830,19 +848,8 @@ void CTestServer::Update()
         *msg >> type;
 
         // LoginPacket이 안오는 경우가 존재하지않음.
-            //if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
-            //{
-            //    // Login Not Recv
-            //    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-            //                                    L"%-20s %12s %05llu %12s %05llu ",
-            //                                    L"HEARTBEAT SessionID_hash not Found : ",
-            //                                    L"현재들어온ID:", l_sessionID);
-            //    stTlsObjectPool<CMessage>::Release(msg);
-            //    Disconnect(l_sessionID);
-            //}
-            //else
 
-        { // Client Message]
+        { //  Client Message]
             AcquireSRWLockShared(&srw_SessionID_Hash);
 
             if (SessionID_hash.find(l_sessionID) != SessionID_hash.end())
@@ -908,7 +915,6 @@ void CTestServer::BalanceUpdate()
             break;
         // TODO : 끊김과 직전의 메세지가 처리가 되지않을 수 있음.  순서가 달라져서 
         // 이렇게 하면 PlayerHash와 prePlayerHash는 ContentsThread에서는 접근할 일이 없음. 
-        // TODO : WorkerThread는 어떤가?
 
         case en_PACKET_Player_Delete:
 

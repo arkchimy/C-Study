@@ -8,7 +8,6 @@ CRingBuffer::CRingBuffer()
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
     _begin = (char*)malloc(iBufferSize);
-    //_begin = clsRingBufferManager::GetInstance()->Alloc(iBufferSize);
     if (_begin == nullptr)
     {
         __debugbreak();
