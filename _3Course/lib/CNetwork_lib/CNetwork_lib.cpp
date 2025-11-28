@@ -160,7 +160,13 @@ unsigned AcceptThread(void *arg)
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
                                        L"Accept", L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
 
-        _interlockedincrement64(&server->m_SessionCount);
+        //_interlockedincrement64(&server->m_SessionCount);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"[ %-10s ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"AcceptIncrement",
+                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", _interlockedincrement64(&server->m_SessionCount));
+
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)&session, 0);
 
         // AllocMsg의 처리가 너무 많이 발생한다면 False를 반환.
@@ -402,7 +408,11 @@ void CLanServer::Stop()
 {
     closesocket(m_listen_sock);
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock", GetLastError());
-    CloseHandle(m_hIOCP);
+    for (clsSession& session : sessions_vec)
+    {
+        Disconnect(session.m_SeqID.SeqNumberAndIdx);
+    }
+
 }
 
 bool CLanServer::Disconnect(const ull SessionID)
@@ -1040,8 +1050,15 @@ void CLanServer::ReleaseSession(ull SessionID)
                                        L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
                                        L"IO_Count", session.m_ioCount);
     }
-    m_SessionIdxStack.Push(SessionID >> 47);
-    _interlockeddecrement64(&m_SessionCount);
-   
+    else
+    {
+        m_SessionIdxStack.Push(SessionID >> 47);
+        //_interlockeddecrement64(&m_SessionCount);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"[ %-10s ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"ReleaseDeCrement",
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", _interlockeddecrement64(&m_SessionCount));
+    }
 }
 

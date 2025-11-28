@@ -202,12 +202,11 @@ void BalanceThread(void *arg)
         server->AccountNo_hash_size = server->AccountNo_hash.size();
         server->SessionID_hash_size = server->SessionID_hash.size();
 
-           if (hSignalIdx - WAIT_OBJECT_0 == 1 
-               && server->prePlayer_hash_size == 0 
-               && server->AccountNo_hash_size == 0 
-               && server->SessionID_hash_size == 0 
-               && ContentsUseSize == 0)
+        if (hSignalIdx - WAIT_OBJECT_0 == 1 && server->prePlayer_hash_size == 0 && server->AccountNo_hash_size == 0 && server->SessionID_hash_size == 0 && ContentsUseSize == 0)
+        {
+            CloseHandle(server->m_hIOCP);
             break;
+        }
         else if (hSignalIdx - WAIT_OBJECT_0 == 1)
         {
             CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode,
