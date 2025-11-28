@@ -979,10 +979,12 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 
     retval = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
 
+
     hBalanceThread = (HANDLE)_beginthreadex(nullptr, 0, BalanceThread, this, 0, nullptr);
     RT_ASSERT(hBalanceThread != nullptr);
-    hr = SetThreadDescription(hBalanceThread, L"\tBalanceThread");
 
+
+    hr = SetThreadDescription(hBalanceThread, L"\tBalanceThread");
     RT_ASSERT(!FAILED(hr));
 
     for (DWORD i =0; i < m_ContentsThreadCnt; i++)
