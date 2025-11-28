@@ -1,6 +1,6 @@
 //#include "pch.h"
 #include "clsSession.h"
-#include "../../../error_log.h"
+
 #include "../CSystemLog_lib/CSystemLog_lib.h"
 #include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 

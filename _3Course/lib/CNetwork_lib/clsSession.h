@@ -17,7 +17,7 @@ using ull = unsigned long long;
 #define SESSION_IDX_MASK 0xFFFF800000000000
 #define SESSION_SEQ_MASK 0x00007FFFFFFFFFFF
 
-enum class Job_Type
+enum class Job_Type : BYTE
 {
     Recv,
     Send,

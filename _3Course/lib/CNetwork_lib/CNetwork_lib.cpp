@@ -113,13 +113,13 @@ unsigned AcceptThread(void *arg)
     if (listen_retval == 0)
         printf("Listen Sucess\n");
     else
-        ERROR_FILE_LOG(L"Socket_Error.txt", L"Listen_Error");
+        CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Listen_Falied %d",GetLastError());
     while (1)
     {
         client_sock = accept(listen_sock, (sockaddr *)&addr, &addrlen);
         if (client_sock == INVALID_SOCKET)
         {
-            ERROR_FILE_LOG(L"Socket_Error.txt", L"Accept Error ");
+            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"INVALID_SOCKET");
             continue;
         }
         server->arrTPS[0]++; // Accept TPS 측정
@@ -227,7 +227,7 @@ unsigned WorkerThread(void *arg)
 
         if (overlapped == nullptr)
         {
-            ERROR_FILE_LOG(L"Socket_Error.txt", L"GetQueuedCompletionStatus Overlapped is nullptr");
+            CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
             continue;
         }
         session = reinterpret_cast<clsSession *>(key);
@@ -243,9 +243,8 @@ unsigned WorkerThread(void *arg)
         case Job_Type::Send:
             server->SendComplete(*session, transferred);
             break;
-
-        case Job_Type::MAX:
-            ERROR_FILE_LOG(L"Socket_Error.txt", L"UnDefine Error Overlapped_mode");
+        default:
+            CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stOverlapped *>(overlapped)->_mode);
             __debugbreak();
         }
         local_IoCount = InterlockedDecrement(&session->m_ioCount);
@@ -304,9 +303,7 @@ CLanServer::CLanServer(bool EnCoding)
     m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (m_listen_sock == INVALID_SOCKET)
     {
-
-        ERROR_FILE_LOG(L"Socket_Error.txt",
-                       L"listen_sock Create Socket Error");
+        CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"listen_sock Create Socket Error %d", GetLastError());
         __debugbreak();
     }
 }
@@ -357,10 +354,10 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     bind_retval = bind(m_listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
     if (bind_retval != 0)
-        ERROR_FILE_LOG(L"Socket_Error.txt", L"Bind Failed");
+        CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Bind Failed %d", GetLastError());
 
     if (GetLogicalProcess(lProcessCnt) == false)
-        ERROR_FILE_LOG(L"GetLogicalProcessError.txt", L"GetLogicalProcess_Error");
+        CSystemLog::GetInstance()->Log(L"GetLogicalProcessError.txt", en_LOG_LEVEL::ERROR_Mode, L"GetLogicalProcess_Error %d", GetLastError());
 
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 

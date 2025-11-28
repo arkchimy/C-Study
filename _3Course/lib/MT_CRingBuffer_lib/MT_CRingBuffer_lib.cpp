@@ -1,6 +1,6 @@
 ﻿#include "MT_CRingBuffer_lib.h"
 #include "clsRingBufferManager.h"
-#include "../../../error_log.h"
+
 
 CRingBuffer::CRingBuffer()
     : CRingBuffer(s_BufferSize) {}

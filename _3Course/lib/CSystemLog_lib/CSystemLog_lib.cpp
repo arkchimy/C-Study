@@ -3,7 +3,7 @@
 
 #include "pch.h"
 #include "CSystemLog_lib.h"
-#include "../../../error_log.h"
+
 #include <strsafe.h>
 #include <thread>
 #define DebugVectorSize 500000
@@ -114,7 +114,7 @@ BOOL CSystemLog::GetLogFileName(const wchar_t *const filename, size_t strlen, SY
     cch_retval = StringCchPrintfW(out, strlen, L"%d%d_%s.txt", stNowTime.wYear, stNowTime.wMonth, filename);
     if (cch_retval != S_OK)
     {
-        ERROR_FILE_LOG(L"StringCchPrintf_Error.txt", L"StringCchPrintfW Error");
+        CSystemLog::GetInstance()->Log(L"StringCchPrintf_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"StringCchPrintfW_Error %d", GetLastError());
         __debugbreak();
         return false;
     }
@@ -236,7 +236,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
     if (cchRetval != S_OK)
     {
-        ERROR_FILE_LOG(L"StringCchVPrintfW.txt", L"StringCchVPrintfW Error");
+        CSystemLog::GetInstance()->Log(L"StringCchPrintf_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"StringCchPrintfW_Error %d", GetLastError());
     }
 
     StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogWstring);
@@ -253,7 +253,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
         if (LogFile == nullptr)
         {
-            ERROR_FILE_LOG(L"FileOpen_Error.txt", L"_wfopen_s Error");
+            CSystemLog::GetInstance()->Log(L"FileOpen_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"_wfopen_s_Error %d", GetLastError());
             ReleaseSRWLockExclusive(&srw_Errorlock);
             return;
         }

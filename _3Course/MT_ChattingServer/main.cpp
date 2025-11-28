@@ -3,7 +3,8 @@
 #include "../lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
 #include "../lib/Profiler_MultiThread/Profiler_MultiThread.h"
 
-//TODO : main이 왜 스택이 큰지 확인하기.
+#include <thread>
+
 int main()
 {
     CDump::SetHandlerDump();
@@ -24,11 +25,13 @@ int main()
     int iRingBufferSize;
     int ContentsRingBufferSize;
 
+    HRESULT hr;
+
     {
         Parser parser;
 
         if (parser.LoadFile(L"Config.txt") == false)
-            ERROR_FILE_LOG(L"ParserError.txt", L"LoadFile");
+            CSystemLog::GetInstance()->Log(L"ParserError.txt", en_LOG_LEVEL::ERROR_Mode, L"LoadFileError %d", GetLastError());
         parser.GetValue(L"ServerAddr", bindAddr, 16);
         parser.GetValue(L"ServerPort", bindPort);
 
@@ -54,16 +57,18 @@ int main()
 
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
-        CTestServer *EchoServer = new CTestServer(ContentsThreadCnt, iEnCording);
+        CTestServer *ChattingServer = new CTestServer(ContentsThreadCnt, iEnCording);
 
-        EchoServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+        ChattingServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+
         CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
         CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
         while (1)
         {
             if (GetAsyncKeyState(VK_ESCAPE))
             {
-                SetEvent(EchoServer->m_ServerOffEvent);
+                SetEvent(ChattingServer->m_ServerOffEvent);
+                break;
             }
             if (_kbhit())
             {
@@ -97,6 +102,8 @@ int main()
                 }
             }
         }
-    }
 
+        Sleep(1000);
+    }
+   
 }

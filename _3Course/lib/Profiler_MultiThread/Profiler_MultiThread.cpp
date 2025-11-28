@@ -4,7 +4,6 @@
 #include "pch.h"
 #include "Profiler_MultiThread.h"
 
-#include "../../../error_log.h"
 
 void Profiler::SaveAsLog(const wchar_t *const lpFileName)
 {
@@ -123,13 +122,11 @@ bool Profiler::Initialization()
     s_Tlsidx = TlsAlloc();
     if (s_Tlsidx == TLS_OUT_OF_INDEXES)
     {
-        ERROR_FILE_LOG(L"Error.txt", L"TlsAlloc retval : TLS_OUT_OF_INDEXES");
         return false;
     }
     retval_QueryPerformanceFrequency = QueryPerformanceFrequency(&s_Frequency);
     if (retval_QueryPerformanceFrequency == 0)
     {
-        ERROR_FILE_LOG(L"Error.txt", L"QueryPerformanceFrequency retval : 0");
         return false;
     }
 
@@ -184,7 +181,6 @@ void Profiler::Start(const wchar_t *const lpTagName)
         StringCchCopyExW_retval = StringCchCopyExW(record.Tag.Name, _countof(record.Tag.Name), lpTagName, &pStrEnd, nullptr, 0);
         if (StringCchCopyExW_retval != S_OK)
         {
-            ERROR_FILE_LOG(L"Error.txt", L"StringCchCopyExW_retval is not S_OK");
             __debugbreak();
         }
         record.Tag.CchLength = pStrEnd - record.Tag.Name;

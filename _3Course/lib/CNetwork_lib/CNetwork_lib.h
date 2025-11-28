@@ -33,7 +33,6 @@ class st_WSAData
         wsaStartRetval = WSAStartup(MAKEWORD(2, 2), &wsa);
         if (wsaStartRetval != 0)
         {
-            ERROR_FILE_LOG(L"WSAData_Error.txt", L"WSAStartup retval is not Zero ");
             __debugbreak();
         }
     }

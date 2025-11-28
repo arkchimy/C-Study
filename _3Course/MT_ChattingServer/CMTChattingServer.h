@@ -5,6 +5,7 @@
 #include <set>
 #include <stack>
 #include <unordered_map>
+#include <thread>
 
 #define dfRANGE_MOVE_TOP 0
 #define dfRANGE_MOVE_LEFT 0
@@ -94,7 +95,7 @@ class CTestServer : public CLanServer
     //ContentsThread 만큼 reSize함.
     DWORD m_ContentsThreadCnt;  // 생성자를 통해 받은 ContentsQ 개수 .
 
-    std::vector<HANDLE> hContentsThread_vec; // HANDLE of ContentThread 
+    std::vector<std::thread> hContentsThread_vec; // HANDLE of ContentThread 
     ull m_ContentsThreadIdX = -1;  // ContentsThread가 생성시에 Interlock으로 1씩 증가.
 
     // 메세지 Q의 주소로 Lock과 SetEvent를할 HANDLE을 가져 옴.
@@ -104,6 +105,7 @@ class CTestServer : public CLanServer
     ////////////////////////////////////////////////////////////////////
     ////////////////////////// BalanceThread //////////////////////////
     //
+    std::thread pBalanceThread;
     std::vector<std::pair<DWORD, int>> balanceVec;
 
     HANDLE hBalanceThread; 

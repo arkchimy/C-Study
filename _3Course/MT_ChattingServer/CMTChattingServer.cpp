@@ -150,13 +150,13 @@ unsigned MonitorThread(void *arg)
         if (nextTime > currentTime)
             Sleep(nextTime - currentTime);
     }
-
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"MonitorThread Terminated %d", 0);
     return 0;
 }
 //arg[0] pServer
 //arg[1] pContentsQ
 
-unsigned BalanceThread(void *arg)
+void BalanceThread(void *arg)
 {
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
@@ -203,12 +203,13 @@ unsigned BalanceThread(void *arg)
         server->AccountNo_hash_size = server->AccountNo_hash.size();
         server->SessionID_hash_size = server->SessionID_hash.size();
     }
-
-    return 0;
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"BalanceThread Terminated %d", 0);
+    //return 0;
 }
 
+
 thread_local ull tls_ContentsQIdx;  // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
-unsigned ContentsThread(void *arg)
+void ContentsThread(void *arg)
 {
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
@@ -259,8 +260,8 @@ unsigned ContentsThread(void *arg)
         server->AccountNo_hash_size = server->AccountNo_hash.size();
         server->SessionID_hash_size = server->SessionID_hash.size();
     }
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"ContentsThread Terminated %d", 0);
 
-    return 0;
 }
 
 void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType, BYTE bBroadCast)
@@ -730,6 +731,10 @@ void CTestServer::DeletePlayer(CMessage *msg)
 CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0), hBalanceThread(0)
 {
+    HRESULT hr;
+    pBalanceThread = std::move(std::thread (&BalanceThread, this));
+    hr = SetThreadDescription(pBalanceThread.native_handle(), L"\tBalanceThread");
+    RT_ASSERT(!FAILED(hr));
 
     InitializeSRWLock(&srw_SessionID_Hash);// SessionID_hash 소유권.
 
@@ -737,6 +742,19 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
     {
         InitializeSRWLock(&srw_BalanceQ);
         hBalanceEvent = CreateEvent(nullptr, false, false, nullptr);
+    }
+    // ContentsThread의 생성
+    hContentsThread_vec.resize(m_ContentsThreadCnt);
+
+    for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
+    {
+        std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
+
+        hContentsThread_vec[i] = (std::thread(ContentsThread,this));
+        RT_ASSERT(hContentsThread_vec[i].native_handle() != nullptr);
+
+        hr = SetThreadDescription(hContentsThread_vec[i].native_handle(), ContentsThreadName.c_str());
+        RT_ASSERT(!FAILED(hr));
     }
 
     //    std::map<CRingBuffer *, SRWLOCK> m_SrwMap;
@@ -777,6 +795,12 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
 
 CTestServer::~CTestServer()
 {
+    pBalanceThread.join(); // Balance
+
+    for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
+    {
+        hContentsThread_vec[i].join();
+    }
 }
 
 void CTestServer::Update()
@@ -978,25 +1002,6 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     m_maxSessions = maxSessions;
 
     retval = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
-
-
-    hBalanceThread = (HANDLE)_beginthreadex(nullptr, 0, BalanceThread, this, 0, nullptr);
-    RT_ASSERT(hBalanceThread != nullptr);
-
-
-    hr = SetThreadDescription(hBalanceThread, L"\tBalanceThread");
-    RT_ASSERT(!FAILED(hr));
-
-    for (DWORD i =0; i < m_ContentsThreadCnt; i++)
-    {
-        std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
-
-        hContentsThread_vec.emplace_back((HANDLE)_beginthreadex(nullptr, 0, ContentsThread, this, 0, nullptr));
-        RT_ASSERT(hContentsThread_vec[i] != nullptr);
-
-        hr = SetThreadDescription(hContentsThread_vec[i], ContentsThreadName.c_str());
-        RT_ASSERT(!FAILED(hr));
-    }
 
     hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
     RT_ASSERT(hMonitorThread != nullptr);
