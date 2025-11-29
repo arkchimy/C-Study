@@ -160,12 +160,8 @@ unsigned AcceptThread(void *arg)
                                        L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
                                        L"Accept", L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
 
-        //_interlockedincrement64(&server->m_SessionCount);
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"[ %-10s ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"AcceptIncrement",
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", _interlockedincrement64(&server->m_SessionCount));
+        _interlockedincrement64(&server->m_SessionCount);
+
 
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)&session, 0);
 
@@ -1053,12 +1049,8 @@ void CLanServer::ReleaseSession(ull SessionID)
     else
     {
         m_SessionIdxStack.Push(SessionID >> 47);
-        //_interlockeddecrement64(&m_SessionCount);
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"[ %-10s ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"ReleaseDeCrement",
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", _interlockeddecrement64(&m_SessionCount));
+        _interlockeddecrement64(&m_SessionCount);
+ 
     }
 }
 

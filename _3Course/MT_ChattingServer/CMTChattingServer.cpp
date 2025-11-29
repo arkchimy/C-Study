@@ -77,39 +77,19 @@ unsigned MonitorThread(void *arg)
             arrTPS[i] = old_arrTPS - before_arrTPS[i];
             before_arrTPS[i] = old_arrTPS;
         }
-        printf(" ==================================\n ");
-        printf("%20s %10d \n", "WorkerThread Cnt :", workthreadCnt);
-        printf("%20s %10d \n", "ZeroCopy  :", ZeroCopy);
-        printf("%20s %10d \n", "Nodelay  :", bNoDelay);
-        printf("%20s %10d \n", "ContentsQSize  :", server->s_ContentsQsize);
-        printf("%20s %10d \n", "MaxSessions  :", MaxSessions);
-        printf("%20s %10d \n", "maxPlayers  :", maxPlayers);
+        printf(" ==================================\n");
+        printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", workthreadCnt, "SessionNum", server->GetSessionCount());
+        printf("%-25s : %10d  %-25s : %10lld\n", "ZeroCopy", ZeroCopy, "PacketPool", stTlsObjectPool<CMessage>::instance.m_TotalCount);
+        printf("%-25s : %10d  \n", "Nodelay", bNoDelay);
+        printf("%-25s : %10d  %-25s : %10lld\n", "MaxSessions", MaxSessions, "ActiveMessage_Cnt", server->getNetworkMsgCount());
 
-        printf(" ==================================\n ");
-        printf("%20s %10lld \n", "SessionNum :", server->GetSessionCount());
-        printf("%20s %10lld \n", "PacketPool :", stTlsObjectPool<CMessage>::instance.m_TotalCount);
-
-        printf("%20s %10lld \n", "UpdateMessage_Queue :", server->m_UpdateMessage_Queue);
-        printf("%20s %10lld \n", "UpdateMessage_Pool :", server->getNetworkMsgCount());
-
-        printf("%20s %10lld \n", "prePlayer Count:", server->GetprePlayer_hash());
-        printf("%20s %10lld \n", "Player Count:", server->GetPlayerCount());
-
-        printf("%20s %10lld \n", "AccountNo_hash_size:", server->GetAccountNo_hash());
-        printf("%20s %10lld \n", "SessionID_hash_size:", server->GetSessionID_hash());
-
-        printf(" ==================================\n ");
-
-        printf(" Total iDisCounnectCount: %llu\n", server->iDisCounnectCount);
-
-        printf(" TotalAccept : %llu\n", server->getTotalAccept());
-        printf(" Accept TPS : %lld\n", arrTPS[0]);
-
-        printf(" Update  TPS : %lld\n", UpdateTPS);
-        // Update TPS : - Update 처리 초당 횟수
-        // Recv TPS : - 초당 Recv 메시지 수
-        // Send TPS : -초당 Send 메시지 수
-        // 메시지별 수신 TPS
+        printf("%-25s : %10d  %-25s : %10lld\n", "MaxPlayers", maxPlayers, "PrePlayer Count", server->GetprePlayer_hash());
+        printf("%-25s : %10lld  %-25s : %10lld\n", "Player Count", server->GetPlayerCount(), "AccountNo_hash_size", server->GetAccountNo_hash());
+        printf("%-25s : %10lld  %-25s : %10lld\n", "SessionID_hash_size", server->GetSessionID_hash(), "Total iDisconnectCount", server->iDisCounnectCount);
+        printf(" ==================================\n");
+        printf(" Total Accept          : %llu\n", server->getTotalAccept());
+        printf(" Accept TPS           : %lld\n", arrTPS[0]);
+        printf(" Update TPS           : %lld\n", UpdateTPS);
 
         {
             LONG64 old_RecvTPS = server->m_RecvTPS;
@@ -122,17 +102,22 @@ unsigned MonitorThread(void *arg)
             for (int i = 1; i <= server->m_WorkThreadCnt; i++)
             {
                 sum += arrTPS[i];
-                // printf(" Send TPS : %lld\n", arrTPS[i]);
+                printf("%20s %10lld \n", "Send TPS :", arrTPS[i]);
             }
-            printf(" Send TPS : %lld\n", sum);
+            printf("%25s %10lld\n", "Total Send TPS :" , sum);
         }
         printf(" ==================================\n");
         {
             LONG64 sum = 0;
-            for (auto element : server->balanceVec)
+            // Contents 정보 Print
+            for (int idx = 0; idx < server->balanceVec.size(); idx++)
             {
-                printf(" Contetent Sessiond : %d \n", element.second);
+                printf("%15s %10s %05d  %10s %05d\n", 
+                    "Contetent",
+                    "Session :",server->balanceVec[idx].second,
+                    "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].GetUseSize());
             }
+
             
         }
         printf(" ==================================\n");
@@ -196,7 +181,6 @@ void BalanceThread(void *arg)
         r = CotentsQ->_rearPtr;
 
         ContentsUseSize = CotentsQ->GetUseSize(f, r);
-        server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
 
         server->prePlayer_hash_size = server->prePlayer_hash.size();
         server->AccountNo_hash_size = server->AccountNo_hash.size();
@@ -301,7 +285,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         // 없다는 것은 내가 만든 절차를 따르지않았음을 의미.
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                       L"%-20s %05lld %12s %05llu ",
                                        L"LoginError - prePlayer_hash not found : ", AccountNo,
                                        L"현재들어온ID:", SessionID);
         Disconnect(SessionID);
@@ -317,7 +301,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         // 로그인 패킷을 여러번 보낸 경우.
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %05lld %12s %05lld %12s %05llu ",
+                                       L"%-20s %05lld %12s %05lld",
                                        L"LoginError - state not equle Session : ", AccountNo,
                                        L"현재들어온ID:", SessionID);
 
@@ -429,7 +413,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     {
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %12s %05llu %12s %05lld ",
+                                       L"%-20s %12s %05llu %12s %05lld %12s %05lld ",
                                        L"REQ_SECTOR_MOVE m_AccountNo != AccountNo : ",
                                        L"현재들어온ID:", SessionID,
                                        L"현재들어온Account:", AccountNo,
@@ -492,7 +476,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
     {
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %12s %05llu %12s %05lld ",
+                                       L"%-20s %12s %05llu %12s %05lld  %12s %05lld ",
                                        L"REQ_MESSAGE m_AccountNo != AccountNo : ",
                                        L"현재들어온ID:", SessionID,
                                        L"현재들어온Account:", AccountNo,
@@ -589,7 +573,7 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
         stTlsObjectPool<CMessage>::Release(msg);
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                        L"%-20s %12s %05llu %12s %05llu ",
+                                        L"%-20s %12s %05llu  ",
                                         L"HEARTBEAT SessionID_hash not Found : ",
                                         L"현재들어온ID:", SessionID);
 
@@ -607,7 +591,7 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
 
 
     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                   L"%-20s %12s %05llu %12s %05llu ",
+                                   L"%-20s %12s %05llu",
                                    L"HEARTBEAT Send : ",
                                    L"현재들어온ID:", SessionID);
 
@@ -640,7 +624,7 @@ void CTestServer::AllocPlayer(CMessage *msg)
         stTlsObjectPool<CMessage>::Release(msg);
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                       L"%-20s %d %12s %05llu ",
                                        L"Player is Fulled : ", 0,
                                        L"현재들어온ID:", SessionID);
 
@@ -654,7 +638,7 @@ void CTestServer::AllocPlayer(CMessage *msg)
     // LoginPacket을 받았다면 ;
     //
     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                   L"%-20s %12s %05llu %12s %05llu ",
+                                   L"%-20s %12s %05llu ",
                                    L"AllocPlayer SessionLock Failed : ",
                                    L"현재들어온ID:", SessionID);
     InterlockedExchange(&player->m_Timer, timeGetTime());
@@ -962,7 +946,7 @@ void CTestServer::BalanceUpdate()
             if (msgInterval >= 5000 && playerTime < currentTime)
             {
                 CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                               L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                               L"%-20s %05lld %12s %05llu",
                                                L"TimeOver_prePlayer : ", player->m_AccountNo,
                                                L"현재들어온ID:", player->m_sessionID);
                 Disconnect(player->m_sessionID);
@@ -987,7 +971,7 @@ void CTestServer::BalanceUpdate()
             if (msgInterval >= 40000 && playerTime < currentTime)
             {
                 CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                               L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                               L"%-20s %05lld %12s %05llu",
                                                L"TimeOver_Player : ", player->m_AccountNo,
                                                L"현재들어온ID:", player->m_sessionID);
                 Disconnect(player->m_sessionID);
@@ -1096,7 +1080,7 @@ bool CTestServer::OnAccept(ull SessionID)
     if (localAllocCnt > m_AllocLimitCnt)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %10s %4llu %10s %05lld  %10s %012llu  %10s %4llu %10s %05lld ",
+                                       L"%-10s %10s %4llu %10s %05lld  %10s %012llu  %10s %4llu  ",
                                        L"AllocMsg_Refuse",
                                        L"LocalMsgCnt", localAllocCnt,
                                        L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
