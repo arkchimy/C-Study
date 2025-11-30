@@ -1,15 +1,11 @@
 ﻿// CNetworkLib.cpp : 정적 라이브러리를 위한 함수를 정의합니다.
 //
-
-#include "pch.h"
 #include "CNetworkLib.h"
 
-#include "CNetwork_lib.h"
+#include "utility/CTlsObjectPool/CTlsObjectPool.h"
+#include "utility/Profiler_MultiThread/Profiler_MultiThread.h"
 
-#include "../../../_4Course/_lib/CTlsObjectPool_lib/CTlsObjectPool_lib.h"
-#include "../Profiler_MultiThread/Profiler_MultiThread.h"
-
-#include "stHeader.h"
+#include "utility/stHeader.h"
 
 #include <list>
 #include <thread>

@@ -7,15 +7,10 @@
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "ws2_32")
 
-#include "../../lib/MT_CRingBuffer_lib/MT_CRingBuffer_lib.h"
-#include "../../lib/CLockFreeQueue_lib/CLockFreeQueue_lib.h"
-
-#include "../../../_4Course/_lib/CTlsLockFreeQueue/CTlsLockFreeQueue.h"
+#include "../utility/MT_CRingBuffer/MT_CRingBuffer.h"
+#include "../utility//CTlsLockFreeQueue/CTlsLockFreeQueue.h"
 
 using ull = unsigned long long;
-
-#define SESSION_IDX_MASK 0xFFFF800000000000
-#define SESSION_SEQ_MASK 0x00007FFFFFFFFFFF
 
 enum class Job_Type : BYTE
 {

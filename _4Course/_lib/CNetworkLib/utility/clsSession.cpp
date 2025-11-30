@@ -1,8 +1,8 @@
-//#include "pch.h"
 #include "clsSession.h"
 
-#include "../CSystemLog_lib/CSystemLog_lib.h"
-#include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
+#include "../utility/CSystemLog/CSystemLog.h"
+#include "../utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
+#include "../utility/CTlsObjectPool/CTlsObjectPool.h"
 
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지

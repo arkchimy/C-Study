@@ -4,11 +4,15 @@
 #include <iostream>
 #include <vector>
 
-#define SEQ_MASK 0XFFFF800000000000
+#ifndef ONCE_DEFINE
+#define ONCE_DEFINE
 #define ADDR_MASK 0x00007FFFFFFFFFFF
-
 #define ALLOC_Node 0xcccccccc
 #define RELEASE_Node 0xeeeeeeee
+#define SEQ_MASK 0XFFFF800000000000
+#endif
+
+
 
 using ull = unsigned long long;
 using ll = long long;

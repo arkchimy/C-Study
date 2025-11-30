@@ -1,4 +1,6 @@
 #pragma once
+#include <vector>
+
 
 #ifndef ONCE_DEFINE
 #define ONCE_DEFINE
@@ -7,13 +9,15 @@
 
 #define ALLOC_Node 0xcccccccc
 #define RELEASE_Node 0xeeeeeeee
+
 #endif
+
 
 
 using ull = unsigned long long;
 using ll = long long;
 
-extern std::vector<stPoolInfo> pool_infos;
+extern std::vector<struct stPoolInfo> pool_infos;
 
 template <typename T>
 class CObjectPool_UnSafeMT

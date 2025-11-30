@@ -13,10 +13,10 @@
 #include <map>
 #include <vector>
 
-#include "../CLockFreeQueue_lib/CLockFreeQueue_lib.h"
-#include "../CLockFreeStack_lib/CLockFreeStack.h"
-#include "../CSystemLog_lib/CSystemLog_lib.h"
-#include "../SerializeBuffer_exception/SerializeBuffer_exception.h"
+#include "utility/CLockFreeQueue/CLockFreeQueue.h"
+#include "utility/CLockFreeStack/CLockFreeStack.h"
+#include "utility/CSystemLog/CSystemLog.h"
+#include "utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
 
 
 using ull = unsigned long long;
