@@ -25,6 +25,7 @@ int main()
     int ContentsRingBufferSize;
 
     HRESULT hr;
+    DWORD waitThread_Retval; // Waitfor 종료절차  반환값. 현재는 infinite
 
     {
         Parser parser;
@@ -51,6 +52,8 @@ int main()
         CRingBuffer::s_BufferSize = iRingBufferSize;
     }
     wchar_t buffer[100];
+    CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
+
 
     StringCchPrintfW(buffer, 100, L"Profiler_%hs.txt", __DATE__);
 
@@ -58,9 +61,8 @@ int main()
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         CTestServer *ChattingServer = new CTestServer(ContentsThreadCnt, iEnCording);
 
+        
         ChattingServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
-
-        CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
         CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
         while (1)
         {
@@ -69,6 +71,8 @@ int main()
                 CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
                 CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
                 ChattingServer->Stop();
+                ChattingServer->bMonitorThreadOn = false;
+
                 SetEvent(ChattingServer->m_ServerOffEvent);
                 break;
             }
@@ -104,8 +108,15 @@ int main()
                 }
             }
         }
+        
+        waitThread_Retval = WaitForSingleObject(ChattingServer->hMonitorThread, INFINITE);
+        if (waitThread_Retval == WAIT_TIMEOUT)
+        {
+            //TODO : 시간 정한다면 어찌할지 정하기.
+            __debugbreak();
+        }
+        CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"ContentsThread_Terminate");
 
-        Sleep(10000);
     }
    
 }

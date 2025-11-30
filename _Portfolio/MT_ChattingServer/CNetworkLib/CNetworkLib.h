@@ -108,7 +108,7 @@ class CLanServer : public Stub, public Proxy
   public:
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
-    HANDLE *m_hThread = nullptr;
+    HANDLE *m_hWorkerThread = nullptr;
 
     HANDLE m_hAccept = INVALID_HANDLE_VALUE;
 

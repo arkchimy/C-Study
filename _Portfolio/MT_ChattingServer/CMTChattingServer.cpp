@@ -11,6 +11,7 @@
 #include <thread>
 #include <algorithm>
 
+
 #pragma comment(lib, "Winmm.lib")
 
 #include "CMTChattingServer.h"
@@ -65,7 +66,7 @@ unsigned MonitorThread(void *arg)
     int maxPlayers = server->m_maxPlayers;
     int bNoDelay = server->bNoDelay;
 
-    while (1)
+    while (server->bMonitorThreadOn)
     {
         nextTime += 1000;
         {
@@ -136,6 +137,103 @@ unsigned MonitorThread(void *arg)
         currentTime = timeGetTime();
         if (nextTime > currentTime)
             Sleep(nextTime - currentTime);
+    }
+    //종료 절차.
+
+    DWORD waitThread_Retval;
+    std::wstring Accept_str(L"AcceptThread Shutdown in progress");
+    std::wstring Worker_str(L"WorkerThread Shutdown in progress");
+    std::wstring Contents_str(L"ContentsThread Shutdown in progress");
+
+    std::wstring Accept_str2(L"AcceptThread Shutdown complete.");
+    std::wstring Worker_str2(L"WorkerThread");
+    std::wstring Contents_str2(L"ContentsThread");
+
+    wchar_t dot_str[][11] = {
+        L".",
+        L"..",
+        L"...",
+        L"....",
+        L".....",
+        L"......",
+        L".......",
+        L"........",
+        L".........",
+        L"..........",
+    };
+    bool bOn = true;
+    while (bOn)
+    {
+        static DWORD Chance = 0;
+        if (Chance % 10000 == 0)
+            bOn = false;
+   
+        Chance++;
+
+        nextTime += 1000;
+        printf(" =========================Waiting for Threads to terminate...=========================\n");
+        // AcceptThread 종료
+        {
+
+            waitThread_Retval = WaitForSingleObject(server->m_hAccept, 0);
+            if (waitThread_Retval == WAIT_TIMEOUT)
+            {
+                wprintf(L"\t%30s\n", (Accept_str + dot_str[Chance % 10]).c_str());
+                bOn = true;
+            }
+            else
+            {
+                wprintf(L"\t%30s\n", (Accept_str2).c_str());
+            }
+            
+        }
+        // WorkerThread 종료
+        for (int i = 0; i < server->m_WorkThreadCnt; i++)
+        {
+            waitThread_Retval = WaitForSingleObject( server->m_hWorkerThread[i], 0);
+            if (waitThread_Retval == WAIT_TIMEOUT)
+            {
+                wprintf(L"\t%30s\n", (Worker_str + std::to_wstring(i) + dot_str[Chance % 10]).c_str());
+                bOn = true;
+            }
+            else
+            {
+                wprintf(L"\t%30s :  %20s\n", (Worker_str2 + std::to_wstring(i)).c_str(), L"\tShutdown complete.");
+            }
+        }
+
+        // ContentsThread 종료
+        for (int i = 0; i < server->m_ContentsThreadCnt; i++)
+        {
+            waitThread_Retval = WaitForSingleObject(server->hContentsThread_vec[i].native_handle(), 0);
+            if (waitThread_Retval == WAIT_TIMEOUT)
+            {
+                wprintf(L"%30s\n", (Contents_str + std::to_wstring(i) + dot_str[Chance % 10]).c_str());
+                bOn = true;
+            }
+            else
+            {
+                wprintf(L"\%30s :  %20s\n", (Contents_str2 + std::to_wstring(i)).c_str() , L"\tShutdown complete.");
+            }
+        }
+        printf(" =========================  Wait for Job Process terminate  =========================\n");
+
+        LONG64 sum = 0;
+        for (int idx = 0; idx < server->balanceVec.size(); idx++)
+        {
+            sum += server->balanceVec[idx].second;
+            printf("%15s %10s %05d  %10s %05d\n",
+                   "Contetent",
+                   "Session :", server->balanceVec[idx].second,
+                   "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].GetUseSize());
+        }
+        if (sum != 0)
+            bOn = true;
+
+        currentTime = timeGetTime();
+        if (nextTime > currentTime)
+            Sleep(nextTime - currentTime);
+        printf(" ===================================================================================\n");
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"MonitorThread Terminated %d", 0);
     return 0;
@@ -244,11 +342,13 @@ void ContentsThread(void *arg)
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
+      
         if (hSignalIdx - WAIT_OBJECT_0 == 1)
         {
             server->Update();
             break;
         }
+
         server->Update();
 
         f = CotentsQ->_frontPtr;
@@ -390,26 +490,25 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
         stTlsObjectPool<CMessage>::Release(msg);
         return;
     }
-    AcquireSRWLockShared(&srw_SessionID_Hash);
-
-    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
     {
-        __debugbreak();
-        stTlsObjectPool<CMessage>::Release(msg);
-        SessionUnLock(SessionID);
+        std::shared_lock lock(srw_SessionID_Hash);
 
-        ReleaseSRWLockShared(&srw_SessionID_Hash);
-        return;
+        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        {
+            __debugbreak();
+            stTlsObjectPool<CMessage>::Release(msg);
+            SessionUnLock(SessionID);
+            return;
+        }
+        player = SessionID_hash[SessionID];
+
+        beforeX = player->iSectorX;
+        beforeY = player->iSectorY;
+
+        player->iSectorX = SectorX;
+        player->iSectorY = SectorY;
+
     }
-    player = SessionID_hash[SessionID];
-
-    beforeX = player->iSectorX;
-    beforeY = player->iSectorY;
-
-    player->iSectorX = SectorX;
-    player->iSectorY = SectorY;
-
-    ReleaseSRWLockShared(&srw_SessionID_Hash);
 
     if (player->m_AccountNo != AccountNo)
     {
@@ -428,14 +527,16 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     }
 
     {
-        stSRWLock srw(&srw_Sectors[beforeY][beforeX]);
+        std::unique_lock lock(srw_Sectors[beforeY][beforeX]);
+        //stSRWLock srw(&srw_Sectors[beforeY][beforeX]);
         g_Sector[beforeY][beforeX].erase(SessionID);
     }
 
 
 
     {
-        stSRWLock srw(&srw_Sectors[SectorY][SectorX]);
+        std::unique_lock lock(srw_Sectors[SectorY][SectorX]);
+        //stSRWLock srw(&srw_Sectors[SectorY][SectorX]);
         g_Sector[SectorY][SectorX].insert(SessionID);
     }
 
@@ -456,106 +557,93 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         return;
     }
 
-    AcquireSRWLockShared(&srw_SessionID_Hash);
-    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
     {
-        __debugbreak();
-        Disconnect(SessionID);
-        stTlsObjectPool<CMessage>::Release(msg);
-        SessionUnLock(SessionID);
-        ReleaseSRWLockShared(&srw_SessionID_Hash);
-        return;
-    }
+        std::shared_lock SessionID_Hashlock(srw_SessionID_Hash);
 
-    player = SessionID_hash[SessionID];
-
-    SectorX = player->iSectorX;
-    SectorY = player->iSectorY;
-
-    
-
-    if (player->m_AccountNo != AccountNo)
-    {
-
-        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %12s %05llu %12s %05lld  %12s %05lld ",
-                                       L"REQ_MESSAGE m_AccountNo != AccountNo : ",
-                                       L"현재들어온ID:", SessionID,
-                                       L"현재들어온Account:", AccountNo,
-                                       L"player Account:", player->m_AccountNo);
-
-        Disconnect(SessionID);
-        stTlsObjectPool<CMessage>::Release(msg);
-        SessionUnLock(SessionID);
-        ReleaseSRWLockShared(&srw_SessionID_Hash);
-        return;
-    }
-    // TODO : Broad Cast  방식 수정하기.
-    Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
-
-    st_Sector_Around AroundSectors;
-    SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
-
-    LONG64 SendCnt = 0;
-    std::list<ull> sendID;
-
-    if (bBroadCast)
-    {
-
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        // AcquireSRWLockShared(&srw_SessionID_Hash);
+        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
-            AcquireSRWLockShared(&srw_Sectors[targetSector._iY][targetSector._iX]);
+            __debugbreak();
+            Disconnect(SessionID);
+            stTlsObjectPool<CMessage>::Release(msg);
+            SessionUnLock(SessionID);
+            // ReleaseSRWLockShared(&srw_SessionID_Hash);
+            return;
         }
 
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        player = SessionID_hash[SessionID];
+
+        SectorX = player->iSectorX;
+        SectorY = player->iSectorY;
+
+        if (player->m_AccountNo != AccountNo)
         {
-            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+
+            CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                           L"%-20s %12s %05llu %12s %05lld  %12s %05lld ",
+                                           L"REQ_MESSAGE m_AccountNo != AccountNo : ",
+                                           L"현재들어온ID:", SessionID,
+                                           L"현재들어온Account:", AccountNo,
+                                           L"player Account:", player->m_AccountNo);
+
+            Disconnect(SessionID);
+            stTlsObjectPool<CMessage>::Release(msg);
+            SessionUnLock(SessionID);
+            // ReleaseSRWLockShared(&srw_SessionID_Hash);
+            return;
+        }
+        // TODO : Broad Cast  방식 수정하기.
+        Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
+
+        st_Sector_Around AroundSectors;
+        SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
+
+        LONG64 SendCnt = 0;
+        std::list<ull> sendID;
+
+        std::vector<std::shared_lock<std::shared_mutex>> SectorAround_locks;
+        SectorAround_locks.reserve(AroundSectors.Around.size());
+
+        if (bBroadCast)
+        {
+
+            for (const st_Sector_Pos targetSector : AroundSectors.Around)
             {
-                if (SessionID_hash.find(id) != SessionID_hash.end())
+                SectorAround_locks.emplace_back(srw_Sectors[targetSector._iY][targetSector._iX]);
+                //AcquireSRWLockShared(&srw_Sectors[targetSector._iY][targetSector._iX]);
+            }
+
+            for (const st_Sector_Pos targetSector : AroundSectors.Around)
+            {
+                for (ull id : g_Sector[targetSector._iY][targetSector._iX])
                 {
-                    sendID.push_back(id);
-                    SendCnt++;
+                    //TODO : 이 부분 SessionID_hash 제거 실험.
+                    if (SessionID_hash.find(id) != SessionID_hash.end())
+                    {
+                        sendID.push_back(id);
+                        SendCnt++;
+                    }
                 }
             }
+            InterlockedExchange64(&msg->iUseCnt, SendCnt);
+
+            for (ull id : sendID)
+            {
+                player = SessionID_hash[id];
+                UnitCast(id, msg, player->m_AccountNo);
+                SendCnt--;
+                InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
+            }
+            if (SendCnt != 0)
+                __debugbreak();
+
+            // ReleaseSRWLockShared(&srw_SessionID_Hash);
+
+            // for (const st_Sector_Pos targetSector : AroundSectors.Around)
+            //{
+            //     ReleaseSRWLockShared(&srw_Sectors[targetSector._iY][targetSector._iX]);
+            // }
         }
-        InterlockedExchange64(&msg->iUseCnt, SendCnt);
-
-        for (ull id : sendID)
-        {
-            player = SessionID_hash[id];
-            UnitCast(id, msg, player->m_AccountNo);
-            SendCnt--;
-            InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
-        }
-        //TODO : 이유 찾기
-  
-        //for (const st_Sector_Pos targetSector : AroundSectors.Around)
-        //{
-        //    for (ull id : g_Sector[targetSector._iY][targetSector._iX])
-        //    {
-        //        
-        //        if (SessionID_hash.find(id) != SessionID_hash.end())
-        //        {
-        //            player = SessionID_hash[id];
-        //            UnitCast(id, msg, player->m_AccountNo);
-        //            SendCnt--;
-        //            InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
-        //        }
-        //        
-        //        // SessionUnLock(id);
-        //    }
-        //}
-        if (SendCnt != 0)
-            __debugbreak();
-
-        ReleaseSRWLockShared(&srw_SessionID_Hash);
-
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
-        {
-            ReleaseSRWLockShared(&srw_Sectors[targetSector._iY][targetSector._iX]);
-        }
-
-
     }
     SessionUnLock(SessionID);
 }
@@ -568,7 +656,8 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
         stTlsObjectPool<CMessage>::Release(msg);
         return;
     }
-    AcquireSRWLockShared(&srw_SessionID_Hash);
+    std::shared_lock SessionID_Hashlock(srw_SessionID_Hash);
+    //AcquireSRWLockShared(&srw_SessionID_Hash);
     if (SessionID_hash.find(SessionID) == SessionID_hash.end())
     {
 
@@ -581,14 +670,14 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBro
 
         Disconnect(SessionID);
         SessionUnLock(SessionID);
-        ReleaseSRWLockShared(&srw_SessionID_Hash);
+        //ReleaseSRWLockShared(&srw_SessionID_Hash);
         return;
     }
 
     player = SessionID_hash[SessionID];
     InterlockedExchange(&player->m_Timer, timeGetTime());
 
-    ReleaseSRWLockShared(&srw_SessionID_Hash);
+    //ReleaseSRWLockShared(&srw_SessionID_Hash);
 
 
 
@@ -686,10 +775,12 @@ void CTestServer::DeletePlayer(CMessage *msg)
             AccountNo_hash.erase(player->m_AccountNo);  
 
             m_TotalPlayers--;
-
-            AcquireSRWLockExclusive(&srw_Sectors[player->iSectorY][player->iSectorX]);
-            g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
-            ReleaseSRWLockExclusive(&srw_Sectors[player->iSectorY][player->iSectorX]);
+            {
+                std::unique_lock SessionID_Hashlock(srw_Sectors[player->iSectorY][player->iSectorX]);
+                //AcquireSRWLockExclusive(&srw_Sectors[player->iSectorY][player->iSectorX]);
+                g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
+                //ReleaseSRWLockExclusive(&srw_Sectors[player->iSectorY][player->iSectorX]);
+            }
 
             player->m_State = en_State::DisConnect;
 
@@ -733,17 +824,46 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0), hBalanceThread(0)
 {
     HRESULT hr;
-    pBalanceThread = std::thread (&BalanceThread, this);
-    hr = SetThreadDescription(pBalanceThread.native_handle(), L"\tBalanceThread");
-    RT_ASSERT(!FAILED(hr));
 
-    InitializeSRWLock(&srw_SessionID_Hash);// SessionID_hash 소유권.
+
+
+    player_pool.Initalize(m_maxPlayers);
+    player_pool.Limite_Lock(); // Pool이 더 이상 늘어나지않음.
+
+    //InitializeSRWLock(&srw_SessionID_Hash);// SessionID_hash 소유권.
 
     // BalanceThread를 위한 정보 초기화.
     {
-        InitializeSRWLock(&srw_BalanceQ);
+        //InitializeSRWLock(&srw_BalanceQ);
+        m_ServerOffEvent = CreateEvent(nullptr, true, false, nullptr);
         hBalanceEvent = CreateEvent(nullptr, false, false, nullptr);
     }
+
+
+    pBalanceThread = std::thread(&BalanceThread, this);
+    hr = SetThreadDescription(pBalanceThread.native_handle(), L"\tBalanceThread");
+    RT_ASSERT(!FAILED(hr));
+
+    //    std::map<CRingBuffer *, SRWLOCK> m_SrwMap;
+    //    각 메세지 Q에 대해서 SRWLOCK을 획득하는 자료구조 초기화 하기.
+    {
+        balanceVec.reserve(ContentsThreadCnt);
+
+        m_CotentsQ_vec.reserve(ContentsThreadCnt);
+        hContentsThread_vec.reserve(ContentsThreadCnt);
+
+        for (DWORD i = 0; i < ContentsThreadCnt; i++)
+        {
+            balanceVec.emplace_back(i, 0);
+            m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
+            m_ContentsQMap[&m_CotentsQ_vec[i]];
+
+            m_ContentsQMap[&m_CotentsQ_vec[i]].second = CreateEvent(nullptr, false, false, nullptr);
+        }
+        // for (DWORD i = 0; i < ContentsThreadCnt; i++)
+        //     InitializeSRWLock(&m_ContentsQMap[&m_CotentsQ_vec[i]].first);
+    }
+
     // ContentsThread의 생성
     hContentsThread_vec.resize(m_ContentsThreadCnt);
 
@@ -758,40 +878,18 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
         RT_ASSERT(!FAILED(hr));
     }
 
-    //    std::map<CRingBuffer *, SRWLOCK> m_SrwMap;
-    //    각 메세지 Q에 대해서 SRWLOCK을 획득하는 자료구조 초기화 하기.
-    {
-        balanceVec.reserve(ContentsThreadCnt);
 
-        m_CotentsQ_vec.reserve(ContentsThreadCnt);
-        hContentsThread_vec.reserve(ContentsThreadCnt);
-        
-        for (DWORD i = 0; i < ContentsThreadCnt; i++)
-        {
-            balanceVec.emplace_back(i, 0);
-            m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
-            m_ContentsQMap[&m_CotentsQ_vec[i]];
-
-            m_ContentsQMap[&m_CotentsQ_vec[i]].second = CreateEvent(nullptr, false, false, nullptr);
-        }
-        for (DWORD i = 0; i < ContentsThreadCnt; i++)
-            InitializeSRWLock(&m_ContentsQMap[&m_CotentsQ_vec[i]].first);
-    }
 
 
     // TODO : Sector마다  Lock 생성하기.
-    for (DWORD w = 0; w < dfRANGE_MOVE_BOTTOM / dfSECTOR_Size; w++)
+ /*   for (DWORD w = 0; w < dfRANGE_MOVE_BOTTOM / dfSECTOR_Size; w++)
     {
         for (DWORD h = 0; h < dfRANGE_MOVE_BOTTOM / dfSECTOR_Size; h++)
         {
             InitializeSRWLock(&srw_Sectors[w][h]);
         }
-    }
+    }*/
 
-    m_ServerOffEvent = CreateEvent(nullptr, true, false, nullptr);
-
-    player_pool.Initalize(m_maxPlayers);
-    player_pool.Limite_Lock(); // Pool이 더 이상 늘어나지않음.
 }
 
 CTestServer::~CTestServer()
@@ -835,18 +933,20 @@ void CTestServer::Update()
         // LoginPacket이 안오는 경우가 존재하지않음.
 
         { //  Client Message]
-            AcquireSRWLockShared(&srw_SessionID_Hash);
-
-            if (SessionID_hash.find(l_sessionID) != SessionID_hash.end())
-                player = SessionID_hash[l_sessionID];
-            else
             {
-                stTlsObjectPool<CMessage>::Release(msg);
-                ReleaseSRWLockShared(&srw_SessionID_Hash);
-                continue;
+                std::shared_lock SessionID_HashLock(srw_SessionID_Hash);
+                // AcquireSRWLockShared(&srw_SessionID_Hash);
+
+                if (SessionID_hash.find(l_sessionID) != SessionID_hash.end())
+                    player = SessionID_hash[l_sessionID];
+                else
+                {
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    // ReleaseSRWLockShared(&srw_SessionID_Hash);
+                    continue;
+                }
+                // ReleaseSRWLockShared(&srw_SessionID_Hash);
             }
-            ReleaseSRWLockShared(&srw_SessionID_Hash);
-  
             InterlockedExchange(&player->m_Timer, timeGetTime());
 
             PacketProc(l_sessionID, msg, type);
@@ -903,23 +1003,26 @@ void CTestServer::BalanceUpdate()
 
         case en_PACKET_Player_Delete:
 
-            AcquireSRWLockExclusive(&srw_SessionID_Hash);
+            {
+                std::unique_lock SessionID_Hashlock(srw_SessionID_Hash);
+                //AcquireSRWLockExclusive(&srw_SessionID_Hash);
 
-            DeletePlayer(msg);
+                DeletePlayer(msg);
 
-            ReleaseSRWLockExclusive(&srw_SessionID_Hash);
-
+                //ReleaseSRWLockExclusive(&srw_SessionID_Hash);
+            }
             _InterlockedDecrement64(&m_NetworkMsgCount);
             break;
-        case en_PACKET_CS_CHAT_REQ_LOGIN:
+            case en_PACKET_CS_CHAT_REQ_LOGIN:
+            {
+                std::unique_lock SessionID_Hashlock(srw_SessionID_Hash);
+                //AcquireSRWLockExclusive(&srw_SessionID_Hash);
 
-            AcquireSRWLockExclusive(&srw_SessionID_Hash);
+                PacketProc(l_sessionID, msg, type); // Login만 실행.
 
-                PacketProc(l_sessionID, msg, type);//Login만 실행.
-
-            ReleaseSRWLockExclusive(&srw_SessionID_Hash);
-            break;
-
+                //ReleaseSRWLockExclusive(&srw_SessionID_Hash);
+                break;
+            }
         default:
             //TODO : 공격이 아닌상황에서 올수 없음.
             __debugbreak();
@@ -1009,8 +1112,9 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
     CMessage **ppMsg;
     CRingBuffer *TargetQ; //  Q 가 많아졌으므로 Q를 찾아오기.
     HANDLE hMsgQueuedEvent; // Q에 데이터가 들어왔음을 알림.
-    SRWLOCK *pSrw;
-    
+    //SRWLOCK *pSrw;
+    std::shared_mutex *pSrw;
+
     std::wstring ProfileName; 
 
     if (bBalanceQ)
@@ -1022,7 +1126,8 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
     }
     else
     {
-        AcquireSRWLockShared(&srw_SessionID_Hash);
+        std::shared_lock SessionID_Hashlock(srw_SessionID_Hash);
+        //AcquireSRWLockShared(&srw_SessionID_Hash);
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
             TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
@@ -1041,7 +1146,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
 
                
         }
-        ReleaseSRWLockShared(&srw_SessionID_Hash);
+        //ReleaseSRWLockShared(&srw_SessionID_Hash);
     }
 
         
@@ -1049,7 +1154,8 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
 
     {
 
-        stSRWLock srw(pSrw);
+        //stSRWLock srw(pSrw);
+        std::unique_lock srw(*pSrw);
         Profiler profile;
 
         ppMsg = &msg;

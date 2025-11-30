@@ -351,7 +351,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 
-    m_hThread = new HANDLE[WorkerCreateCnt];
+    m_hWorkerThread = new HANDLE[WorkerCreateCnt];
     arrTPS = new LONG64[WorkerCreateCnt + 1];
     ZeroMemory(arrTPS, sizeof(LONG64) * (WorkerCreateCnt + 1));
 
@@ -375,11 +375,11 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     for (int i = 0; i < WorkerCreateCnt; i++)
     {
-        m_hThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
-        RT_ASSERT(m_hThread[i] != nullptr);
+        m_hWorkerThread[i] = (HANDLE)_beginthreadex(nullptr, 0, WorkerThread, &WorkerArg, 0, nullptr);
+        RT_ASSERT(m_hWorkerThread[i] != nullptr);
         std::wstring name = L"\tWorkerThread" + std::to_wstring(i);
 
-        hr = SetThreadDescription(m_hThread[i], name.c_str());
+        hr = SetThreadDescription(m_hWorkerThread[i], name.c_str());
         RT_ASSERT(!FAILED(hr));
     }
 

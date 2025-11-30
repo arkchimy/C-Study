@@ -7,6 +7,7 @@
 #include <stack>
 #include <unordered_map>
 #include <thread>
+#include <shared_mutex>
 
 #define dfRANGE_MOVE_TOP 0
 #define dfRANGE_MOVE_LEFT 0
@@ -101,7 +102,8 @@ class CTestServer : public CLanServer
 
     // 메세지 Q의 주소로 Lock과 SetEvent를할 HANDLE을 가져 옴.
     std::vector<CRingBuffer> m_CotentsQ_vec; // ContentsQ vec
-    std::map<CRingBuffer *, std::pair<SRWLOCK, HANDLE>> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
+    //std::map<CRingBuffer *, std::pair<SRWLOCK, HANDLE>> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
+    std::map<CRingBuffer *, std::pair<std::shared_mutex, HANDLE>> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
 
     ////////////////////////////////////////////////////////////////////
     ////////////////////////// BalanceThread //////////////////////////
@@ -110,7 +112,8 @@ class CTestServer : public CLanServer
     std::vector<std::pair<DWORD, int>> balanceVec;
 
     HANDLE hBalanceThread; 
-    SRWLOCK srw_BalanceQ;  // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
+    //SRWLOCK srw_BalanceQ;  // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
+    std::shared_mutex srw_BalanceQ; // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
     HANDLE hBalanceEvent; // EnQ를 알려주는 이벤트
     CRingBuffer m_BalanceQ = CRingBuffer(s_ContentsQsize, 1); 
     
@@ -120,7 +123,7 @@ class CTestServer : public CLanServer
     inline static ringBufferSize s_ContentsQsize;
     
     HANDLE hMonitorThread = 0;
-
+    bool bMonitorThreadOn = true;
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
 
@@ -142,7 +145,8 @@ class CTestServer : public CLanServer
     // TODO: 특정 인원이상 안늘어나게 조치.
     CObjectPool_UnSafeMT<CPlayer> player_pool;
 
-    SRWLOCK srw_SessionID_Hash; // SessionID_hash 소유권. OnRecv , BalanceThread에서 접근
+    //SRWLOCK srw_SessionID_Hash; // SessionID_hash 소유권. OnRecv , BalanceThread에서 접근
+    std::shared_mutex srw_SessionID_Hash;
 
     // Account   Key , Player접근.
     std::unordered_map<ull, CPlayer *> AccountNo_hash; // 중복 접속을 제거하는 용도
@@ -159,8 +163,9 @@ class CTestServer : public CLanServer
                 [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
 
     // Sector마다 Lock이 존재.
-    inline static SRWLOCK srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
-                [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
+    inline static std::shared_mutex srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size][dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
+    //inline static SRWLOCK srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
+    //            [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
 
     /*
       하트비트 처리 방법.
