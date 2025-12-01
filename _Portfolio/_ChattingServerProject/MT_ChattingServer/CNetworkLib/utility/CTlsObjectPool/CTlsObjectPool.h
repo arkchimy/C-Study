@@ -244,7 +244,7 @@ struct stTlsObjectPool
         pool->releasePool->Release(node);
 
         swap = pool->releasePool;
-        if (pool->releasePool->m_size == tlsPool_init_Capacity / 20)
+        if (pool->releasePool->m_size == tlsPool_init_Capacity )
         {
 
             pool->releasePool = instance.GetEmptyPool(swap);

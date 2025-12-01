@@ -101,7 +101,7 @@ class CTestServer : public CLanServer
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
 
     int m_maxSessions = 0;
-    int m_maxPlayers = 10000;
+    int m_maxPlayers = 20000;
 
     LONG64 m_prePlayerCount = 0;
     LONG64 m_TotalPlayers = 0; // ÇöÀç PlayerÀÇ Cnt

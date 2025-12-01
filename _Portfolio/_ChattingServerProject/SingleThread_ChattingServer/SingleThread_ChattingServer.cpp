@@ -627,50 +627,119 @@ void CTestServer::Update()
     // msg  크기 메세지 하나에 8Byte
     while (m_ContentsQ.GetUseSize() != 0)
     {
-
-        DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
-        if (DeQSisze != sizeof(size_t))
-            __debugbreak();
+        if (Profiler::bOn)
+        {
+            Profiler profiler(L"Dequeue");
+            DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
+            if (DeQSisze != sizeof(size_t))
+                __debugbreak();
+        
+        }
+        else
+        {
+            DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
+            if (DeQSisze != sizeof(size_t))
+                __debugbreak();
+        }
 
         msg = (CMessage *)addr;
         l_sessionID = msg->ownerID;
 
         *msg >> type;
 
-        switch (type)
+        if (Profiler::bOn)
         {
-        // 현재 미 사용중
-        case en_PACKET_Player_Alloc:
-            AllocPlayer(msg);
-            _InterlockedDecrement64(&m_NetworkMsgCount);
-            break;
-
-        case en_PACKET_Player_Delete:
-            DeletePlayer(msg);
-            _InterlockedDecrement64(&m_NetworkMsgCount);
-            break;
-        case en_PACKET_CS_CHAT_REQ_LOGIN:
-            PacketProc(l_sessionID, msg, type);
-            break;
-        default:
-            if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
+            Profiler profiler(L"Switch");
+            switch (type)
             {
-                // Login Not Recv
-                CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                               L"%-20s %12s %05llu %12s %05llu ",
-                                               L"HEARTBEAT SessionID_hash not Found : ",
-                                               L"현재들어온ID:", l_sessionID);
-
-                stTlsObjectPool<CMessage>::Release(msg);
-                Disconnect(l_sessionID);
+            // 현재 미 사용중
+            case en_PACKET_Player_Alloc:
+            {
+                Profiler profiler(L"switch_PlayerAlloc");
+                AllocPlayer(msg);
+                _InterlockedDecrement64(&m_NetworkMsgCount);
             }
-            else
-            { // Client Message
-                CPlayer *player = SessionID_hash[l_sessionID];
+                break;
 
-                player->m_Timer = timeGetTime();
+            case en_PACKET_Player_Delete:
+                {
+                Profiler profiler(L"switch_PlayerDelete");
+                    DeletePlayer(msg);
+                    _InterlockedDecrement64(&m_NetworkMsgCount);
+                }
+                break;
+            case en_PACKET_CS_CHAT_REQ_LOGIN:
+                {
+                Profiler profiler(L"swtich_Login");
+                    PacketProc(l_sessionID, msg, type);
+                }
+                break;
+            default:
+                {
+                    if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
+                    {
+                        // Login Not Recv
+                        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                                       L"%-20s %12s %05llu %12s %05llu ",
+                                                       L"HEARTBEAT SessionID_hash not Found : ",
+                                                       L"현재들어온ID:", l_sessionID);
+
+                        stTlsObjectPool<CMessage>::Release(msg);
+                        Disconnect(l_sessionID);
+                    }
+                    else
+                    { // Client Message
+                        
+                        CPlayer *player = SessionID_hash[l_sessionID];
+                        player->m_Timer = timeGetTime();
+                        
+                        {
+                            Profiler profiler(L"PacketProc");
+                            PacketProc(l_sessionID, msg, type);
+                        }
+
+                        m_RecvMsgArr[type]++;
+                    }
+                }
+            }
+        }
+        else
+        {
+            switch (type)
+            {
+            // 현재 미 사용중
+            case en_PACKET_Player_Alloc:
+                AllocPlayer(msg);
+                _InterlockedDecrement64(&m_NetworkMsgCount);
+                break;
+
+            case en_PACKET_Player_Delete:
+                DeletePlayer(msg);
+                _InterlockedDecrement64(&m_NetworkMsgCount);
+                break;
+            case en_PACKET_CS_CHAT_REQ_LOGIN:
                 PacketProc(l_sessionID, msg, type);
-                m_RecvMsgArr[type]++;
+                break;
+            default:
+                if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
+                {
+                    // Login Not Recv
+                    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                                   L"%-20s %12s %05llu %12s %05llu ",
+                                                   L"HEARTBEAT SessionID_hash not Found : ",
+                                                   L"현재들어온ID:", l_sessionID);
+
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    Disconnect(l_sessionID);
+                }
+                else
+                { // Client Message
+                    CPlayer *player = SessionID_hash[l_sessionID];
+
+                    player->m_Timer = timeGetTime();
+                    PacketProc(l_sessionID, msg, type);
+                    m_RecvMsgArr[type]++;
+                }
             }
         }
 

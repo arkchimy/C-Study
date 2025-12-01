@@ -242,10 +242,13 @@ void ContentsThread(void *arg)
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
-        if (hSignalIdx - WAIT_OBJECT_0 == 1)
+        if (Profiler::bOn)
         {
-            server->Update();
-            break;
+            if (hSignalIdx - WAIT_OBJECT_0 == 1)
+            {
+                server->Update();
+                break;
+            }
         }
         server->Update();
 

@@ -193,7 +193,7 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
                                    L"Release ", L"Node ", node, L"PoolAddress ", pool->releasePool, L"m_size", pool->releasePool->m_size);
 
     swap = pool->releasePool;
-    if (pool->releasePool->m_size == tlsPool_init_Capacity / 20)
+    if (pool->releasePool->m_size == tlsPool_init_Capacity)
     {
 
         pool->releasePool = instance.GetEmptyPool(swap);

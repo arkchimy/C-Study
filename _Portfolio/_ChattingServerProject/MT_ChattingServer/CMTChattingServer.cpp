@@ -975,7 +975,13 @@ void CTestServer::Update()
             }
             InterlockedExchange(&player->m_Timer, timeGetTime());
 
-            PacketProc(l_sessionID, msg, type);
+            if (Profiler::bOn)
+            {
+                Profiler profiler(L"PacketProc");
+                PacketProc(l_sessionID, msg, type);
+            }
+            else 
+                PacketProc(l_sessionID, msg, type);
            
 
             InterlockedIncrement64(&m_RecvMsgArr[type]);

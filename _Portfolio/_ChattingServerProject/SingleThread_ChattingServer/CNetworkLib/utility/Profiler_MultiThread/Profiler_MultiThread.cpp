@@ -16,12 +16,12 @@ void Profiler::SaveAsLog(const wchar_t *const lpFileName)
     unsigned int recordIndex;
     wchar_t recordString[CCH_RECORD_CAPACITY];
     static const wchar_t *PRINT_FORMATS[] = {
-        L" Tid   | No  | Name                     | Calls    | Avg w/o           | Max         #1    | Min         #1    | Max         #2    | Min         #2    |\n",
-        L"-------+-----+--------------------------+----------+-------------------+-------------------+-------------------+-------------------+-------------------+\n",
-        L" %06u | %3u | %24s | %8llu | %14s μs | %14s μs | %14s μs | %14s μs | %14s μs |\n",
-        L" %06u | %3u | %24s | %8llu | %14s μs | %14.4lf μs | %14.4lf μs | %14s μs | %14s μs |\n",
-        L" %06u | %3u | %24s | %8llu | %14s μs | %14.4lf μs | %14.4lf μs | %14.4lf μs | %14.4lf μs |\n",
-        L" %06u | %3u | %24s | %8llu | %14.4lf μs | %14.4lf μs | %14.4lf μs | %14.4lf μs | %14.4lf μs |\n",
+        L" Tid   | No  | Name                     | Calls         | Avg w/o           | Max         #1    | Min         #1    | Max         #2    | Min         #2    |\n",
+        L"-------+-----+--------------------------+---------------+-------------------+-------------------+-------------------+-------------------+-------------------+\n",
+        L" %06u | %3u | %24s | %12llu | %14s μs | %14s μs | %14s μs | %14s μs | %14s μs |\n",
+        L" %06u | %3u | %24s | %12llu | %14s μs | %14.4lf μs | %14.4lf μs | %14s μs | %14s μs |\n",
+        L" %06u | %3u | %24s | %12llu | %14s μs | %14.4lf μs | %14.4lf μs | %14.4lf μs | %14.4lf μs |\n",
+        L" %06u | %3u | %24s | %12llu | %14.4lf μs | %14.4lf μs | %14.4lf μs | %14.4lf μs | %14.4lf μs |\n",
     };
     pFileLog = nullptr;
     retFileOpen = _wfopen_s(&pFileLog, lpFileName, L"w,ccs=UTF-8");
