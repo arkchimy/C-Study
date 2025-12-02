@@ -785,13 +785,51 @@ void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType, INT64 A
     switch (SendType)
     {
     case 0:
-        UnitCast(SessionID, msg, Account);
+        UnLockUnitCast(SessionID, msg, Account);
         break;
         // case 1:
         //     BroadCast(SessionID, msg, iSectorX, iSectorY);
         //     break;
     }
 }
+void CLanServer::UnLockUnitCast(ull SessionID, CMessage *msg, LONG64 Account)
+{
+    // 외부에서 Lock을 잡기.
+    clsSession &session = sessions_vec[SessionID >> 47];
+    CMessage **ppMsg;
+    ull local_IoCount;
+    ppMsg = &msg;
+
+    {
+
+        if (Profiler::bOn)
+        {
+            Profiler profile(L"LFQ_Push");
+            session.m_sendBuffer.Push(*ppMsg);
+        }
+        else
+            session.m_sendBuffer.Push(*ppMsg);
+
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
+                                       L"%-20s %12s %05lld  %12s %05llu %12s %05llu %10s %05llu",
+                                       L"UnitCast  ",
+                                       L"Account:", Account,
+                                       L"SessiondID:", SessionID,
+                                       L"SessiondIndex:", SessionID >> 47,
+                                       L"Socket :", session.m_sock);
+    }
+
+    // PQCS를 시도.
+    if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
+    {
+        ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+
+        local_IoCount = InterlockedIncrement(&session.m_ioCount);
+
+        PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
+    }
+}
+
 void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
@@ -879,6 +917,7 @@ void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
 }
 void CLanServer::BroadCast(ull SessionID, CMessage *msg, WORD SectorX, WORD SectorY)
 {
+
 }
 void CLanServer::RecvPacket(clsSession &session)
 {

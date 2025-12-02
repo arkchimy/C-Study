@@ -3,8 +3,6 @@
 #pragma comment(lib, "Winmm.lib")
 #include <timeapi.h>
 
-
-
 extern SRWLOCK srw_Log;
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
@@ -176,7 +174,7 @@ unsigned ContentsThread(void *arg)
             server->HeartBeat();
         }
         ContentsUseSize = server->m_ContentsQ.GetUseSize();
-        //Hash크기 Monitoring 정보변수 Store
+        // Hash크기 Monitoring 정보변수 Store
         {
             server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
             server->prePlayer_hash_size = server->prePlayer_hash.size();
@@ -333,10 +331,15 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
 void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType, BYTE bBroadCast)
 {
     CPlayer *player;
-    if (SessionLock(SessionID) == false)
+    Profiler total(L"REQ_MESSAGE");
+
     {
-        stTlsObjectPool<CMessage>::Release(msg);
-        return;
+        Profiler profile(L"SessionLock");
+        if (SessionLock(SessionID) == false)
+        {
+            stTlsObjectPool<CMessage>::Release(msg);
+            return;
+        }
     }
 
     if (SessionID_hash.find(SessionID) == SessionID_hash.end())
@@ -364,46 +367,60 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         return;
     }
     // TODO : Broad Cast  방식 수정하기.
-    Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
+    {
+        Profiler profile(L"RES_MESSAGE");
+        Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
+    }
 
     int SectorX = player->iSectorX;
     int SectorY = player->iSectorY;
 
     st_Sector_Around AroundSectors;
-    SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
-
-    if (bBroadCast)
-    {
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
         {
-            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
-            {
-                if (id == SessionID)
-                    continue;
-
-                msg->iUseCnt++;
-            }
+            Profiler profile(L"GetSectorAround");
+            SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
         }
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
-        {
-            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+
+        
+            if (bBroadCast)
             {
-                // 여기가 문제인것 같은데.
-                /*   if (SessionLock(id) == false)
-                   {
-                       stTlsObjectPool<CMessage>::Release(msg);
-                       continue;
-                   }*/
-                if (SessionID_hash.find(id) != SessionID_hash.end())
                 {
-                    player = SessionID_hash[id];
-                    UnitCast(id, msg, player->m_AccountNo);
-                    m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]++;
+                    Profiler profile(L"g_Settor_Around1");
+                    for (const st_Sector_Pos targetSector : AroundSectors.Around)
+                    {
+                        for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+                        {
+                            if (id == SessionID)
+                                continue;
+
+                            msg->iUseCnt++;
+                        }
+                    }
                 }
-                // SessionUnLock(id);
+                {
+                    Profiler profile(L"g_Settor_Around2");
+                    for (const st_Sector_Pos targetSector : AroundSectors.Around)
+                    {
+                        for (ull id : g_Sector[targetSector._iY][targetSector._iX])
+                        {
+                            // 여기가 문제인것 같은데.
+                            /*   if (SessionLock(id) == false)
+                               {
+                                   stTlsObjectPool<CMessage>::Release(msg);
+                                   continue;
+                               }*/
+                            if (SessionID_hash.find(id) != SessionID_hash.end())
+                            {
+                                player = SessionID_hash[id];
+                                UnitCast(id, msg, player->m_AccountNo);
+                                m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]++;
+                            }
+                            // SessionUnLock(id);
+                        }
+                    }
+                }
             }
-        }
-    }
+        
     SessionUnLock(SessionID);
 }
 
@@ -639,7 +656,6 @@ void CTestServer::Update()
             DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
             if (DeQSisze != sizeof(size_t))
                 __debugbreak();
-        
         }
         else
         {
@@ -655,58 +671,54 @@ void CTestServer::Update()
 
         if (Profiler::bOn)
         {
-            Profiler profiler(L"Switch");
             switch (type)
             {
             // 현재 미 사용중
             case en_PACKET_Player_Alloc:
-            {
-                Profiler profiler(L"switch_PlayerAlloc");
+
                 AllocPlayer(msg);
                 _InterlockedDecrement64(&m_NetworkMsgCount);
-            }
+
                 break;
 
             case en_PACKET_Player_Delete:
-                {
-                Profiler profiler(L"switch_PlayerDelete");
-                    DeletePlayer(msg);
-                    _InterlockedDecrement64(&m_NetworkMsgCount);
-                }
+
+                DeletePlayer(msg);
+                _InterlockedDecrement64(&m_NetworkMsgCount);
+
                 break;
             case en_PACKET_CS_CHAT_REQ_LOGIN:
-                {
-                Profiler profiler(L"swtich_Login");
-                    PacketProc(l_sessionID, msg, type);
-                }
+
+                PacketProc(l_sessionID, msg, type);
+
                 break;
             default:
+            {
+                if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
                 {
-                    if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
-                    {
-                        // Login Not Recv
-                        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                                       L"%-20s %12s %05llu %12s %05llu ",
-                                                       L"HEARTBEAT SessionID_hash not Found : ",
-                                                       L"현재들어온ID:", l_sessionID);
+                    // Login Not Recv
+                    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                                   L"%-20s %12s %05llu %12s %05llu ",
+                                                   L"HEARTBEAT SessionID_hash not Found : ",
+                                                   L"현재들어온ID:", l_sessionID);
 
-                        stTlsObjectPool<CMessage>::Release(msg);
-                        Disconnect(l_sessionID);
-                    }
-                    else
-                    { // Client Message
-                        
-                        CPlayer *player = SessionID_hash[l_sessionID];
-                        player->m_Timer = timeGetTime();
-                        
-                        {
-                            Profiler profiler(L"PacketProc");
-                            PacketProc(l_sessionID, msg, type);
-                        }
-
-                        m_RecvMsgArr[type]++;
-                    }
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    Disconnect(l_sessionID);
                 }
+                else
+                { // Client Message
+
+                    CPlayer *player = SessionID_hash[l_sessionID];
+                    player->m_Timer = timeGetTime();
+
+                    {
+                        Profiler profiler(L"PacketProc");
+                        PacketProc(l_sessionID, msg, type);
+                    }
+
+                    m_RecvMsgArr[type]++;
+                }
+            }
             }
         }
         else
@@ -847,7 +859,7 @@ bool CTestServer::OnAccept(ull SessionID)
 
         *msg << (unsigned short)en_PACKET_Player_Alloc;
         InterlockedExchange(&msg->ownerID, SessionID);
-        // TODO : ContentsThread에서 
+        // TODO : ContentsThread에서
         OnRecv(SessionID, msg);
         _InterlockedIncrement64(&m_NetworkMsgCount);
     }

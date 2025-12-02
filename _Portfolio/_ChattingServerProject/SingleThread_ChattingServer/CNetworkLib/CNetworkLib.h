@@ -82,6 +82,7 @@ class CLanServer : public Stub, public Proxy
 
     void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType, INT64 Account = 0,
                     int iSectorX = 0, int iSectorY = 0);
+    void UnLockUnitCast(ull SessionID, CMessage *msg, LONG64 Account = 0);
     void UnitCast(ull SessionID, CMessage *msg, LONG64 Account = 0);
     void BroadCast(ull SessionID, CMessage *msg, WORD SectorX, WORD SectorY);
 
