@@ -82,7 +82,7 @@ unsigned MonitorThread(void *arg)
         printf("%20s %10lld \n", "SessionNum :", server->GetSessionCount());
         printf("%20s %10lld \n", "PacketPool :", stTlsObjectPool<CMessage>::instance.m_TotalCount);
 
-        printf("%20s %10lld \n", "UpdateMessage_Queue :", server->m_UpdateMessage_Queue);
+        printf("%20s %10d \n", "UpdateMessage_Queue :", server->m_ContentsQ.GetUseSize());
         printf("%20s %10lld \n", "UpdateMessage_Pool :", server->getNetworkMsgCount());
 
         printf("%20s %10lld \n", "prePlayer Count:", server->GetprePlayer_hash());
@@ -141,7 +141,7 @@ unsigned ContentsThread(void *arg)
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
     HANDLE hWaitHandle[2] = {server->m_ContentsEvent, server->m_ServerOffEvent};
 
-    // bool 이 좋아보임.
+    // Thread Log정보 저장.
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-20s ",
@@ -151,8 +151,6 @@ unsigned ContentsThread(void *arg)
                                        L"This is ContentsThread");
     }
     ringBufferSize ContentsUseSize;
-    char *f, *r;
-
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
@@ -167,17 +165,25 @@ unsigned ContentsThread(void *arg)
         {
             server->Update();
         }
-        f = server->m_ContentsQ._frontPtr;
-        r = server->m_ContentsQ._rearPtr;
 
-        ContentsUseSize = server->m_ContentsQ.GetUseSize(f, r);
-        server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
-
-        server->prePlayer_hash_size = server->prePlayer_hash.size();
-        server->AccountNo_hash_size = server->AccountNo_hash.size();
-        server->SessionID_hash_size = server->SessionID_hash.size();
+        if (Profiler::bOn)
+        {
+            Profiler profiler(L"HeartBeat");
+            server->HeartBeat();
+        }
+        else
+        {
+            server->HeartBeat();
+        }
+        ContentsUseSize = server->m_ContentsQ.GetUseSize();
+        //Hash크기 Monitoring 정보변수 Store
+        {
+            server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
+            server->prePlayer_hash_size = server->prePlayer_hash.size();
+            server->AccountNo_hash_size = server->AccountNo_hash.size();
+            server->SessionID_hash_size = server->SessionID_hash.size();
+        }
     }
-
     return 0;
 }
 
@@ -745,16 +751,6 @@ void CTestServer::Update()
 
         m_UpdateTPS++;
     }
-
-    if (Profiler::bOn)
-    {
-        Profiler profiler(L"HeartBeat");
-        HeartBeat();
-    }
-    else
-    {
-        HeartBeat();
-    }
 }
 
 BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
@@ -851,7 +847,7 @@ bool CTestServer::OnAccept(ull SessionID)
 
         *msg << (unsigned short)en_PACKET_Player_Alloc;
         InterlockedExchange(&msg->ownerID, SessionID);
-        // TODO : 실패의 경우의 수
+        // TODO : ContentsThread에서 
         OnRecv(SessionID, msg);
         _InterlockedIncrement64(&m_NetworkMsgCount);
     }

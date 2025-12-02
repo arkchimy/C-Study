@@ -465,21 +465,12 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     ringBufferSize useSize;
     float qPersentage;
     ull SessionID;
-    // 해당 주석 12_02_ 파워포인트 만들기전.
-    //char *f, *r, *b;
 
     {
         session.m_recvBuffer.MoveRear(transferred);
-
         SessionID = session.m_SeqID.SeqNumberAndIdx;
-
-        //b = session.m_recvBuffer._begin;
-        //f = session.m_recvBuffer._frontPtr;
-        //r = session.m_recvBuffer._rearPtr;
     }
     // Header의 크기만큼을 확인.
-
-    //while (session.m_recvBuffer.Peek(&header, headerSize, f, r) == headerSize)
     while (session.m_recvBuffer.Peek(&header, headerSize) == headerSize)
     {
         useSize = session.m_recvBuffer.GetUseSize();
@@ -490,7 +481,6 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         }
         // 메세지 생성
         CMessage *msg = CreateMessage(session, header);
-
         if (msg == nullptr)
             break;
         if (bEnCording)
@@ -520,11 +510,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
                                            L"TargetID : ", SessionID);
             return;
         }
-
-        //f = session.m_recvBuffer._frontPtr;
-        //r = session.m_recvBuffer._rearPtr;
     }
-
     RecvPacket(session);
 }
 
@@ -775,6 +761,7 @@ void CLanServer::SessionUnLock(ull SessionID)
 
     Local_ioCount = InterlockedDecrement(&session.m_ioCount);
     // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    // TODO :  ContentsThread에서 Contents_Enq하는 경우의 수. 문제가없는가?
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
         ReleaseSession(SessionID);
 }

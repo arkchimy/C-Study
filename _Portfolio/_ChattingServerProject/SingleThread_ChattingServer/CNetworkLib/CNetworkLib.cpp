@@ -774,7 +774,7 @@ void CLanServer::SessionUnLock(ull SessionID)
     ull Local_ioCount;
 
     Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    // TODO :  ContentsThread에서 Contents_Enq하는 경우의 수. 문제가없는가?
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
         ReleaseSession(SessionID);
 }
