@@ -62,8 +62,6 @@ class clsSession
     void Release();
 
     SOCKET m_sock = 0;
-    DWORD m_AcceptTime = 0;
-
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
     stSendOverlapped m_sendOverlapped = stSendOverlapped(Job_Type::Send);
 
@@ -74,6 +72,4 @@ class clsSession
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0; // SendFlag
-
-
 };

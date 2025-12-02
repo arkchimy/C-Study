@@ -114,14 +114,12 @@ unsigned AcceptThread(void *arg)
         }
         server->arrTPS[0]++; // Accept TPS 측정
         server->m_TotalAccept++;
-        {
 
+        {
+            // 예상한 Session을 초과한다면 새로 들어온 연결을 끊음.
             if (server->m_SessionIdxStack.Pop(idx) == false)
             {
                 closesocket(client_sock);
-
-                // 추가적으로 구현해야되는 부분이 존재함.
-                //  DisConnect 행위
                 InterlockedIncrement(&server->iDisCounnectCount);
                 continue;
             }
@@ -467,22 +465,24 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     ringBufferSize useSize;
     float qPersentage;
     ull SessionID;
-    char *f, *r, *b;
+    // 해당 주석 12_02_ 파워포인트 만들기전.
+    //char *f, *r, *b;
 
     {
         session.m_recvBuffer.MoveRear(transferred);
 
         SessionID = session.m_SeqID.SeqNumberAndIdx;
 
-        b = session.m_recvBuffer._begin;
-        f = session.m_recvBuffer._frontPtr;
-        r = session.m_recvBuffer._rearPtr;
+        //b = session.m_recvBuffer._begin;
+        //f = session.m_recvBuffer._frontPtr;
+        //r = session.m_recvBuffer._rearPtr;
     }
     // Header의 크기만큼을 확인.
 
-    while (session.m_recvBuffer.Peek(&header, headerSize, f, r) == headerSize)
+    //while (session.m_recvBuffer.Peek(&header, headerSize, f, r) == headerSize)
+    while (session.m_recvBuffer.Peek(&header, headerSize) == headerSize)
     {
-        useSize = session.m_recvBuffer.GetUseSize(f, r);
+        useSize = session.m_recvBuffer.GetUseSize();
         if (useSize < header.sDataLen + headerSize)
         {
             // 데이터가 덜 옴.
@@ -521,8 +521,8 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
             return;
         }
 
-        f = session.m_recvBuffer._frontPtr;
-        r = session.m_recvBuffer._rearPtr;
+        //f = session.m_recvBuffer._frontPtr;
+        //r = session.m_recvBuffer._rearPtr;
     }
 
     RecvPacket(session);
