@@ -83,7 +83,7 @@ class CLanServer : public Stub, public Proxy
     void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
                     std::vector<ull> *pIDVector = nullptr, WORD wVecLen = 0);
     void UnitCast(ull SessionID, CMessage *msg, LONG64 Account = 0);
-    void BroadCast(ull SessionID, CMessage *msg, WORD SectorX, WORD SectorY);
+    void BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, WORD wVecLen);
 
     void RecvPacket(class clsSession &session);
 

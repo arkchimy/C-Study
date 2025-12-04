@@ -126,6 +126,7 @@ unsigned AcceptThread(void *arg)
         }
 
         clsSession &session = server->sessions_vec[idx];
+ 
         if (session.m_sendBuffer.m_size != 0)
             __debugbreak();
         // Session 초기화 부분.
@@ -769,68 +770,25 @@ void CLanServer::SessionUnLock(ull SessionID)
 void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
                             std::vector<ull>* pIDVector , WORD wVecLen)
 {
-    if (SessionLock(SessionID) == false)
-    {
-        stTlsObjectPool<CMessage>::Release(msg);
-        return;
-    }
-
+    //InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
     switch (SendType)
     {
     case 0:
         UnitCast(SessionID, msg);
         break;
-        // case 1:
-        //     BroadCast(SessionID, msg, iSectorX, iSectorY);
-        //     break;
+    case 1:
+        BroadCast(SessionID, msg, pIDVector, wVecLen);
+        break;
     }
-
-    SessionUnLock(SessionID);
 }
 void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
 {
+    if (SessionLock(SessionID) == false)
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
     clsSession &session = sessions_vec[SessionID >> 47];
-    ull Local_ioCount;
-    ull seqID;
-    // session의 보장 장치.
-    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
-
-    if ((Local_ioCount & (ull)1 << 47) != 0)
-    {
-        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
-        stTlsObjectPool<CMessage>::Release(msg);
-        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
-        return;
-    }
-
-    // session의 Release는 막았으므로 변경되지않음.
-    seqID = session.m_SeqID.SeqNumberAndIdx;
-    if (seqID != SessionID)
-    {
-        // 새로 세팅된 Session이므로 다른 연결이라 판단.
-        stTlsObjectPool<CMessage>::Release(msg);
-        // 내가 잘못 올린 ioCount를 감소 시켜주어야한다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(seqID);
-
-        return;
-    }
-
-    if (Local_ioCount == 1)
-    {
-        // 원래 '0'이 었는데 내가 증가시켰다.
-        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-
-        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession(SessionID);
-
-        stTlsObjectPool<CMessage>::Release(msg);
-        return;
-    }
 
     // 여기까지 왔다면, 같은 Session으로 판단하자.
     CMessage **ppMsg;
@@ -866,14 +824,51 @@ void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
         PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
     }
 
-    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
-
-    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
-    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-        ReleaseSession(SessionID);
+    SessionUnLock(SessionID);
 }
-void CLanServer::BroadCast(ull SessionID, CMessage *msg, WORD SectorX, WORD SectorY)
+void CLanServer::BroadCast(ull SessionID, CMessage *msg , std::vector<ull>* pIDVector, WORD wVecLen)
 {
+    InterlockedExchange64(&msg->iUseCnt, wVecLen);
+    for (WORD i = 0; i < wVecLen; i++)
+    {
+        ull currentSessionID = (*pIDVector)[i];
+        if (SessionLock(currentSessionID) == false)
+        {
+            stTlsObjectPool<CMessage>::Release(msg);
+            continue;
+        }
+        clsSession &session = sessions_vec[currentSessionID >> 47];
+
+        // 여기까지 왔다면, 같은 Session으로 판단하자.
+        CMessage **ppMsg;
+        ull local_IoCount;
+        ppMsg = &msg;
+
+        {
+
+            if (Profiler::bOn)
+            {
+                Profiler profile(L"LFQ_Push");
+                session.m_sendBuffer.Push(*ppMsg);
+            }
+            else
+                session.m_sendBuffer.Push(*ppMsg);
+
+        }
+
+        // PQCS를 시도.
+        if (InterlockedCompareExchange(&session.m_flag, 1, 0) == 0)
+        {
+            ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
+
+            local_IoCount = InterlockedIncrement(&session.m_ioCount);
+
+            PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
+        }
+        
+        SessionUnLock(currentSessionID);
+    }
+
 }
 void CLanServer::RecvPacket(clsSession &session)
 {

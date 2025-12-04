@@ -574,50 +574,55 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
             return;
         }
         // TODO : Broad Cast  방식 수정하기.
-        Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
+        std::vector<ull> sendID;
 
         st_Sector_Around AroundSectors;
         SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
 
-        LONG64 SendCnt = 0;
-        std::list<ull> sendID;
+        DWORD vectorReserverSize = 0;
 
         std::vector<std::shared_lock<std::shared_mutex>> SectorAround_locks;
         SectorAround_locks.reserve(AroundSectors.Around.size());
 
-        if (bBroadCast)
+        for (const st_Sector_Pos targetSector : AroundSectors.Around)
         {
+            SectorAround_locks.emplace_back(srw_Sectors[targetSector._iY][targetSector._iX]);
+        }
+      
+        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+        {
+            vectorReserverSize += g_Sector[targetSector._iY][targetSector._iX].size();
+        }
+        sendID.reserve(vectorReserverSize);
 
-            for (const st_Sector_Pos targetSector : AroundSectors.Around)
-            {
-                SectorAround_locks.emplace_back(srw_Sectors[targetSector._iY][targetSector._iX]);
-            }
+        {
+            Profiler profile(L"UnitCast_Loop");
+            Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer,
+                               en_PACKET_CS_CHAT_RES_MESSAGE, 3, &sendID, sendID.size());
+            InterlockedExchange64(&msg->iUseCnt, vectorReserverSize);
 
             for (const st_Sector_Pos targetSector : AroundSectors.Around)
             {
                 for (ull id : g_Sector[targetSector._iY][targetSector._iX])
                 {
-                    //TODO : 이 부분 SessionID_hash 제거 실험.
+                    // TODO : 이 부분 SessionID_hash 제거 실험.
                     if (SessionID_hash.find(id) != SessionID_hash.end())
                     {
-                        sendID.push_back(id);
-                        SendCnt++;
+                        
+                        //sendID.push_back(id); // BroadCast시 전해줄 Vector Info
+                        UnitCast(id,msg);
+                        InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
                     }
                 }
             }
-            InterlockedExchange64(&msg->iUseCnt, SendCnt);
-
-            for (ull id : sendID)
+          /*  LONG64 beforeValue = m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE];
+            while (InterlockedCompareExchange64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE], (LONG64)(beforeValue + sendID.size()), beforeValue) != beforeValue)
             {
-                player = SessionID_hash[id];
-                UnitCast(id, msg, player->m_AccountNo);
-                SendCnt--;
-                InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
-            }
-            if (SendCnt != 0)
-                __debugbreak();
-
+                beforeValue = m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE];
+            }*/
         }
+  
+        
     }
   
 }
