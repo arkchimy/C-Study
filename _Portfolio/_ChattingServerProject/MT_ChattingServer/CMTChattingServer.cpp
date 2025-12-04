@@ -596,11 +596,8 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         sendID.reserve(vectorReserverSize);
 
         {
-            Profiler profile(L"UnitCast_Loop");
-            Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer,
-                               en_PACKET_CS_CHAT_RES_MESSAGE, 3, &sendID, sendID.size());
-            InterlockedExchange64(&msg->iUseCnt, vectorReserverSize);
-
+            Profiler profile(L"Broad_Loop");
+            // InterlockedExchange64(&msg->iUseCnt, vectorReserverSize);  BroadCast 내부에서 실행.
             for (const st_Sector_Pos targetSector : AroundSectors.Around)
             {
                 for (ull id : g_Sector[targetSector._iY][targetSector._iX])
@@ -608,18 +605,14 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
                     // TODO : 이 부분 SessionID_hash 제거 실험.
                     if (SessionID_hash.find(id) != SessionID_hash.end())
                     {
-                        
-                        //sendID.push_back(id); // BroadCast시 전해줄 Vector Info
-                        UnitCast(id,msg);
+                        sendID.push_back(id); // BroadCast시에만 사용이지만 성능측정을 위해 납둠.
+                        //Unicast(id,msg);
                         InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
                     }
                 }
             }
-          /*  LONG64 beforeValue = m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE];
-            while (InterlockedCompareExchange64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE], (LONG64)(beforeValue + sendID.size()), beforeValue) != beforeValue)
-            {
-                beforeValue = m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE];
-            }*/
+            Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen,
+                               MessageBuffer, en_PACKET_CS_CHAT_RES_MESSAGE, true, &sendID, sendID.size());
         }
   
         

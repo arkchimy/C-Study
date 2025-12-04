@@ -774,15 +774,16 @@ void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
     switch (SendType)
     {
     case 0:
-        UnitCast(SessionID, msg);
+        Unicast(SessionID, msg);
         break;
     case 1:
         BroadCast(SessionID, msg, pIDVector, wVecLen);
         break;
     }
 }
-void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
+void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
 {
+    Profiler profile(L"UnitCast_Cnt");
     if (SessionLock(SessionID) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
