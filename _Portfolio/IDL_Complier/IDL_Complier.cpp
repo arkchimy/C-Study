@@ -9,6 +9,7 @@ const std::wstring needle1 = L"SizedArray'";
 const std::wstring needle2 = L"DynamicArray'";
 
 wchar_t TargetPath[FILENAME_MAX];
+WORD TypeOffset;
 
 #define BufferMax 700
 #define PackStartFormat L"\n\t const static BYTE %s \t=\t %s ;"
@@ -31,7 +32,7 @@ wchar_t TargetPath[FILENAME_MAX];
 { \n \
 \t stHeader header; \n \
 \t CTestServer *server; \n \
-\t server = reinterpret_cast<CTestServer *>((char *)this - 8); \n \
+\t server = static_cast<CTestServer *>(this); \n \
 \n\
 \t header.byCode = 0x77; \n \
 \t msg->~CMessage(); \n \
@@ -49,7 +50,7 @@ wchar_t TargetPath[FILENAME_MAX];
 \t *pheaderlen = msg->_rearPtr - msg->_frontPtr - server->headerSize;\n\
 \t if (server->bEnCording)\n\
 \t \t msg->EnCoding(); \n \
-\t server->SendPacket(SessionID, msg, bBroadCast);\n};\n\n \
+\t server->SendPacket(SessionID, msg, bBroadCast , pIDVector , wVectorLen );\n};\n\n \
 "
 // Proxy 끝
 //======================================================================
@@ -397,6 +398,7 @@ void MakeCommon()
         Parser parser;
         parser.LoadFile(L"Config.txt");
         parser.GetValue(L"TargetPath", TargetPath, sizeof(TargetPath));
+        parser.GetValue(L"TypeOffset", TypeOffset);
 
     }
     FILE *file;
@@ -615,7 +617,7 @@ void MakeProxy()
         
         
             {
-                std::vector<wchar_t *>::iterator iter = words.end() - 2;
+                std::vector<wchar_t *>::iterator iter = words.end() - TypeOffset;
                 fwrite(L"\t *msg ", 2, wcslen(L"\t *msg "), file);
                 StringCchPrintfW(buffer, BufferMax, ProxyCPPArg_FORMAT, *iter);
                 fwrite(buffer, 2, wcslen(buffer), file);
@@ -624,7 +626,7 @@ void MakeProxy()
 
             i = 2;
             for (std::vector<wchar_t *>::iterator iter = words.begin() + 2;
-                    iter != words.end() - 2; iter++)
+                 iter != words.end() - TypeOffset; iter++)
             {
                 std::wstring temp(types[i]);
 
@@ -671,7 +673,7 @@ class Stub\n{ \n public:\n\
     L"\nvoid Stub::PacketProc(ull SessionID, CMessage *msg, WORD " \
     L"byType)\n {\n \
     \tCTestServer *server;\n \
-    \tserver = reinterpret_cast<CTestServer *>(this);\n \
+    \t server = static_cast<CTestServer *>(this); \n \
     \n\tswitch(byType)\n \t{\n"
 //  int a ;
 #define STUB_CPP_OPEN_FORMAT L"\tcase %s :\n \t{ \n"
@@ -861,7 +863,7 @@ void MakeStub()
             fwrite(buffer2, 2, wcslen(buffer2), file);
 
             {
-                int cnt = types.size() < words.size() - 2 ? types.size() : words.size() - 2;
+                int cnt = types.size() < words.size() - TypeOffset ? types.size() : words.size() - TypeOffset;
                 for (int i = 2; i < cnt; i++)
                 {
                     {
@@ -893,7 +895,7 @@ void MakeStub()
             
             i = 2;
             for (std::vector<wchar_t *>::iterator iter = words.begin() + 2;
-                 iter != words.end() - 2; iter++)
+                 iter != words.end() - TypeOffset; iter++)
             {
                 std::wstring temp(types[i]);
                 if (temp.find(needle1) != std::wstring::npos)
@@ -938,9 +940,9 @@ void MakeStub()
             StringCchPrintfW(buffer2, BufferMax, STUB_CPP_FUNCTION_FORMAT, buffer);
             fwrite(buffer2, 2, wcslen(buffer2), file);
 
-            for (int i = 0; i < words.size() - 2; i++)
+            for (int i = 0; i < words.size() - TypeOffset; i++)
             {
-                if (i == words.size() - 3)
+                if (i == words.size() - (TypeOffset + 1))
                 {
                     StringCchPrintfW(buffer, BufferMax, L"%s );\n", words[i]);
                     fwrite(buffer, 2, wcslen(buffer), file);

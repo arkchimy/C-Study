@@ -766,18 +766,26 @@ void CLanServer::SessionUnLock(ull SessionID)
         ReleaseSession(SessionID);
 }
 
-void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType, INT64 Account,
-                            int iSectorX, int iSectorY)
+void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
+                            std::vector<ull>* pIDVector , WORD wVecLen)
 {
+    if (SessionLock(SessionID) == false)
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+
     switch (SendType)
     {
     case 0:
-        UnitCast(SessionID, msg, Account);
+        UnitCast(SessionID, msg);
         break;
         // case 1:
         //     BroadCast(SessionID, msg, iSectorX, iSectorY);
         //     break;
     }
+
+    SessionUnLock(SessionID);
 }
 void CLanServer::UnitCast(ull SessionID, CMessage *msg, LONG64 Account)
 {

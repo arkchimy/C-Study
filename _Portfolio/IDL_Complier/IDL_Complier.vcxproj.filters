@@ -23,5 +23,8 @@
     <Text Include="Config.txt">
       <Filter>리소스 파일</Filter>
     </Text>
+    <Text Include="IDL.txt">
+      <Filter>리소스 파일</Filter>
+    </Text>
   </ItemGroup>
 </Project>
