@@ -57,6 +57,7 @@ struct stSRWLock
     SRWLOCK *m_srw;
 };
 
+
 class CLanServer : public Stub, public Proxy
 {
   public:
@@ -80,11 +81,10 @@ class CLanServer : public Stub, public Proxy
     bool SessionLock(ull SessionID);   // 내부에서 IO를 증가시켜 안전을 보장함.
     void SessionUnLock(ull SessionID); // 반환형 쓸때가 없음.
 
-    void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType, INT64 Account = 0,
-                    int iSectorX = 0, int iSectorY = 0);
-    void UnLockUnitCast(ull SessionID, CMessage *msg, LONG64 Account = 0);
-    void UnitCast(ull SessionID, CMessage *msg, LONG64 Account = 0);
-    void BroadCast(ull SessionID, CMessage *msg, WORD SectorX, WORD SectorY);
+    void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
+                    std::vector<ull> *pIDVector = nullptr, WORD wVecLen = 0);
+    void Unicast(ull SessionID, CMessage *msg, LONG64 Account = 0);
+    void BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, WORD wVecLen);
 
     void RecvPacket(class clsSession &session);
 

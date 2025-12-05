@@ -46,11 +46,10 @@ class CTestServer : public CLanServer
   public:
     // Stub함수
 
-    virtual void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType = en_PACKET_CS_CHAT_REQ_LOGIN, BYTE bBroadCast = false) final; // 동적 바인딩
-    virtual void REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, BYTE byType = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE, BYTE bBroadCast = true) final;
-    virtual void REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType = en_PACKET_CS_CHAT_REQ_MESSAGE, BYTE bBroadCast = true) final;
-    virtual void HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType = en_PACKET_CS_CHAT__HEARTBEAT, BYTE bBroadCast = false) final;
-
+    virtual void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, WORD wType = en_PACKET_CS_CHAT_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0) final;
+    virtual void REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, WORD wType = en_PACKET_CS_CHAT_REQ_SECTOR_MOVE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0) final;
+    virtual void REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, WORD wType = en_PACKET_CS_CHAT_REQ_MESSAGE, BYTE bBroadCast = true, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0) final;
+    virtual void HEARTBEAT(ull SessionID, CMessage *msg, WORD wType = en_PACKET_CS_CHAT__HEARTBEAT, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0) final;
   public:
     void AllocPlayer(CMessage *msg);
     void DeletePlayer(CMessage *msg);

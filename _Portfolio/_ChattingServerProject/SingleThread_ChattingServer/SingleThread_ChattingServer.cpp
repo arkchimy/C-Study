@@ -185,7 +185,7 @@ unsigned ContentsThread(void *arg)
     return 0;
 }
 
-void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, BYTE byType, BYTE bBroadCast)
+void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, WORD wType , BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
     CPlayer *player;
 
@@ -284,7 +284,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
                                    L"현재들어온ID:", SessionID);
     SessionUnLock(SessionID);
 }
-void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, BYTE byType, BYTE bBroadCast)
+void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
     CPlayer *player;
 
@@ -328,7 +328,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     m_RecvMsgArr[en_PACKET_CS_CHAT_RES_SECTOR_MOVE]++;
     SessionUnLock(SessionID);
 }
-void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, BYTE byType, BYTE bBroadCast)
+void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
     CPlayer *player;
     Profiler total(L"REQ_MESSAGE");
@@ -366,65 +366,46 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         SessionUnLock(SessionID);
         return;
     }
-    // TODO : Broad Cast  방식 수정하기.
-    {
-        Profiler profile(L"RES_MESSAGE");
-        Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer);
-    }
+
+    std::vector<ull> seqID;
+
 
     int SectorX = player->iSectorX;
     int SectorY = player->iSectorY;
 
     st_Sector_Around AroundSectors;
+    DWORD vectorReserverSize = 0;
+
+    {
+        Profiler profile(L"GetSectorAround");
+        SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
+    }
+
+    for (const st_Sector_Pos targetSector : AroundSectors.Around)
+    {
+        vectorReserverSize += g_Sector[targetSector._iY][targetSector._iX].size();
+    }
+    seqID.reserve( vectorReserverSize );
+    {
+        for (const st_Sector_Pos targetSector : AroundSectors.Around)
         {
-            Profiler profile(L"GetSectorAround");
-            SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
-        }
-
-        
-            if (bBroadCast)
+            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
             {
-                {
-                    Profiler profile(L"g_Settor_Around1");
-                    for (const st_Sector_Pos targetSector : AroundSectors.Around)
-                    {
-                        for (ull id : g_Sector[targetSector._iY][targetSector._iX])
-                        {
-                            if (id == SessionID)
-                                continue;
-
-                            msg->iUseCnt++;
-                        }
-                    }
-                }
-                {
-                    Profiler profile(L"g_Settor_Around2");
-                    for (const st_Sector_Pos targetSector : AroundSectors.Around)
-                    {
-                        for (ull id : g_Sector[targetSector._iY][targetSector._iX])
-                        {
-                            // 여기가 문제인것 같은데.
-                            /*   if (SessionLock(id) == false)
-                               {
-                                   stTlsObjectPool<CMessage>::Release(msg);
-                                   continue;
-                               }*/
-                            if (SessionID_hash.find(id) != SessionID_hash.end())
-                            {
-                                player = SessionID_hash[id];
-                                UnitCast(id, msg, player->m_AccountNo);
-                                m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]++;
-                            }
-                            // SessionUnLock(id);
-                        }
-                    }
-                }
+                msg->iUseCnt++;
+                m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]++;
+                seqID.push_back(id);
             }
-        
+        }
+        // TODO : Broad Cast  방식 수정하기.
+        {
+            Profiler profile(L"RES_MESSAGE");
+            Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname, MessageLen, MessageBuffer,
+                               en_PACKET_CS_CHAT_RES_MESSAGE, true, &seqID, seqID.size());
+        }
+    }   
     SessionUnLock(SessionID);
 }
-
-void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, BYTE byType, BYTE bBroadCast)
+void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
     CPlayer *player;
     if (SessionLock(SessionID) == false)
