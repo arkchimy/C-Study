@@ -16,10 +16,10 @@
 #include "utility/CLockFreeQueue/CLockFreeQueue.h"
 #include "utility/CLockFreeStack/CLockFreeStack.h"
 #include "utility/CSystemLog/CSystemLog.h"
-#include "utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
-#include "utility/Parser/Parser.h"
 #include "utility/CTlsObjectPool/CTlsObjectPool.h"
+#include "utility/Parser/Parser.h"
 #include "utility/Profiler_MultiThread/Profiler_MultiThread.h"
+#include "utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
 
 using ull = unsigned long long;
 
@@ -80,11 +80,10 @@ class CLanServer : public Stub, public Proxy
     bool SessionLock(ull SessionID);   // 내부에서 IO를 증가시켜 안전을 보장함.
     void SessionUnLock(ull SessionID); // 반환형 쓸때가 없음.
 
-    void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType, INT64 Account = 0,
-                    int iSectorX = 0, int iSectorY = 0);
-    void UnLockUnitCast(ull SessionID, CMessage *msg, LONG64 Account = 0);
-    void UnitCast(ull SessionID, CMessage *msg, LONG64 Account = 0);
-    void BroadCast(ull SessionID, CMessage *msg, WORD SectorX, WORD SectorY);
+    void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
+                    std::vector<ull> *pIDVector = nullptr, WORD wVecLen = 0);
+    void Unicast(ull SessionID, CMessage *msg, LONG64 Account = 0);
+    void BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, WORD wVecLen);
 
     void RecvPacket(class clsSession &session);
 

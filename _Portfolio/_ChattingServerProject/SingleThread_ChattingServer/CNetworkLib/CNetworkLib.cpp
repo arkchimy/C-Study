@@ -781,7 +781,6 @@ void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
 }
 void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
 {
-    Profiler profile(L"UnitCast_Cnt");
     if (SessionLock(SessionID) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
@@ -827,7 +826,7 @@ void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
 }
 void CLanServer::BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, WORD wVecLen)
 {
-    InterlockedExchange64(&msg->iUseCnt, wVecLen);
+    msg->iUseCnt =  wVecLen;
     for (WORD i = 0; i < wVecLen; i++)
     {
         ull currentSessionID = (*pIDVector)[i];
