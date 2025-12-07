@@ -89,9 +89,10 @@ class CTestServer : public CLanServer
 
     ///////////////////////////////////////////////////////////////////////
 
-    SRWLOCK srw_ContentQ;
+    //SRWLOCK srw_ContentQ;
 
-    CRingBuffer m_ContentsQ = CRingBuffer(s_ContentsQsize, 1); // Pool에서 할당하지않음
+    CLockFreeQueue<CMessage *> m_ContentsQ;
+    //CRingBuffer m_ContentsQ = CRingBuffer(s_ContentsQsize, 1); // Pool에서 할당하지않음
     inline static ringBufferSize s_ContentsQsize;
     HANDLE hContentsThread = 0;
     HANDLE hMonitorThread = 0;

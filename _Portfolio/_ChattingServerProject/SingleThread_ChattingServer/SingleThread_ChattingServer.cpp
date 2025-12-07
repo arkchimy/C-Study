@@ -72,7 +72,7 @@ unsigned MonitorThread(void *arg)
         printf("%20s %10d \n", "WorkerThread Cnt :", workthreadCnt);
         printf("%20s %10d \n", "ZeroCopy  :", ZeroCopy);
         printf("%20s %10d \n", "Nodelay  :", bNoDelay);
-        printf("%20s %10d \n", "ContentsQSize  :", server->m_ContentsQ._size);
+        printf("%20s %10d \n", "ContentsQMaxSize  :", CTestServer::s_ContentsQsize);
         printf("%20s %10d \n", "MaxSessions  :", MaxSessions);
         printf("%20s %10d \n", "maxPlayers  :", maxPlayers);
 
@@ -80,7 +80,7 @@ unsigned MonitorThread(void *arg)
         printf("%20s %10lld \n", "SessionNum :", server->GetSessionCount());
         printf("%20s %10lld \n", "PacketPool :", stTlsObjectPool<CMessage>::instance.m_TotalCount);
 
-        printf("%20s %10d \n", "UpdateMessage_Queue :", server->m_ContentsQ.GetUseSize());
+        printf("%20s %10lld \n", "UpdateMessage_Queue :", server->m_ContentsQ.m_size);
         printf("%20s %10lld \n", "UpdateMessage_Pool :", server->getNetworkMsgCount());
 
         printf("%20s %10lld \n", "prePlayer Count:", server->GetprePlayer_hash());
@@ -173,7 +173,7 @@ unsigned ContentsThread(void *arg)
         {
             server->HeartBeat();
         }
-        ContentsUseSize = server->m_ContentsQ.GetUseSize();
+        ContentsUseSize = server->m_ContentsQ.m_size;
         // Hash크기 Monitoring 정보변수 Store
         {
             server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
@@ -560,7 +560,6 @@ void CTestServer::HeartBeat()
 CTestServer::CTestServer(int iEncording)
     : CLanServer(iEncording)
 {
-    InitializeSRWLock(&srw_ContentQ);
 
     m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     m_ServerOffEvent = CreateEvent(nullptr, false, false, nullptr);
@@ -588,23 +587,17 @@ void CTestServer::Update()
     WORD type;
 
     // msg  크기 메세지 하나에 8Byte
-    while (m_ContentsQ.GetUseSize() != 0)
+    while (m_ContentsQ.m_size != 0)
     {
         if (Profiler::bOn)
         {
             Profiler profiler(L"Dequeue");
-            DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
-            if (DeQSisze != sizeof(size_t))
-                __debugbreak();
+            m_ContentsQ.Pop(msg);
         }
         else
         {
-            DeQSisze = m_ContentsQ.Dequeue(&addr, sizeof(size_t));
-            if (DeQSisze != sizeof(size_t))
-                __debugbreak();
+            m_ContentsQ.Pop(msg);
         }
-
-        msg = (CMessage *)addr;
         l_sessionID = msg->ownerID;
 
         *msg >> type;
@@ -725,10 +718,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
 {
     // double CurrentQ;
     ringBufferSize ContentsUseSize;
-
-    stSRWLock srw(&srw_ContentQ);
-
-    ContentsUseSize = m_ContentsQ.GetUseSize();
+    ContentsUseSize = m_ContentsQ.m_size;
     if (msg == nullptr)
     {
         // ContentsQ 상태 확인용
@@ -744,17 +734,14 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
         if (Profiler::bOn)
         {
             Profiler profile(L"ContentsQ_Enqueue");
-            if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
-                __debugbreak();
+            m_ContentsQ.Push(msg);
         }
         else
         {
-            if (m_ContentsQ.Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
-                __debugbreak();
+            m_ContentsQ.Push(msg);
         }
 
         SetEvent(m_ContentsEvent);
-        //
         _interlockedincrement64(&m_RecvTPS);
     }
 

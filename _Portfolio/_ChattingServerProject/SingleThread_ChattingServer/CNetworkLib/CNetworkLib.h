@@ -16,10 +16,10 @@
 #include "utility/CLockFreeQueue/CLockFreeQueue.h"
 #include "utility/CLockFreeStack/CLockFreeStack.h"
 #include "utility/CSystemLog/CSystemLog.h"
-#include "utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
-#include "utility/Parser/Parser.h"
 #include "utility/CTlsObjectPool/CTlsObjectPool.h"
+#include "utility/Parser/Parser.h"
 #include "utility/Profiler_MultiThread/Profiler_MultiThread.h"
+#include "utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
 
 using ull = unsigned long long;
 
@@ -56,7 +56,6 @@ struct stSRWLock
     }
     SRWLOCK *m_srw;
 };
-
 
 class CLanServer : public Stub, public Proxy
 {

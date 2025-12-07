@@ -157,7 +157,7 @@ unsigned MonitorThread(void *arg)
                     printf("%15s %10s %05d  %10s %05d\n",
                            "Contetent",
                            "Session :", server->balanceVec[idx].second,
-                           "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].GetUseSize());
+                           "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].m_size);
                 }
             }
             printf(" ==================================\n");
@@ -177,24 +177,25 @@ unsigned MonitorThread(void *arg)
 
                 CPUTime.UpdateCpuTime();
 
-                wprintf(L"==================================\n");
+                wprintf(L"============================================ CPU Useage ============================================\n");
 
-                wprintf(L"T:%03f U : %03f  K : %03f \t", CPUTime.ProcessorTotal(), CPUTime.ProcessorKernel(), CPUTime.ProcessorUser());
-                wprintf(L" [ Process ] T:%03f U : %03f  K : %03f   \n", CPUTime.ProcessTotal(), CPUTime.ProcessKernel(), CPUTime.ProcessUser());
-    
+                wprintf(L" [ Total ]T:%03.2f U : %03.2f  K : %03.2f \t", CPUTime.ProcessorTotal(), CPUTime.ProcessorKernel(), CPUTime.ProcessorUser());
+                wprintf(L" [ Process ] T:%03.2f U : %03.2f  K : %03.2f   \n", CPUTime.ProcessTotal(), CPUTime.ProcessKernel(), CPUTime.ProcessUser());
+                wprintf(L"====================================================================================================\n");
+
                 // 갱신 데이터 얻음
                 PDH_FMT_COUNTERVALUE counterVal;
-                PdhGetFormattedCounterValue(Process_PrivateByte, PDH_FMT_DOUBLE, NULL, &Process_PrivateByteVal);
-                wprintf(L"Process_PrivateByte : %lf Byte\n", Process_PrivateByteVal.doubleValue);
+                PdhGetFormattedCounterValue(Process_PrivateByte, PDH_FMT_LARGE, NULL, &Process_PrivateByteVal);
+                wprintf(L"Process_PrivateByte : %lld Byte\n", Process_PrivateByteVal.largeValue);
 
-                PdhGetFormattedCounterValue(Process_NonpagedByte, PDH_FMT_DOUBLE, NULL, &Process_Nonpaged_ByteVal);
-                wprintf(L"Process_Nonpaged_Byte : %lf Byte\n", Process_Nonpaged_ByteVal.doubleValue);
+                PdhGetFormattedCounterValue(Process_NonpagedByte, PDH_FMT_LARGE, NULL, &Process_Nonpaged_ByteVal);
+                wprintf(L"Process_Nonpaged_Byte :  %lld Byte\n", Process_Nonpaged_ByteVal.largeValue);
 
-                PdhGetFormattedCounterValue(Available_Byte, PDH_FMT_DOUBLE, NULL, &Available_Byte_ByteVal);
-                wprintf(L"Available_Byte : %lf Byte\n", Available_Byte_ByteVal.doubleValue);
+                PdhGetFormattedCounterValue(Available_Byte, PDH_FMT_LARGE, NULL, &Available_Byte_ByteVal);
+                wprintf(L"Available_Byte :  %lld Byte\n", Available_Byte_ByteVal.largeValue);
 
-                PdhGetFormattedCounterValue(Nonpaged_Byte, PDH_FMT_DOUBLE, NULL, &Nonpaged_Byte_ByteVal);
-                wprintf(L"Nonpaged_Byte_ByteVal : %lf Byte\n", Nonpaged_Byte_ByteVal.doubleValue);
+                PdhGetFormattedCounterValue(Nonpaged_Byte, PDH_FMT_LARGE, NULL, &Nonpaged_Byte_ByteVal);
+                wprintf(L"Nonpaged_Byte_ByteVal : %lld Byte\n", Nonpaged_Byte_ByteVal.largeValue);
             }
 
             currentTime = timeGetTime();
@@ -289,7 +290,7 @@ unsigned MonitorThread(void *arg)
             printf("%15s %10s %05d  %10s %05d\n",
                    "Contetent",
                    "Session :", server->balanceVec[idx].second,
-                   "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].GetUseSize());
+                   "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].m_size);
         }
         if (sum != 0)
             bOn = true;
@@ -310,7 +311,7 @@ void BalanceThread(void *arg)
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
-    CLockFreeQueue<CMessage *> *CotentsQ;
+    CLockFreeQueue<CMessage*> *CotentsQ;
     HANDLE local_ContentsEvent;
 
 
@@ -346,10 +347,7 @@ void BalanceThread(void *arg)
         else
             server->BalanceUpdate();
 
-        f = CotentsQ->_frontPtr;
-        r = CotentsQ->_rearPtr;
-
-        ContentsUseSize = CotentsQ->GetUseSize(f, r);
+        ContentsUseSize = CotentsQ->m_size;
 
         server->prePlayer_hash_size = server->prePlayer_hash.size();
         server->AccountNo_hash_size = server->AccountNo_hash.size();
@@ -380,7 +378,7 @@ void ContentsThread(void *arg)
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
-    CLockFreeQueue<CMessage *> *CotentsQ;
+    CLockFreeQueue<CMessage*> *CotentsQ;
     HANDLE local_ContentsEvent;
 
 
@@ -388,7 +386,7 @@ void ContentsThread(void *arg)
     {
         tls_ContentsQIdx = InterlockedIncrement(&server->m_ContentsThreadIdX);
         CotentsQ = &server->m_CotentsQ_vec[tls_ContentsQIdx];
-        local_ContentsEvent = server->m_ContentsQMap[CotentsQ].second;
+        local_ContentsEvent = server->m_ContentsQMap[CotentsQ];
     }
 
     HANDLE hWaitHandle[2] = {local_ContentsEvent, server->m_ServerOffEvent};
@@ -862,10 +860,9 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
         for (DWORD i = 0; i < ContentsThreadCnt; i++)
         {
             balanceVec.emplace_back(i, 0);
-            m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
-            m_ContentsQMap[&m_CotentsQ_vec[i]];
-
-            m_ContentsQMap[&m_CotentsQ_vec[i]].second = CreateEvent(nullptr, false, false, nullptr);
+            //m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
+            m_CotentsQ_vec.emplace_back();
+            m_ContentsQMap[&m_CotentsQ_vec[i]] = CreateEvent(nullptr, false, false, nullptr);
         }
 
     }
@@ -878,6 +875,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
         std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
 
         hContentsThread_vec[i] = std::move(std::thread(ContentsThread, this));
+
         RT_ASSERT(hContentsThread_vec[i].native_handle() != nullptr);
 
         hr = SetThreadDescription(hContentsThread_vec[i].native_handle(), ContentsThreadName.c_str());
@@ -902,7 +900,7 @@ CTestServer::~CTestServer()
 void CTestServer::Update()
 {
 
-    size_t addr;
+    CMessage** addr;
     CMessage *msg;
 
     ringBufferSize  DeQSisze;
@@ -910,24 +908,21 @@ void CTestServer::Update()
 
     WORD type;
 
-    CRingBuffer* CotentsQ = &m_CotentsQ_vec[tls_ContentsQIdx];
+    CLockFreeQueue<CMessage*>* CotentsQ = &m_CotentsQ_vec[tls_ContentsQIdx];
     // msg  크기 메세지 하나에 8Byte
-    while (CotentsQ->GetUseSize() != 0)
+    while (CotentsQ->m_size != 0)
     {
         CPlayer *player = nullptr;
 
         if (Profiler::bOn)
         {
             Profiler profile(L"Contents_DeQ");
-            DeQSisze = CotentsQ->Dequeue(&addr, sizeof(size_t));
+            CotentsQ->Pop(msg);
         }
         else
-            DeQSisze = CotentsQ->Dequeue(&addr, sizeof(size_t));
+            CotentsQ->Pop(msg);
 
-        if (DeQSisze != sizeof(size_t))
-            __debugbreak();
-
-        msg = (CMessage *)addr;
+        //msg = *addr;
         l_sessionID = msg->ownerID;
 
         *msg >> type;
@@ -967,7 +962,7 @@ void CTestServer::Update()
 
 void CTestServer::BalanceUpdate()
 {
-    size_t addr;
+    CMessage** addr;
     CMessage *msg;
 
     ringBufferSize DeQSisze;
@@ -975,18 +970,18 @@ void CTestServer::BalanceUpdate()
 
     WORD type;
 
-    CRingBuffer *CotentsQ = &m_BalanceQ;
+    CLockFreeQueue<CMessage*> *CotentsQ = &m_BalanceQ;
 
     
     // msg  크기 메세지 하나에 8Byte
-    while (CotentsQ->GetUseSize() != 0)
+    while (CotentsQ->m_size != 0)
     {
 
-        DeQSisze = CotentsQ->Dequeue(&addr, sizeof(size_t));
-        if (DeQSisze != sizeof(size_t))
-            __debugbreak();
+        DeQSisze = CotentsQ->Pop(msg);
+        //if (DeQSisze != sizeof(size_t))
+        //    __debugbreak();
 
-        msg = (CMessage *)addr;
+        //msg = *addr;
         l_sessionID = msg->ownerID;
 
         *msg >> type;
@@ -1118,15 +1113,13 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
     CMessage **ppMsg;
     CLockFreeQueue<CMessage*> *TargetQ; //  Q 가 많아졌으므로 Q를 찾아오기.
     HANDLE hMsgQueuedEvent; // Q에 데이터가 들어왔음을 알림.
-    //SRWLOCK *pSrw;
-    std::shared_mutex *pSrw;
 
     std::wstring ProfileName; 
 
     if (bBalanceQ)
     {
         TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
-        pSrw = &srw_BalanceQ;
+        //pSrw = &srw_BalanceQ;
         hMsgQueuedEvent = hBalanceEvent;
         ProfileName = L"EnQueue_BalanceQ";
     }
@@ -1137,7 +1130,6 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
             TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
-            pSrw = &srw_BalanceQ;
             hMsgQueuedEvent = hBalanceEvent;
             ProfileName = L"EnQueue_BalanceQ";
         }
@@ -1146,8 +1138,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
             CPlayer *player = SessionID_hash[SessionID];
 
             TargetQ = &m_CotentsQ_vec[player->m_ContentsQIdx];
-            pSrw = &m_ContentsQMap[TargetQ].first;
-            hMsgQueuedEvent = m_ContentsQMap[TargetQ].second;
+            hMsgQueuedEvent = m_ContentsQMap[TargetQ];
             ProfileName = L"EnQueue_CotentsQ" + std::to_wstring(player->m_ContentsQIdx);
                
         }
@@ -1158,32 +1149,23 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
 
     {
 
-        std::unique_lock srw(*pSrw);
-        
-        
-
         ppMsg = &msg;
         
         {
             if (Profiler::bOn)
             {
                 Profiler profile(L"Target_Enqeue");
-
-                // 내가 넣은 msg인데 여기에 없으면 ( X )
-                if (TargetQ->Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
-                    __debugbreak();
+                TargetQ->Push(msg);
             }
             else
             {
-                if (TargetQ->Enqueue(ppMsg, sizeof(msg)) != sizeof(msg))
-                    __debugbreak();
+                TargetQ->Push(msg);
             }
             SetEvent(hMsgQueuedEvent);
         }
 
         _interlockedincrement64(&m_RecvTPS);
-
-        ContentsUseSize = TargetQ->GetUseSize();
+        ContentsUseSize = TargetQ->m_size;
     }
     return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
 }

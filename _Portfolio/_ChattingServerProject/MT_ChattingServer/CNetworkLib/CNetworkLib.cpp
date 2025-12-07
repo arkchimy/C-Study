@@ -801,10 +801,10 @@ void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
         if (Profiler::bOn)
         {
             Profiler profile(L"LFQ_Push");
-            session.m_sendBuffer.Push(*ppMsg);
+            session.m_sendBuffer.Push(msg);
         }
         else
-            session.m_sendBuffer.Push(*ppMsg);
+            session.m_sendBuffer.Push(msg);
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
                                        L"%-20s %12s %05lld  %12s %05llu %12s %05llu %10s %05llu",
