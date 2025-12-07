@@ -81,22 +81,45 @@ unsigned MonitorThread(void *arg)
     };
 
      // PDH 쿼리 핸들 생성
-    PDH_HQUERY cpuQuery;
-    PdhOpenQuery(NULL, NULL, &cpuQuery);
+    PDH_HQUERY hQuery;
+    PdhOpenQuery(NULL, NULL, &hQuery);
 
     PDH_HCOUNTER Process_PrivateByte;
-    PdhAddCounter(cpuQuery, L"\\Process(AggregatorHost)\\Private Bytes", NULL, &Process_PrivateByte);
+    PdhAddCounter(hQuery, L"\\Process(MT_ChattingServer)\\Private Bytes", NULL, &Process_PrivateByte);
 
     PDH_HCOUNTER Process_NonpagedByte;
-    PdhAddCounter(cpuQuery, L"\\Process(AggregatorHost)\\Pool Nonpaged Bytes", NULL, &Process_NonpagedByte);
+    PdhAddCounter(hQuery, L"\\Process(MT_ChattingServer)\\Pool Nonpaged Bytes", NULL, &Process_NonpagedByte);
 
     PDH_HCOUNTER Available_Byte;
-    PdhAddCounter(cpuQuery, L"\\Memory\\Available MBytes", NULL, &Available_Byte);
+    PdhAddCounter(hQuery, L"\\Memory\\Available MBytes", NULL, &Available_Byte);
 
     PDH_HCOUNTER Nonpaged_Byte;
-    PdhAddCounter(cpuQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &Nonpaged_Byte);
+    PdhAddCounter(hQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &Nonpaged_Byte);
 
-    PdhCollectQueryData(cpuQuery);
+    PDH_HCOUNTER hBytesRecv, hBytesSent, hBytesTotal;
+    PDH_HCOUNTER hBytesRecv1, hBytesSent1, hBytesTotal1;
+    PDH_HCOUNTER hBytesRecv2, hBytesSent2, hBytesTotal2;
+
+    PDH_HCOUNTER hTcp4Retrans, hTcp4SegSent, hTcp4SegRecv;
+
+    PdhAddCounter(hQuery, (L"\\Network Interface(Realtek PCIe GbE Family Controller)\\Bytes Received/sec"), 0, &hBytesRecv);
+    PdhAddCounter(hQuery, (L"\\Network Interface(Intel[R] I210 Gigabit Network Connection)\\Bytes Received/sec"), 0, &hBytesRecv1);
+    PdhAddCounter(hQuery, (L"\\Network Interface(Intel[R] I210 Gigabit Network Connection _2)\\Bytes Received/sec"), 0, &hBytesRecv2);
+
+    PdhAddCounter(hQuery, (L"\\Network Interface(Realtek PCIe GbE Family Controller)\\Bytes Sent/sec"), 0, &hBytesSent);
+    PdhAddCounter(hQuery, (L"\\Network Interface(Intel[R] I210 Gigabit Network Connection)\\Bytes Sent/sec"), 0, &hBytesSent1);
+    PdhAddCounter(hQuery, (L"\\Network Interface(Intel[R] I210 Gigabit Network Connection _2)\\Bytes Sent/sec"), 0, &hBytesSent2);
+
+    PdhAddCounter(hQuery, (L"\\Network Interface(Realtek PCIe GbE Family Controller)\\Bytes Total/sec"), 0, &hBytesTotal);
+    PdhAddCounter(hQuery, (L"\\Network Interface(Intel[R] I210 Gigabit Network Connection)\\Bytes Total/sec"), 0, &hBytesTotal1);
+    PdhAddCounter(hQuery, (L"\\Network Interface(Intel[R] I210 Gigabit Network Connection _2)\\Bytes Total/sec"), 0, &hBytesTotal2);
+
+
+    PdhAddCounter(hQuery, L"\\TCPv4\\Segments Retransmitted/sec", 0, &hTcp4Retrans);
+    PdhAddCounter(hQuery, L"\\TCPv4\\Segments Sent/sec", 0, &hTcp4SegSent);
+    PdhAddCounter(hQuery, L"\\TCPv4\\Segments Received/sec", 0, &hTcp4SegRecv);
+
+    PdhCollectQueryData(hQuery);
     CCpuUsage CPUTime;
 
     {
@@ -104,6 +127,11 @@ unsigned MonitorThread(void *arg)
         PDH_FMT_COUNTERVALUE Process_Nonpaged_ByteVal;
         PDH_FMT_COUNTERVALUE Available_Byte_ByteVal;
         PDH_FMT_COUNTERVALUE Nonpaged_Byte_ByteVal;
+
+        PDH_FMT_COUNTERVALUE recvVal[3];
+        PDH_FMT_COUNTERVALUE sentVal[3];
+        PDH_FMT_COUNTERVALUE totalVal[3];
+        PDH_FMT_COUNTERVALUE vTcp4Retr, vTcp4Sent, vTcp4Recv;
 
         while (server->bMonitorThreadOn)
         {
@@ -119,17 +147,26 @@ unsigned MonitorThread(void *arg)
                 arrTPS[i] = old_arrTPS - before_arrTPS[i];
                 before_arrTPS[i] = old_arrTPS;
             }
-            printf(" ==================================\n");
-            printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", workthreadCnt, "SessionNum", server->GetSessionCount());
-            printf("%-25s : %10d  %-25s : %10lld\n", "ZeroCopy", ZeroCopy, "PacketPool", stTlsObjectPool<CMessage>::instance.m_TotalCount);
-            printf("%-25s : %10d  \n", "Nodelay", bNoDelay);
-            printf("%-25s : %10d  %-25s : %10lld\n", "MaxSessions", MaxSessions, "ActiveMessage_Cnt", server->getNetworkMsgCount());
+            printf(" ============================================ Config ============================================ \n");
 
-            printf("%-25s : %10d  %-25s : %10lld\n", "MaxPlayers", maxPlayers, "PrePlayer Count", server->GetprePlayer_hash());
-            printf("%-25s : %10lld  %-25s : %10lld\n", "Player Count", server->GetPlayerCount(), "AccountNo_hash_size", server->GetAccountNo_hash());
-            printf("%-25s : %10lld  %-25s : %10lld\n", "SessionID_hash_size", server->GetSessionID_hash(), "Total iDisconnectCount", server->iDisCounnectCount);
-            printf(" ==================================\n");
-            printf(" Total Accept          : %llu  %30s \n", server->getTotalAccept(), ProfilerFormat[Profiler::bOn]);
+            printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", workthreadCnt, "SessionNum", server->GetSessionCount());
+            printf("%-25s : %10d  %-25s : %10d \n", "ZeroCopy", ZeroCopy, "Nodelay", bNoDelay);
+            printf("%-25s : %10d  %-25s : %10d\n", "MaxSessions", MaxSessions, "MaxPlayers", maxPlayers);
+
+
+            printf(" \n========================================= Server Runtime Status ====================================== \n");
+
+            printf(" %-25s : %10llu  \n", "Total Accept", server->getTotalAccept());
+            printf(" %-25s : %10lld  \n", "ActiveMessage_Cnt", server->getNetworkMsgCount());
+            printf(" %-25s : %10lld  %-25s : %10lld\n", "PrePlayer Count", server->GetprePlayer_hash(),
+                   "Player Count", server->GetPlayerCount());
+
+            printf(" %-25s : %10lld\n", "PacketPool", stTlsObjectPool<CMessage>::instance.m_TotalCount);
+            printf(" %-25s : %10lld\n", "Total iDisconnectCount", server->iDisCounnectCount);
+            printf(" %230s \n", ProfilerFormat[Profiler::bOn]);
+
+            printf(" ============================================ Contents Thread TPS ========================================== \n");
+
             printf(" Accept TPS           : %lld\n", arrTPS[0]);
             printf(" Update TPS           : %lld\n", UpdateTPS);
 
@@ -146,9 +183,11 @@ unsigned MonitorThread(void *arg)
                     sum += arrTPS[i];
                     printf("%20s %10lld \n", "Send TPS :", arrTPS[i]);
                 }
-                printf("%25s %10lld\n", "Total Send TPS :", sum);
+                printf(" ===================================================================================================== \n");
+                printf("%35s %10lld\n", "Total Send TPS :", sum);
+                printf(" ===================================================================================================== \n");
             }
-            printf(" ==================================\n");
+            
             {
                 LONG64 sum = 0;
                 // Contents 정보 Print
@@ -160,7 +199,7 @@ unsigned MonitorThread(void *arg)
                            "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].m_size);
                 }
             }
-            printf(" ==================================\n");
+            printf(" ===================================================================================================== \n");
 
             // 메세지 별
             for (int i = 3; i < en_PACKET_CS_CHAT__Max - 1; i++)
@@ -173,11 +212,11 @@ unsigned MonitorThread(void *arg)
 
             {
                 // 1초마다 갱신
-                PdhCollectQueryData(cpuQuery);
+                PdhCollectQueryData(hQuery);
 
                 CPUTime.UpdateCpuTime();
 
-                wprintf(L"============================================ CPU Useage ============================================\n");
+                wprintf(L" ============================================ CPU Useage ============================================ \n");
 
                 wprintf(L" [ Total ]T:%03.2f U : %03.2f  K : %03.2f \t", CPUTime.ProcessorTotal(), CPUTime.ProcessorKernel(), CPUTime.ProcessorUser());
                 wprintf(L" [ Process ] T:%03.2f U : %03.2f  K : %03.2f   \n", CPUTime.ProcessTotal(), CPUTime.ProcessKernel(), CPUTime.ProcessUser());
@@ -196,6 +235,62 @@ unsigned MonitorThread(void *arg)
 
                 PdhGetFormattedCounterValue(Nonpaged_Byte, PDH_FMT_LARGE, NULL, &Nonpaged_Byte_ByteVal);
                 wprintf(L"Nonpaged_Byte_ByteVal : %lld Byte\n", Nonpaged_Byte_ByteVal.largeValue);
+            }
+            // NetWork 
+            {
+                PdhGetFormattedCounterValue(hBytesRecv, PDH_FMT_DOUBLE, NULL, &recvVal[0]);
+                PdhGetFormattedCounterValue(hBytesRecv1, PDH_FMT_DOUBLE, NULL, &recvVal[1]);
+                PdhGetFormattedCounterValue(hBytesRecv2, PDH_FMT_DOUBLE, NULL, &recvVal[2]);
+
+                PdhGetFormattedCounterValue(hBytesSent, PDH_FMT_DOUBLE, NULL, &sentVal[0]);
+                PdhGetFormattedCounterValue(hBytesSent1, PDH_FMT_DOUBLE, NULL, &sentVal[1]);
+                PdhGetFormattedCounterValue(hBytesSent2, PDH_FMT_DOUBLE, NULL, &sentVal[2]);
+
+                PdhGetFormattedCounterValue(hBytesTotal, PDH_FMT_DOUBLE, NULL, &totalVal[0]);
+                PdhGetFormattedCounterValue(hBytesTotal1, PDH_FMT_DOUBLE, NULL, &totalVal[1]);
+                PdhGetFormattedCounterValue(hBytesTotal2, PDH_FMT_DOUBLE, NULL, &totalVal[2]);
+
+                PdhGetFormattedCounterValue(hTcp4Retrans, PDH_FMT_DOUBLE, NULL, &vTcp4Retr);
+                PdhGetFormattedCounterValue(hTcp4SegSent, PDH_FMT_DOUBLE, NULL, &vTcp4Sent);
+                PdhGetFormattedCounterValue(hTcp4SegRecv, PDH_FMT_DOUBLE, NULL, &vTcp4Recv);
+
+                 double tcp4RetrRatio = 0.0;
+                if (vTcp4Sent.doubleValue > 0.0)
+                    tcp4RetrRatio = (vTcp4Retr.doubleValue / vTcp4Sent.doubleValue) * 100.0;
+
+
+                wprintf(L"\n ============================================ Network Usage (Bytes/sec) ============================================ \n");
+                wprintf(L"%20s %15s %15s %15s\n",
+                        L"Adapter",
+                        L"Recv(B/s)",
+                        L"Sent(B/s)",
+                        L"Total(B/s)");
+                wprintf(L"--------------------------------------------------------------------------\n");
+
+                wprintf(L"%-40s %15.0f %15.0f %15.0f\n",
+                        L"Realtek PCIe GbE Family Controller",
+                        recvVal[0].doubleValue,
+                        sentVal[0].doubleValue,
+                        totalVal[0].doubleValue);
+
+                wprintf(L"%-40s %15.0f %15.0f %15.0f\n",
+                        L"Intel[R] I210 Gigabit Network Connection",
+                        recvVal[1].doubleValue,
+                        sentVal[1].doubleValue,
+                        totalVal[1].doubleValue);
+
+                wprintf(L"%-40s %15.0f %15.0f %15.0f\n",
+                        L"Intel[R] I210 Gigabit Network Connection _2",
+                        recvVal[2].doubleValue,
+                        sentVal[2].doubleValue,
+                        totalVal[2].doubleValue);
+
+                wprintf(L"\n ============================================ TCP Retransmission ============================================ \n");
+                wprintf(L"TCPv4 Segments Sent/sec          : %.2f\n", vTcp4Sent.doubleValue);
+                wprintf(L"TCPv4 Segments Retransmitted/sec : %.2f\n", vTcp4Retr.doubleValue);
+                wprintf(L"TCPv4 Retrans Ratio              : %.2f %%\n", tcp4RetrRatio);
+
+                wprintf(L" ============================================================================================================== \n");
             }
 
             currentTime = timeGetTime();
