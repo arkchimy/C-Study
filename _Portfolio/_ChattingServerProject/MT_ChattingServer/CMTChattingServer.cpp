@@ -163,7 +163,7 @@ unsigned MonitorThread(void *arg)
 
             printf(" %-25s : %10lld\n", "PacketPool", stTlsObjectPool<CMessage>::instance.m_TotalCount);
             printf(" %-25s : %10lld\n", "Total iDisconnectCount", server->iDisCounnectCount);
-            printf(" %230s \n", ProfilerFormat[Profiler::bOn]);
+            printf(" %100s \n", ProfilerFormat[Profiler::bOn]);
 
             printf(" ============================================ Contents Thread TPS ========================================== \n");
 
