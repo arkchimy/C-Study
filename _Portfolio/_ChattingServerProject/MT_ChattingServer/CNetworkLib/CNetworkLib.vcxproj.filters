@@ -49,6 +49,9 @@
     <Filter Include="utility\CTlsLockFreeQueue">
       <UniqueIdentifier>{fadd9591-1885-4bf9-a2f5-e2538141e602}</UniqueIdentifier>
     </Filter>
+    <Filter Include="utility\CCpuUsage">
+      <UniqueIdentifier>{c4366cbb-1f9e-4653-87db-b8f9ca91f69c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CNetworkLib.h">
@@ -102,6 +105,9 @@
     <ClInclude Include="utility\CTlsLockFreeQueue\CTlsLockFreeQueue.h">
       <Filter>utility\CTlsLockFreeQueue</Filter>
     </ClInclude>
+    <ClInclude Include="utility\CCpuUsage\CCpuUsage.h">
+      <Filter>utility\CCpuUsage</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CNetworkLib.cpp">
@@ -148,6 +154,9 @@
     </ClCompile>
     <ClCompile Include="utility\CTlsLockFreeQueue\CTlsLockFreeQueue.cpp">
       <Filter>utility\CTlsLockFreeQueue</Filter>
+    </ClCompile>
+    <ClCompile Include="utility\CCpuUsage\CCpuUsage.cpp">
+      <Filter>utility\CCpuUsage</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

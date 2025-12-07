@@ -101,9 +101,8 @@ class CTestServer : public CLanServer
     ull m_ContentsThreadIdX = -1;  // ContentsThread가 생성시에 Interlock으로 1씩 증가.
 
     // 메세지 Q의 주소로 Lock과 SetEvent를할 HANDLE을 가져 옴.
-    std::vector<CRingBuffer> m_CotentsQ_vec; // ContentsQ vec
-    //std::map<CRingBuffer *, std::pair<SRWLOCK, HANDLE>> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
-    std::map<CRingBuffer *, std::pair<std::shared_mutex, HANDLE>> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
+    std::vector<CLockFreeQueue<CMessage*>> m_CotentsQ_vec; // ContentsQ vec
+    std::map<CLockFreeQueue<CMessage *> *, std::pair<std::shared_mutex, HANDLE>> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
 
     ////////////////////////////////////////////////////////////////////
     ////////////////////////// BalanceThread //////////////////////////
@@ -115,7 +114,7 @@ class CTestServer : public CLanServer
     //SRWLOCK srw_BalanceQ;  // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
     std::shared_mutex srw_BalanceQ; // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
     HANDLE hBalanceEvent; // EnQ를 알려주는 이벤트
-    CRingBuffer m_BalanceQ = CRingBuffer(s_ContentsQsize, 1); 
+    CLockFreeQueue<CMessage *> m_BalanceQ = CLockFreeQueue<CMessage *>(); 
     
 
 

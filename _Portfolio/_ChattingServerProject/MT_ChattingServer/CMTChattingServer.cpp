@@ -17,6 +17,15 @@
 #include "CMTChattingServer.h"
 #include "CNetworkLib/CNetworkLib.h"
 
+#include <Pdh.h>
+#include <stdio.h>
+
+#pragma comment(lib, "Pdh.lib")
+
+#include "./CNetworkLib/utility/CCpuUsage/CCpuUsage.h"
+
+
+
 extern SRWLOCK srw_Log;
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
@@ -70,77 +79,128 @@ unsigned MonitorThread(void *arg)
         "Profiler_Mode : Off\n",
         "Profiler_Mode : On\n"
     };
-    while (server->bMonitorThreadOn)
+
+     // PDH 쿼리 핸들 생성
+    PDH_HQUERY cpuQuery;
+    PdhOpenQuery(NULL, NULL, &cpuQuery);
+
+    PDH_HCOUNTER Process_PrivateByte;
+    PdhAddCounter(cpuQuery, L"\\Process(AggregatorHost)\\Private Bytes", NULL, &Process_PrivateByte);
+
+    PDH_HCOUNTER Process_NonpagedByte;
+    PdhAddCounter(cpuQuery, L"\\Process(AggregatorHost)\\Pool Nonpaged Bytes", NULL, &Process_NonpagedByte);
+
+    PDH_HCOUNTER Available_Byte;
+    PdhAddCounter(cpuQuery, L"\\Memory\\Available MBytes", NULL, &Available_Byte);
+
+    PDH_HCOUNTER Nonpaged_Byte;
+    PdhAddCounter(cpuQuery, L"\\Memory\\Pool Nonpaged Bytes", NULL, &Nonpaged_Byte);
+
+    PdhCollectQueryData(cpuQuery);
+    CCpuUsage CPUTime;
+
     {
-        nextTime += 1000;
-        {
-            LONG64 old_UpdateTPS = server->m_UpdateTPS;
-            UpdateTPS = old_UpdateTPS - before_UpdateTPS;
-            before_UpdateTPS = old_UpdateTPS;
-        }
-        for (int i = 0; i <= workthreadCnt; i++)
-        {
-            LONG64 old_arrTPS = server->arrTPS[i];
-            arrTPS[i] = old_arrTPS - before_arrTPS[i];
-            before_arrTPS[i] = old_arrTPS;
-        }
-        printf(" ==================================\n");
-        printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", workthreadCnt, "SessionNum", server->GetSessionCount());
-        printf("%-25s : %10d  %-25s : %10lld\n", "ZeroCopy", ZeroCopy, "PacketPool", stTlsObjectPool<CMessage>::instance.m_TotalCount);
-        printf("%-25s : %10d  \n", "Nodelay", bNoDelay);
-        printf("%-25s : %10d  %-25s : %10lld\n", "MaxSessions", MaxSessions, "ActiveMessage_Cnt", server->getNetworkMsgCount());
+        PDH_FMT_COUNTERVALUE Process_PrivateByteVal;
+        PDH_FMT_COUNTERVALUE Process_Nonpaged_ByteVal;
+        PDH_FMT_COUNTERVALUE Available_Byte_ByteVal;
+        PDH_FMT_COUNTERVALUE Nonpaged_Byte_ByteVal;
 
-        printf("%-25s : %10d  %-25s : %10lld\n", "MaxPlayers", maxPlayers, "PrePlayer Count", server->GetprePlayer_hash());
-        printf("%-25s : %10lld  %-25s : %10lld\n", "Player Count", server->GetPlayerCount(), "AccountNo_hash_size", server->GetAccountNo_hash());
-        printf("%-25s : %10lld  %-25s : %10lld\n", "SessionID_hash_size", server->GetSessionID_hash(), "Total iDisconnectCount", server->iDisCounnectCount);
-        printf(" ==================================\n");
-        printf(" Total Accept          : %llu  %30s \n", server->getTotalAccept(), ProfilerFormat[Profiler::bOn]);
-        printf(" Accept TPS           : %lld\n", arrTPS[0]);
-        printf(" Update TPS           : %lld\n", UpdateTPS);
-
+        while (server->bMonitorThreadOn)
         {
-            LONG64 old_RecvTPS = server->m_RecvTPS;
-            RecvTPS = old_RecvTPS - before_RecvTPS;
-            before_RecvTPS = old_RecvTPS;
-            printf(" Recv TPS : %lld\n", RecvTPS);
-        }
-        {
-            LONG64 sum = 0;
-            for (int i = 1; i <= server->m_WorkThreadCnt; i++)
+            nextTime += 1000;
             {
-                sum += arrTPS[i];
-                printf("%20s %10lld \n", "Send TPS :", arrTPS[i]);
+                LONG64 old_UpdateTPS = server->m_UpdateTPS;
+                UpdateTPS = old_UpdateTPS - before_UpdateTPS;
+                before_UpdateTPS = old_UpdateTPS;
             }
-            printf("%25s %10lld\n", "Total Send TPS :" , sum);
-        }
-        printf(" ==================================\n");
-        {
-            LONG64 sum = 0;
-            // Contents 정보 Print
-            for (int idx = 0; idx < server->balanceVec.size(); idx++)
+            for (int i = 0; i <= workthreadCnt; i++)
             {
-                printf("%15s %10s %05d  %10s %05d\n", 
-                    "Contetent",
-                    "Session :",server->balanceVec[idx].second,
-                    "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].GetUseSize());
+                LONG64 old_arrTPS = server->arrTPS[i];
+                arrTPS[i] = old_arrTPS - before_arrTPS[i];
+                before_arrTPS[i] = old_arrTPS;
+            }
+            printf(" ==================================\n");
+            printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", workthreadCnt, "SessionNum", server->GetSessionCount());
+            printf("%-25s : %10d  %-25s : %10lld\n", "ZeroCopy", ZeroCopy, "PacketPool", stTlsObjectPool<CMessage>::instance.m_TotalCount);
+            printf("%-25s : %10d  \n", "Nodelay", bNoDelay);
+            printf("%-25s : %10d  %-25s : %10lld\n", "MaxSessions", MaxSessions, "ActiveMessage_Cnt", server->getNetworkMsgCount());
+
+            printf("%-25s : %10d  %-25s : %10lld\n", "MaxPlayers", maxPlayers, "PrePlayer Count", server->GetprePlayer_hash());
+            printf("%-25s : %10lld  %-25s : %10lld\n", "Player Count", server->GetPlayerCount(), "AccountNo_hash_size", server->GetAccountNo_hash());
+            printf("%-25s : %10lld  %-25s : %10lld\n", "SessionID_hash_size", server->GetSessionID_hash(), "Total iDisconnectCount", server->iDisCounnectCount);
+            printf(" ==================================\n");
+            printf(" Total Accept          : %llu  %30s \n", server->getTotalAccept(), ProfilerFormat[Profiler::bOn]);
+            printf(" Accept TPS           : %lld\n", arrTPS[0]);
+            printf(" Update TPS           : %lld\n", UpdateTPS);
+
+            {
+                LONG64 old_RecvTPS = server->m_RecvTPS;
+                RecvTPS = old_RecvTPS - before_RecvTPS;
+                before_RecvTPS = old_RecvTPS;
+                printf(" Recv TPS : %lld\n", RecvTPS);
+            }
+            {
+                LONG64 sum = 0;
+                for (int i = 1; i <= server->m_WorkThreadCnt; i++)
+                {
+                    sum += arrTPS[i];
+                    printf("%20s %10lld \n", "Send TPS :", arrTPS[i]);
+                }
+                printf("%25s %10lld\n", "Total Send TPS :", sum);
+            }
+            printf(" ==================================\n");
+            {
+                LONG64 sum = 0;
+                // Contents 정보 Print
+                for (int idx = 0; idx < server->balanceVec.size(); idx++)
+                {
+                    printf("%15s %10s %05d  %10s %05d\n",
+                           "Contetent",
+                           "Session :", server->balanceVec[idx].second,
+                           "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].GetUseSize());
+                }
+            }
+            printf(" ==================================\n");
+
+            // 메세지 별
+            for (int i = 3; i < en_PACKET_CS_CHAT__Max - 1; i++)
+            {
+                LONG64 old_RecvMsg = server->m_RecvMsgArr[i];
+                RecvMsgArr[i] = old_RecvMsg - before_RecvMsgArr[i];
+                before_RecvMsgArr[i] = old_RecvMsg;
+                MsgTypePrint(i, RecvMsgArr[i]);
             }
 
-            
-        }
-        printf(" ==================================\n");
+            {
+                // 1초마다 갱신
+                PdhCollectQueryData(cpuQuery);
 
-        // 메세지 별
-        for (int i = 3; i < en_PACKET_CS_CHAT__Max - 1; i++)
-        {
-            LONG64 old_RecvMsg = server->m_RecvMsgArr[i];
-            RecvMsgArr[i] = old_RecvMsg - before_RecvMsgArr[i];
-            before_RecvMsgArr[i] = old_RecvMsg;
-            MsgTypePrint(i, RecvMsgArr[i]);
-        }
+                CPUTime.UpdateCpuTime();
 
-        currentTime = timeGetTime();
-        if (nextTime > currentTime)
-            Sleep(nextTime - currentTime);
+                wprintf(L"==================================\n");
+
+                wprintf(L"T:%03f U : %03f  K : %03f \t", CPUTime.ProcessorTotal(), CPUTime.ProcessorKernel(), CPUTime.ProcessorUser());
+                wprintf(L" [ Process ] T:%03f U : %03f  K : %03f   \n", CPUTime.ProcessTotal(), CPUTime.ProcessKernel(), CPUTime.ProcessUser());
+    
+                // 갱신 데이터 얻음
+                PDH_FMT_COUNTERVALUE counterVal;
+                PdhGetFormattedCounterValue(Process_PrivateByte, PDH_FMT_DOUBLE, NULL, &Process_PrivateByteVal);
+                wprintf(L"Process_PrivateByte : %lf Byte\n", Process_PrivateByteVal.doubleValue);
+
+                PdhGetFormattedCounterValue(Process_NonpagedByte, PDH_FMT_DOUBLE, NULL, &Process_Nonpaged_ByteVal);
+                wprintf(L"Process_Nonpaged_Byte : %lf Byte\n", Process_Nonpaged_ByteVal.doubleValue);
+
+                PdhGetFormattedCounterValue(Available_Byte, PDH_FMT_DOUBLE, NULL, &Available_Byte_ByteVal);
+                wprintf(L"Available_Byte : %lf Byte\n", Available_Byte_ByteVal.doubleValue);
+
+                PdhGetFormattedCounterValue(Nonpaged_Byte, PDH_FMT_DOUBLE, NULL, &Nonpaged_Byte_ByteVal);
+                wprintf(L"Nonpaged_Byte_ByteVal : %lf Byte\n", Nonpaged_Byte_ByteVal.doubleValue);
+            }
+
+            currentTime = timeGetTime();
+            if (nextTime > currentTime)
+                Sleep(nextTime - currentTime);
+        }
     }
     //종료 절차.
 
@@ -250,7 +310,7 @@ void BalanceThread(void *arg)
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
-    CRingBuffer *CotentsQ;
+    CLockFreeQueue<CMessage *> *CotentsQ;
     HANDLE local_ContentsEvent;
 
 
@@ -320,7 +380,7 @@ void ContentsThread(void *arg)
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
-    CRingBuffer *CotentsQ;
+    CLockFreeQueue<CMessage *> *CotentsQ;
     HANDLE local_ContentsEvent;
 
 
@@ -370,10 +430,10 @@ void ContentsThread(void *arg)
         }
         else
             server->Update();
-        f = CotentsQ->_frontPtr;
-        r = CotentsQ->_rearPtr;
+   /*     f = CotentsQ->_frontPtr;
+        r = CotentsQ->_rearPtr;*/
 
-        ContentsUseSize = CotentsQ->GetUseSize(f, r);
+        ContentsUseSize = CotentsQ->m_size;
         server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
 
         server->prePlayer_hash_size = server->prePlayer_hash.size();
@@ -1056,7 +1116,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
     // double CurrentQ;
     ringBufferSize ContentsUseSize;
     CMessage **ppMsg;
-    CRingBuffer *TargetQ; //  Q 가 많아졌으므로 Q를 찾아오기.
+    CLockFreeQueue<CMessage*> *TargetQ; //  Q 가 많아졌으므로 Q를 찾아오기.
     HANDLE hMsgQueuedEvent; // Q에 데이터가 들어왔음을 알림.
     //SRWLOCK *pSrw;
     std::shared_mutex *pSrw;
