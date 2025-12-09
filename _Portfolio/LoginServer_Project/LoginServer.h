@@ -9,24 +9,17 @@
 #include <shared_mutex>
 
 
-enum class en_State : int
+enum class en_State : ull
 {
-    Session,
-    Player,
-    DisConnect,
+    None,
+    LoginWait,
     Max,
 };
 
-struct stDBOverapped : public OVERLAPPED
-{
-    ull SessionID;
-    CMessage *msg;
-};
 
 struct CPlayer
 {
-    DWORD m_ContentsQIdx = 0;
-    en_State m_State = en_State::Max;
+    en_State m_State = en_State::None;
     ull m_sessionID = 0;
 
     DWORD m_Timer = 0;
@@ -35,7 +28,6 @@ struct CPlayer
     WCHAR m_ID[20]{0};
     WCHAR m_Nickname[20]{0};
     char m_SessionKey[64]{0};
-    stDBOverapped DB_ReqOverlapped;
 };
 
 
@@ -62,17 +54,17 @@ class CTestServer :public CLanServer
     virtual bool OnAccept(ull SessionID) override;
     virtual void OnRelease(ull SessionID) override;
 
-
-    std::queue<CMessage *> JobQueue;
-    std::shared_mutex JobQueue_Lock;
-
+    ////////////////////////// HeartBeatThread  //////////////////////////
+    std::thread hHeartBeatThread;
 
     ////////////////////////// jobQueue of DBThread  //////////////////////////
     HANDLE m_hDBIOCP = INVALID_HANDLE_VALUE;
+    std::queue<CMessage *> JobQueue;
+    std::shared_mutex JobQueue_Lock;
 
     DWORD m_ContentsThreadCnt;
 
-    std::vector<std::thread> hContentsThread_vec;
+    std::vector<std::thread> hDBThread_vec;
     inline static ringBufferSize s_ContentsQsize;
 
     HANDLE hMonitorThread = 0;
@@ -98,16 +90,11 @@ class CTestServer :public CLanServer
 
     // TODO: 특정 인원이상 안늘어나게 조치.
     CObjectPool_UnSafeMT<CPlayer> player_pool;
+    CObjectPool<stDBOverlapped> dbOverlapped_pool;
     std::shared_mutex SessionID_hash_Lock;
-
-    // Account   Key , Player접근.
-    std::unordered_map<ull, CPlayer *> AccountNo_hash; // 중복 접속을 제거하는 용도
 
     // SessionID Key , Player접근.
     std::unordered_map<ull, CPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
-
-    // SessionID Key , Player접근.
-    std::unordered_map<ull, CPlayer *> prePlayer_hash; // 중복 접속을 제거하는 용도
 
 };
 //// Debuging 정보

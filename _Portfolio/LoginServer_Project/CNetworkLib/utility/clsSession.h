@@ -16,6 +16,7 @@ enum class Job_Type : BYTE
 {
     Recv,
     Send,
+    Post,
     MAX,
 };
 // _mode 판단을 stOverlapped 기준으로 하므로 첫 멤버변수 _mode 로 할것. 
@@ -30,9 +31,17 @@ struct stSendOverlapped : public OVERLAPPED
     stSendOverlapped(Job_Type mode) : _mode(mode) {}
     Job_Type _mode = Job_Type::MAX;
     DWORD msgCnt = 0;
-    struct CMessage *msgs[500]{0,};
+    struct CMessage *msg;
 
 };
+struct stDBOverlapped : public OVERLAPPED
+{
+    Job_Type _mode = Job_Type::Post;
+
+    ull SessionID;
+    CMessage *msg;
+};
+
 typedef struct stSessionId
 {
     bool operator==(const stSessionId other)

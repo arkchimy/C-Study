@@ -2,9 +2,130 @@
 //
 
 #include <iostream>
+#include "LoginServer.h"
+#include <conio.h>
+#include <thread>
+
+#include "CrushDump_lib/CrushDump_lib.h"
 
 int main()
 {
-    std::cout << "Hello World!\n";
-}
 
+    CDump::SetHandlerDump();
+
+    st_WSAData wsa;
+
+    wchar_t bindAddr[16];
+    short bindPort;
+
+    int iZeroCopy;
+    int iEnCording;
+    int DBWorkerThreadCnt, DBContentsThreadCnt;
+    int WorkerThreadCnt, ContentsThreadCnt;
+    int reduceThreadCount;
+    int NoDelay;
+    int maxSessions;
+
+    LINGER linger;
+    int iRingBufferSize;
+    int ContentsRingBufferSize;
+
+    HRESULT hr;
+    DWORD waitThread_Retval; // Waitfor 종료절차  반환값. 현재는 infinite
+
+    {
+        Parser parser;
+
+        if (parser.LoadFile(L"Config.txt") == false)
+            CSystemLog::GetInstance()->Log(L"ParserError.txt", en_LOG_LEVEL::ERROR_Mode, L"LoadFileError %d", GetLastError());
+        parser.GetValue(L"ServerAddr", bindAddr, 16);
+        parser.GetValue(L"ServerPort", bindPort);
+
+        parser.GetValue(L"LingerOn", linger.l_onoff);
+        parser.GetValue(L"ZeroCopy", iZeroCopy);
+
+        parser.GetValue(L"DBWorkerThreadCnt", DBWorkerThreadCnt);
+        parser.GetValue(L"DBContentsThreadCnt", DBContentsThreadCnt);
+
+        parser.GetValue(L"WorkerThreadCnt", WorkerThreadCnt);
+        parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
+        parser.GetValue(L"NoDelay", NoDelay);
+        parser.GetValue(L"MaxSessions", maxSessions);
+
+        parser.GetValue(L"ContentsThreadCnt", ContentsThreadCnt);
+        parser.GetValue(L"RingBufferSize", iRingBufferSize);
+        parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
+        parser.GetValue(L"EnCording", iEnCording);
+
+        CRingBuffer::s_BufferSize = iRingBufferSize;
+    }
+    wchar_t buffer[100];
+    CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
+
+    StringCchPrintfW(buffer, 100, L"Profiler_%hs.txt", __DATE__);
+
+    {
+        CTestServer::s_ContentsQsize = ContentsRingBufferSize;
+        // 생성자에서 넘겨주는 것이 DB컨커런트
+        CTestServer *ChattingServer = new CTestServer(DBWorkerThreadCnt, iEnCording, DBContentsThreadCnt);
+
+        ChattingServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+        CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
+        while (1)
+        {
+            if (GetAsyncKeyState(VK_ESCAPE))
+            {
+                CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
+                CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
+                ChattingServer->Stop();
+                ChattingServer->bMonitorThreadOn = false;
+
+                SetEvent(ChattingServer->m_ServerOffEvent);
+                break;
+            }
+            if (_kbhit())
+            {
+                char ch = _getch();
+                if (ch == 'A' || ch == 'a')
+                {
+                    CSystemLog::GetInstance()->SaveAsLog();
+                    Profiler::SaveAsLog(buffer);
+                }
+                if (ch == 'D' || ch == 'd')
+                {
+                    Profiler::Reset();
+                }
+                if (ch == '1')
+                {
+
+                    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
+                    printf("ERROR_Mode\n");
+                }
+                if (ch == '2')
+                {
+
+                    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_TargetMode);
+                    printf("DEBUG_TargetMode\n");
+                }
+                if (ch == '3')
+                {
+
+                    CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
+                    printf("DEBUG_Mode\n");
+                }
+                if (ch == 'P' || ch == 'p')
+                {
+                    Profiler::bOn = Profiler::bOn == true ? false : true;
+                }
+            }
+        }
+
+        waitThread_Retval = WaitForSingleObject(ChattingServer->hMonitorThread, INFINITE);
+        if (waitThread_Retval == WAIT_TIMEOUT)
+        {
+            // TODO : 시간 정한다면 어찌할지 정하기.
+            __debugbreak();
+        }
+        CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"ContentsThread_Terminate");
+    }
+}

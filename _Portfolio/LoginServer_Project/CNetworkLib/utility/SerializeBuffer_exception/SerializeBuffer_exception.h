@@ -62,6 +62,7 @@ struct CMessage
 
     CMessage();
     ~CMessage();
+    void InitMessage();
     CMessage(const CMessage &) = delete;
     CMessage &operator=(const CMessage &) = delete;
     CMessage(CMessage &&) = delete;

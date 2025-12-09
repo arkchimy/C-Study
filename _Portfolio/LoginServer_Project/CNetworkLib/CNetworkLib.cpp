@@ -587,7 +587,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
     for (DWORD i = 0; i < session.m_sendOverlapped.msgCnt; i++)
     {
-        stTlsObjectPool<CMessage>::Release(session.m_sendOverlapped.msgs[i]);
+        stTlsObjectPool<CMessage>::Release(session.m_sendOverlapped.msg);
     }
 
     {
@@ -629,35 +629,18 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     bufCnt = 0;
 
 
-    if (Profiler::bOn)
+   
+    Profiler profile(L"LFQ_Pop");
+    while (session.m_sendBuffer.Pop(msg))
     {
-        Profiler profile(L"LFQ_Pop");
-        while (session.m_sendBuffer.Pop(msg))
-        {
-            wsaBuf[bufCnt].buf = msg->_frontPtr;
-            wsaBuf[bufCnt].len = ULONG(msg->_rearPtr - msg->_frontPtr);
+        wsaBuf[bufCnt].buf = msg->_frontPtr;
+        wsaBuf[bufCnt].len = ULONG(msg->_rearPtr - msg->_frontPtr);
 
-            session.m_sendOverlapped.msgs[bufCnt] = msg;
-            bufCnt++;
-            if (bufCnt == 500)
-            {
-                break;
-            }
-        }
-    }
-    else
-    {
-        while (session.m_sendBuffer.Pop(msg))
+        session.m_sendOverlapped.msg = msg;
+        bufCnt++;
+        if (bufCnt == 500)
         {
-            wsaBuf[bufCnt].buf = msg->_frontPtr;
-            wsaBuf[bufCnt].len = ULONG(msg->_rearPtr - msg->_frontPtr);
-
-            session.m_sendOverlapped.msgs[bufCnt] = msg;
-            bufCnt++;
-            if (bufCnt == 500)
-            {
-                break;
-            }
+            break;
         }
     }
 

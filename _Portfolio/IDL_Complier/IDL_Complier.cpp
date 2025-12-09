@@ -35,7 +35,7 @@ WORD TypeOffset;
 \t server = static_cast<CTestServer *>(this); \n \
 \n\
 \t header.byCode = 0x77; \n \
-\t msg->~CMessage(); \n \
+\t msg->InitMessage(); \n \
 \t \n \
 \t msg->PutData(&header,sizeof(stHeader)); \n\
 "

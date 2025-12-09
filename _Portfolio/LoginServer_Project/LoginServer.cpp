@@ -1,4 +1,7 @@
 #include "LoginServer.h"
+#include <Windows.h>
+#include <timeapi.h>
+
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
 
@@ -32,7 +35,7 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
 }
 WCHAR GameServerIP[16] = L"0.0.0.0";
 USHORT GameServerPort = 0 ;
-WCHAR ChatServerIP[16] = L"106.245.38.108";
+WCHAR ChatServerIP[16] = L"127.0.0.1";
 USHORT ChatServerPort = 6000;
 
 void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
@@ -50,7 +53,20 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
     RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
 
 }
+void HeartBeatThread(void *arg) 
+{
+    DWORD retval;
+    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+    while (1)
+    {
+        retval = WaitForSingleObject(server->m_ServerOffEvent, 20);
+        if (retval != WAIT_TIMEOUT)
+            return;
+        server->Update();
 
+    }
+    
+}
 void DBworkerThread(void *arg)
 {
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
@@ -60,9 +76,9 @@ void DBworkerThread(void *arg)
     OVERLAPPED *overlapped;
     clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
 
-    stDBOverapped *dbOverlapped;
+    stDBOverlapped *dbOverlapped;
 
-    while (server->bOn)
+    while (1)
     {
         // 지역변수 초기화
         {
@@ -73,16 +89,51 @@ void DBworkerThread(void *arg)
         }
         GetQueuedCompletionStatus(server->m_hDBIOCP, &transferred, &key, &overlapped, INFINITE);
         _interlockeddecrement64(&server->m_DBMessageCnt);
-        dbOverlapped = reinterpret_cast<stDBOverapped *>(overlapped);
+        dbOverlapped = reinterpret_cast<stDBOverlapped *>(overlapped);
         if (overlapped == nullptr)
             __debugbreak();
+
         // TODO : DB_VerifySession의 반환값에 따른 동작이 이게 맞나?
         server->DB_VerifySession(dbOverlapped->SessionID,dbOverlapped->msg);
-
+        server->dbOverlapped_pool.Release(dbOverlapped);
     }
     
 }
 
+void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
+{
+    // NetworkThread가 진입.
+    CPlayer *player;
+    {
+        std::shared_lock sessionHashLock(SessionID_hash_Lock);
+
+        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+            return;
+
+        player = SessionID_hash[SessionID];
+
+        // 이미 LoginReq를 보낸적이 있다면,
+        if (InterlockedCompareExchange((ull *)&player->m_State, (ull)en_State::LoginWait, (ull)en_State::None) != (ull)en_State::None)
+        {
+            Disconnect(SessionID);
+            return;
+        }
+        // TODO : dbOverlapped_pool.pool 모니터링 필요
+        stDBOverlapped *overlapped = reinterpret_cast<stDBOverlapped *>(dbOverlapped_pool.Alloc());
+        ZeroMemory(overlapped, sizeof(OVERLAPPED));
+
+        msg->_frontPtr = msg->_begin;
+        msg->_rearPtr = msg->_frontPtr;
+
+        *msg << AccountNo;
+        msg->PutData(SessionKey, 64);
+        overlapped->msg = msg;
+        overlapped->SessionID = SessionID;
+
+        PostQueuedCompletionStatus(m_hDBIOCP, 0, 0, (LPOVERLAPPED)overlapped);
+        _interlockedincrement64(&m_DBMessageCnt);
+    }
+}
 
 CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThreadCount)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt)
@@ -101,17 +152,19 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
         m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     }
     // ContentsThread의 생성
-    hContentsThread_vec.resize(ContentsThreadCnt);
+    hHeartBeatThread = std::move(std::thread(HeartBeatThread, this));
+
+    hDBThread_vec.resize(ContentsThreadCnt);
 
     for (DWORD i = 0; i < ContentsThreadCnt; i++)
     {
-        std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
+        std::wstring ContentsThreadName = L"\tDBThread" + std::to_wstring(i);
 
-        hContentsThread_vec[i] = std::move(std::thread(DBworkerThread, this));
+        hDBThread_vec[i] = std::move(std::thread(DBworkerThread, this));
 
-        RT_ASSERT(hContentsThread_vec[i].native_handle() != nullptr);
+        RT_ASSERT(hDBThread_vec[i].native_handle() != nullptr);
 
-        hr = SetThreadDescription(hContentsThread_vec[i].native_handle(), ContentsThreadName.c_str());
+        hr = SetThreadDescription(hDBThread_vec[i].native_handle(), ContentsThreadName.c_str());
         RT_ASSERT(!FAILED(hr));
     }
 
@@ -120,10 +173,13 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
 CTestServer::~CTestServer()
 {
 
+    hHeartBeatThread.join();
     for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
     {
-        hContentsThread_vec[i].join();
+        hDBThread_vec[i].join();
     }
+
+
 }
 BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
 {
@@ -152,41 +208,69 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
 
 bool CTestServer::OnAccept(ull SessionID)
 {
-    return false;
+    std::unique_lock sessionHashLock(SessionID_hash_Lock);
+
+    if (SessionID_hash.find(SessionID) != SessionID_hash.end())
+    {
+        return false;
+    }
+    CPlayer *player = reinterpret_cast<CPlayer*>(player_pool.Alloc());
+    if (player == nullptr)
+    {
+        return false;
+    }
+
+  
+        //TODO : 이부분 Flush 되나?
+        SessionID_hash[SessionID] = player;
+        InterlockedExchange((ull *)&player->m_State, (ull)en_State::None);
+        //player->m_State = en_State::None;
+        player->m_Timer = timeGetTime();
+        player->m_sessionID = SessionID;
+    
+    return true;
 }
 
 void CTestServer::OnRelease(ull SessionID)
 {
+
 }
 
-void CTestServer::REQ_LOGIN(ull SessionID, CMessage* msg, INT64 AccountNo, WCHAR* SessionKey, WORD wType , BYTE bBroadCast , std::vector<ull>* pIDVector , WORD wVectorLen )
-{
-    //NetworkThread가 진입.
-    std::shared_lock sessionHashLock(SessionID_hash_Lock);
 
-    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
-        return;
-
-    CPlayer *player = SessionID_hash[SessionID];
-    ZeroMemory(&player->DB_ReqOverlapped, sizeof(OVERLAPPED));
-
-    *msg << AccountNo;
-    msg->PutData(SessionKey, 64);
-    player->DB_ReqOverlapped.msg = msg;
-    player->DB_ReqOverlapped.SessionID = SessionID;
-
-    PostQueuedCompletionStatus(m_hDBIOCP, 0, 0, (LPOVERLAPPED)&player->DB_ReqOverlapped);
-    _interlockedincrement64(&m_DBMessageCnt);
-}
-
-void CTestServer::AllocPlayer(CMessage *msg)
-{
-}
 
 void CTestServer::DeletePlayer(CMessage *msg)
-{
+{    
+    ull SessionID;
+    *msg >> SessionID;
+
+    std::unique_lock sessionHashLock(SessionID_hash_Lock);
+
+    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        __debugbreak();
+    SessionID_hash.erase(SessionID);
+    
+    stTlsObjectPool<CMessage>::Release(msg);
 }
 
 void CTestServer::Update()
 {
+    std::shared_lock sessionHashLock(SessionID_hash_Lock);
+    
+    //DWORD currentTime = timeGetTime();
+    //DWORD distance;
+
+    //for (auto& element : SessionID_hash)
+    //{
+    //    DWORD targetTime = element.second->m_Timer;
+    //    if (currentTime < targetTime)
+    //    {
+    //        continue;
+    //    }
+    //    distance = currentTime - targetTime;
+    //    if (distance > 10000)
+    //    {
+    //        Disconnect(element.first);
+    //    }
+    //}
+
 }
