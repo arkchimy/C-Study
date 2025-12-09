@@ -285,6 +285,12 @@ unsigned WorkerThread(void *arg)
 CLanServer::CLanServer(bool EnCoding)
     : bEnCording(EnCoding)
 {
+    DWORD lProcessCnt;
+    if (GetLogicalProcess(lProcessCnt) == false)
+        CSystemLog::GetInstance()->Log(L"GetLogicalProcessError.txt", en_LOG_LEVEL::ERROR_Mode, L"GetLogicalProcess_Error %d", GetLastError());
+
+    m_lProcessCnt = lProcessCnt;
+
     if (bEnCording)
         headerSize = sizeof(stHeader);
     else
@@ -306,7 +312,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 {
     linger linger;
     int buflen;
-    DWORD lProcessCnt;
+
     DWORD bind_retval;
     HRESULT hr;
     SOCKADDR_IN serverAddr;
@@ -346,10 +352,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     if (bind_retval != 0)
         CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Bind Failed %d", GetLastError());
 
-    if (GetLogicalProcess(lProcessCnt) == false)
-        CSystemLog::GetInstance()->Log(L"GetLogicalProcessError.txt", en_LOG_LEVEL::ERROR_Mode, L"GetLogicalProcess_Error %d", GetLastError());
-
-    m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
+    m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, m_lProcessCnt - reduceThreadCount);
 
     m_hWorkerThread = new HANDLE[WorkerCreateCnt];
     arrTPS = new LONG64[WorkerCreateCnt + 1];

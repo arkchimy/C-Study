@@ -135,7 +135,7 @@ class CLanServer : public Stub, public Proxy
     LONG64 m_NetworkMsgCount = 0;
 
     int m_AllocLimitCnt = 10000;
-
+    DWORD m_lProcessCnt;
   public:
     bool bOn = false;
 

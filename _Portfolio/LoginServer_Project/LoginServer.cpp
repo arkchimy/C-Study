@@ -1,4 +1,6 @@
 #include "LoginServer.h"
+extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
+extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
 
 // Chatting Server와의 연결
 // Redis와의 연결
@@ -7,8 +9,45 @@
 // OnRecv를 통해 Player객체에 접근 Player에 Overapped 을 두고 
 // 
 
-void MakeAndSendPacket()
+enum en_PACKET_CS_LOGIN_RES_LOGIN : BYTE
 {
+    dfLOGIN_STATUS_NONE = -1,        // 미인증상태
+    dfLOGIN_STATUS_FAIL = 0,         // 세션오류
+    dfLOGIN_STATUS_OK = 1,           // 성공
+    dfLOGIN_STATUS_GAME = 2,         // 게임중
+    dfLOGIN_STATUS_ACCOUNT_MISS = 3, // account 테이블에 AccountNo 없음
+    dfLOGIN_STATUS_SESSION_MISS = 4, // Session 테이블에 AccountNo 없음
+    dfLOGIN_STATUS_STATUS_MISS = 5,  // Status 테이블에 AccountNo 없음
+    dfLOGIN_STATUS_NOSERVER = 6,     // 서비스중인 서버가 없음.
+};
+BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *ID, WCHAR *Nick)
+{
+    //일단은 성공만 반환 나중에 db에서 가져와서 확인.
+    Sleep(10); // DB의 I/O요청을 고려해서 Sleep 을 둠.
+
+    ZeroMemory(ID, 40);
+    ZeroMemory(Nick, 40);
+
+    return dfLOGIN_STATUS_OK;
+}
+WCHAR GameServerIP[16] = L"0.0.0.0";
+USHORT GameServerPort = 0 ;
+WCHAR ChatServerIP[16] = L"106.245.38.108";
+USHORT ChatServerPort = 6000;
+
+void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
+{
+    INT64 AccountNo;
+    WCHAR SessionKey[32];
+    BYTE retval;
+    WCHAR ID[20];      // 사용자 ID		. null 포함
+    WCHAR Nickname[20]; // 사용자 닉네임	. null 포함
+
+    *msg >> AccountNo;
+    msg->GetData(SessionKey, 64);
+
+    retval = WaitDB(AccountNo, SessionKey, ID,Nickname);
+    RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
 
 }
 
@@ -21,6 +60,8 @@ void DBworkerThread(void *arg)
     OVERLAPPED *overlapped;
     clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
 
+    stDBOverapped *dbOverlapped;
+
     while (server->bOn)
     {
         // 지역변수 초기화
@@ -31,59 +72,24 @@ void DBworkerThread(void *arg)
             session = nullptr;
         }
         GetQueuedCompletionStatus(server->m_hDBIOCP, &transferred, &key, &overlapped, INFINITE);
-        
+        _interlockeddecrement64(&server->m_DBMessageCnt);
+        dbOverlapped = reinterpret_cast<stDBOverapped *>(overlapped);
+        if (overlapped == nullptr)
+            __debugbreak();
+        // TODO : DB_VerifySession의 반환값에 따른 동작이 이게 맞나?
+        server->DB_VerifySession(dbOverlapped->SessionID,dbOverlapped->msg);
+
     }
     
 }
-BOOL GetLogicalProcess(DWORD &out)
-{
-    SYSTEM_LOGICAL_PROCESSOR_INFORMATION *infos = nullptr;
-    DWORD len;
-    DWORD cnt;
-    DWORD temp = 0;
 
-    len = 0;
-
-    GetLogicalProcessorInformation(infos, &len);
-
-    infos = new SYSTEM_LOGICAL_PROCESSOR_INFORMATION[len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION)];
-
-    if (infos == nullptr)
-        return false;
-
-    GetLogicalProcessorInformation(infos, &len);
-
-    cnt = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION); // 반복문
-
-    for (DWORD i = 0; i < cnt; i++)
-    {
-        if (infos[i].Relationship == RelationProcessorCore)
-        {
-            ULONG_PTR mask = infos[i].ProcessorMask;
-            // 논리 프로세서의 수는 set된 비트의 개수
-            while (mask)
-            {
-                temp += (mask & 1);
-                mask >>= 1;
-            }
-        }
-    }
-    printf("LogicalProcess Cnt : %d \n", temp);
-
-    delete[] infos;
-    out = temp;
-    return true;
-}
 
 CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThreadCount)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt)
 {
-    DWORD lProcessCnt;
-    if (GetLogicalProcess(lProcessCnt) == false)
-        __debugbreak();
 
     // DBConcurrent Thread 세팅
-    m_hDBIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
+    m_hDBIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, m_lProcessCnt - reduceThreadCount);
 
     HRESULT hr;
     player_pool.Initalize(m_maxPlayers);
@@ -119,34 +125,68 @@ CTestServer::~CTestServer()
         hContentsThread_vec[i].join();
     }
 }
+BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
+{
+    BOOL retval;
+    HRESULT hr;
+
+    m_maxSessions = maxSessions;
+
+    retval = CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
+
+    //hMonitorThread = (HANDLE)_beginthreadex(nullptr, 0, MonitorThread, this, 0, nullptr);
+    //RT_ASSERT(hMonitorThread != nullptr);
+    //hr = SetThreadDescription(hMonitorThread, L"\tMonitorThread");
+    //RT_ASSERT(!FAILED(hr));
+
+    return retval;
+}
 
 float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
 {
-    // Connect만하고 아무것도 안하는 얘가 존재할것임.
-    // Session이 아닌 Player의 존재가 나와야하고, Player의 생성시기는? 
-    // Accept를 받으면 바로 ContentsQ에 넣어서  생성.
-    // 어차피 Update가 나와야함,  HeartBeat를 위해서 
-    // 그 쓰레드에 넣고 Update를 돌림,
-    // OnRecv를 받으면 PQCS를 통해서 DBIOCP에 일감을 넣어줄때 Player 정보에 들어있는 Overapped을 사용,
-    // 
-    std::shared_lock sessionHashLock(SessionID_hash_Lock);
-
-    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
-        return 0;
-
-    CPlayer* player = SessionID_hash[SessionID];
-    ZeroMemory(&player->DB_ReqOverlapped, sizeof(OVERLAPPED));
-
-    player->DB_ReqOverlapped.msg = msg;
-    player->DB_ReqOverlapped.SessionID = SessionID;
-
-    PostQueuedCompletionStatus(m_hDBIOCP, 0, 0, (LPOVERLAPPED)&player->DB_ReqOverlapped);
-    _interlockeddecrement64(&m_DBMessageCnt);
-
+    WORD type;
+    *msg >> type;
+    PacketProc(SessionID,msg,type);
     return 0.0f;
+}
+
+bool CTestServer::OnAccept(ull SessionID)
+{
+    return false;
+}
+
+void CTestServer::OnRelease(ull SessionID)
+{
 }
 
 void CTestServer::REQ_LOGIN(ull SessionID, CMessage* msg, INT64 AccountNo, WCHAR* SessionKey, WORD wType , BYTE bBroadCast , std::vector<ull>* pIDVector , WORD wVectorLen )
 {
+    //NetworkThread가 진입.
+    std::shared_lock sessionHashLock(SessionID_hash_Lock);
 
+    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        return;
+
+    CPlayer *player = SessionID_hash[SessionID];
+    ZeroMemory(&player->DB_ReqOverlapped, sizeof(OVERLAPPED));
+
+    *msg << AccountNo;
+    msg->PutData(SessionKey, 64);
+    player->DB_ReqOverlapped.msg = msg;
+    player->DB_ReqOverlapped.SessionID = SessionID;
+
+    PostQueuedCompletionStatus(m_hDBIOCP, 0, 0, (LPOVERLAPPED)&player->DB_ReqOverlapped);
+    _interlockedincrement64(&m_DBMessageCnt);
+}
+
+void CTestServer::AllocPlayer(CMessage *msg)
+{
+}
+
+void CTestServer::DeletePlayer(CMessage *msg)
+{
+}
+
+void CTestServer::Update()
+{
 }

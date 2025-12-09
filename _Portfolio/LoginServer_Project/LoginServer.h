@@ -8,6 +8,7 @@
 #include <thread>
 #include <shared_mutex>
 
+
 enum class en_State : int
 {
     Session,
@@ -40,12 +41,17 @@ struct CPlayer
 
 class CTestServer :public CLanServer
 {
+  public:
     virtual void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType = en_PACKET_CS_LOGIN_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0);
 
      public:
     void AllocPlayer(CMessage *msg);
     void DeletePlayer(CMessage *msg);
-    void Update();
+    //////////////////////////////////////////////////////// 하트 비트 전용////////////////////////////////////////////////////////
+    void Update(); 
+    //////////////////////////////////////////////////////// DB에서 토큰 대조하는 함수 ////////////////////////////////////////////////////////
+    void DB_VerifySession(ull SessionID, CMessage *msg);
+    BYTE WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *ID, WCHAR* Nick);
   public:
     CTestServer(DWORD ContentsThreadCnt = 1, int iEncording = false, int reduceThreadCount = 0);
     virtual ~CTestServer();
@@ -61,7 +67,7 @@ class CTestServer :public CLanServer
     std::shared_mutex JobQueue_Lock;
 
 
-    ////////////////////////// ContentsThread //////////////////////////
+    ////////////////////////// jobQueue of DBThread  //////////////////////////
     HANDLE m_hDBIOCP = INVALID_HANDLE_VALUE;
 
     DWORD m_ContentsThreadCnt;
@@ -73,13 +79,6 @@ class CTestServer :public CLanServer
     bool bMonitorThreadOn = true;
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
-
-    int m_maxSessions = 0;
-    int m_maxPlayers = 20000;
-
-    LONG64 m_prePlayerCount = 0;
-    LONG64 m_TotalPlayers = 0; // 현재 Player의 Cnt
-    int m_State_Session = 0;   // 아직 Player가 되지못한 Session의 Cnt
 
     int m_maxSessions = 0;
     int m_maxPlayers = 20000;
