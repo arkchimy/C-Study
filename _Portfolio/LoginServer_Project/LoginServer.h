@@ -96,6 +96,13 @@ class CTestServer :public CLanServer
     // SessionID Key , Player접근.
     std::unordered_map<ull, CPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
 
+
+    WCHAR GameServerIP[16] = L"0.0.0.0";
+    USHORT GameServerPort = 0;
+
+    WCHAR ChatServerIP[16] = L"127.0.0.1";
+    USHORT ChatServerPort = 6000;
+
 };
 //// Debuging 정보
 //////////////////////////////////////////////////////////////////////////

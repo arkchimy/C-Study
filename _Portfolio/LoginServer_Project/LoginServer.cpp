@@ -33,10 +33,7 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
 
     return dfLOGIN_STATUS_OK;
 }
-WCHAR GameServerIP[16] = L"0.0.0.0";
-USHORT GameServerPort = 0 ;
-WCHAR ChatServerIP[16] = L"127.0.0.1";
-USHORT ChatServerPort = 6000;
+
 
 void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
 {
@@ -51,7 +48,7 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
 
     retval = WaitDB(AccountNo, SessionKey, ID,Nickname);
     RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
-
+    printf("RES_LOGIN\n");
 }
 void HeartBeatThread(void *arg) 
 {
@@ -122,9 +119,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         stDBOverlapped *overlapped = reinterpret_cast<stDBOverlapped *>(dbOverlapped_pool.Alloc());
         ZeroMemory(overlapped, sizeof(OVERLAPPED));
 
-        msg->_frontPtr = msg->_begin;
-        msg->_rearPtr = msg->_frontPtr;
-
+        msg->InitMessage();
         *msg << AccountNo;
         msg->PutData(SessionKey, 64);
         overlapped->msg = msg;

@@ -18,6 +18,9 @@ int main()
     wchar_t bindAddr[16];
     short bindPort;
 
+    wchar_t ChatServerbindAddr[16];
+    short ChatServerbindPort;
+
     int iZeroCopy;
     int iEnCording;
     int DBWorkerThreadCnt, DBContentsThreadCnt;
@@ -40,6 +43,14 @@ int main()
             CSystemLog::GetInstance()->Log(L"ParserError.txt", en_LOG_LEVEL::ERROR_Mode, L"LoadFileError %d", GetLastError());
         parser.GetValue(L"ServerAddr", bindAddr, 16);
         parser.GetValue(L"ServerPort", bindPort);
+
+        parser.GetValue(L"ChatServerIP", ChatServerbindAddr, 16);
+        parser.GetValue(L"ChatServerPort", ChatServerbindPort);
+
+   /*     WCHAR GameServerIP[16] = L"0.0.0.0";
+        USHORT GameServerPort = 0;
+        WCHAR ChatServerIP[16] = L"127.0.0.1";
+        USHORT ChatServerPort = 6000;*/
 
         parser.GetValue(L"LingerOn", linger.l_onoff);
         parser.GetValue(L"ZeroCopy", iZeroCopy);
@@ -67,9 +78,11 @@ int main()
     {
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         // 생성자에서 넘겨주는 것이 DB컨커런트
-        CTestServer *ChattingServer = new CTestServer(DBWorkerThreadCnt, iEnCording, DBContentsThreadCnt);
+        CTestServer *LoginServer = new CTestServer(DBWorkerThreadCnt, iEnCording, DBContentsThreadCnt);
+        memcpy(LoginServer->ChatServerIP, ChatServerbindAddr, 32);
+        LoginServer->ChatServerPort = ChatServerbindPort;
 
-        ChattingServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+        LoginServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
         CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
         while (1)
         {
@@ -77,10 +90,10 @@ int main()
             {
                 CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
                 CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
-                ChattingServer->Stop();
-                ChattingServer->bMonitorThreadOn = false;
+                LoginServer->Stop();
+                LoginServer->bMonitorThreadOn = false;
 
-                SetEvent(ChattingServer->m_ServerOffEvent);
+                SetEvent(LoginServer->m_ServerOffEvent);
                 break;
             }
             if (_kbhit())
@@ -120,7 +133,7 @@ int main()
             }
         }
 
-        waitThread_Retval = WaitForSingleObject(ChattingServer->hMonitorThread, INFINITE);
+        waitThread_Retval = WaitForSingleObject(LoginServer->hMonitorThread, INFINITE);
         if (waitThread_Retval == WAIT_TIMEOUT)
         {
             // TODO : 시간 정한다면 어찌할지 정하기.
