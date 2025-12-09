@@ -984,11 +984,9 @@ CTestServer::~CTestServer()
 {
     pBalanceThread.join(); // Balance
 
-    CloseHandle(pBalanceThread.native_handle());
     for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
     {
         hContentsThread_vec[i].join();
-        CloseHandle(hContentsThread_vec[i].native_handle());
     }
 }
 
