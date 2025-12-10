@@ -26,7 +26,6 @@ enum en_PACKET_CS_LOGIN_RES_LOGIN : BYTE
 BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *ID, WCHAR *Nick)
 {
     //일단은 성공만 반환 나중에 db에서 가져와서 확인.
-    Sleep(10); // DB의 I/O요청을 고려해서 Sleep 을 둠.
 
     ZeroMemory(ID, 40);
     ZeroMemory(Nick, 40);
@@ -48,8 +47,22 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
 
     retval = WaitDB(AccountNo, SessionKey, ID,Nickname);
     RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
-    printf("RES_LOGIN\n");
+
 }
+void MonitorThread(void *arg)
+{
+    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+
+    while (1)
+    {
+        Sleep(1000);
+        printf("======================================================================");
+        printf("%20s : %10lld\n", "DBQuery_Count", server->m_DBMessageCnt);
+        printf("%20s : %10lld\n", "SessionID_hash.size", server->SessionID_hash.size());
+        printf("======================================================================");
+    }
+}
+
 void HeartBeatThread(void *arg) 
 {
     DWORD retval;
@@ -64,6 +77,7 @@ void HeartBeatThread(void *arg)
     }
     
 }
+
 void DBworkerThread(void *arg)
 {
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
@@ -148,7 +162,12 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
     }
     // ContentsThread의 생성
     hHeartBeatThread = std::move(std::thread(HeartBeatThread, this));
+    hr = SetThreadDescription(hHeartBeatThread.native_handle(), L"HeartBeatThread");
+    RT_ASSERT(!FAILED(hr));
 
+    hMonitorThread = std::move(std::thread(MonitorThread, this));
+    hr = SetThreadDescription(hMonitorThread.native_handle(), L"MonitorThread");
+    RT_ASSERT(!FAILED(hr));
     hDBThread_vec.resize(ContentsThreadCnt);
 
     for (DWORD i = 0; i < ContentsThreadCnt; i++)
@@ -228,6 +247,17 @@ bool CTestServer::OnAccept(ull SessionID)
 
 void CTestServer::OnRelease(ull SessionID)
 {
+    CPlayer *player;
+
+    std::unique_lock sessionHashLock(SessionID_hash_Lock);
+
+    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        __debugbreak();
+    player = SessionID_hash[SessionID];
+
+    SessionID_hash.erase(SessionID);
+
+    player_pool.Release(player);
 
 }
 
@@ -236,14 +266,19 @@ void CTestServer::OnRelease(ull SessionID)
 void CTestServer::DeletePlayer(CMessage *msg)
 {    
     ull SessionID;
+    CPlayer *player;
+
     *msg >> SessionID;
 
     std::unique_lock sessionHashLock(SessionID_hash_Lock);
 
     if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         __debugbreak();
+    player = SessionID_hash[SessionID];
+
     SessionID_hash.erase(SessionID);
-    
+
+    player_pool.Release(player);
     stTlsObjectPool<CMessage>::Release(msg);
 }
 

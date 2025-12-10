@@ -133,7 +133,7 @@ int main()
             }
         }
 
-        waitThread_Retval = WaitForSingleObject(LoginServer->hMonitorThread, INFINITE);
+        waitThread_Retval = WaitForSingleObject(LoginServer->hMonitorThread.native_handle(), INFINITE);
         if (waitThread_Retval == WAIT_TIMEOUT)
         {
             // TODO : 시간 정한다면 어찌할지 정하기.

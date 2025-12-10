@@ -54,6 +54,7 @@ class CTestServer :public CLanServer
     virtual bool OnAccept(ull SessionID) override;
     virtual void OnRelease(ull SessionID) override;
 
+    std::thread hMonitorThread;
     ////////////////////////// HeartBeatThread  //////////////////////////
     std::thread hHeartBeatThread;
 
@@ -67,7 +68,6 @@ class CTestServer :public CLanServer
     std::vector<std::thread> hDBThread_vec;
     inline static ringBufferSize s_ContentsQsize;
 
-    HANDLE hMonitorThread = 0;
     bool bMonitorThreadOn = true;
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
@@ -102,6 +102,8 @@ class CTestServer :public CLanServer
 
     WCHAR ChatServerIP[16] = L"127.0.0.1";
     USHORT ChatServerPort = 6000;
+
+    
 
 };
 //// Debuging Á¤º¸
