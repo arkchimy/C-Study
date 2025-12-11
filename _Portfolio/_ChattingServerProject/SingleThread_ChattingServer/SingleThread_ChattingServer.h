@@ -29,6 +29,8 @@ struct CPlayer
 {
     void Initalize() 
     {
+        if (paddin1 != 0xedededed || paddin2 != 0xedededed)
+            __debugbreak();
          m_State = en_State::Max;
          m_sessionID = 0;
 
@@ -38,6 +40,7 @@ struct CPlayer
         iSectorX = 0;
         iSectorY = 0;
     }
+    int paddin1 = 0xedededed;
     en_State m_State = en_State::Max;
     ull m_sessionID = 0;
 
@@ -50,6 +53,7 @@ struct CPlayer
 
     int iSectorX = 0;
     int iSectorY = 0;
+    int paddin2 = 0xedededed;
 };
 
 class CTestServer : public CLanServer
@@ -139,10 +143,11 @@ class CTestServer : public CLanServer
     std::unordered_map<ull, CPlayer *> prePlayer_hash; // 중복 접속을 제거하는 용도
 
     // SessionID 를 삽입
-    inline static std::set<ull>
+    int paddin1 = 0xedededed;
+    std::set<ull>
         g_Sector[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
                 [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
-
+    int paddin2 = 0xedededed;
     /*
       하트비트 처리 방법.
       일단 LoginPacket을 보내지않는 Session에 대해서 처리 방법이 필요함.

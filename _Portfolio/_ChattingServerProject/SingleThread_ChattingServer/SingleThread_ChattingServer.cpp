@@ -200,7 +200,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         // 없다는 것은 내가 만든 절차를 따르지않았음을 의미.
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                       L"%-20s %05lld %12s %05llu %12s %05llu ",
+                                       L"%-20s %05lld %12s %05llu ",
                                        L"LoginError - prePlayer_hash not found : ", AccountNo,
                                        L"현재들어온ID:", SessionID);
         Disconnect(SessionID);
@@ -216,7 +216,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         // 로그인 패킷을 여러번 보낸 경우.
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %05lld %12s %05lld %12s %05llu ",
+                                       L"%-20s %05lld %12s %05lld ",
                                        L"LoginError - state not equle Session : ", AccountNo,
                                        L"현재들어온ID:", SessionID);
 
@@ -257,9 +257,19 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     memcpy(player->m_SessionKey, SessionKey, sizeof(player->m_SessionKey));
 
     SessionID_hash[SessionID] = player;
+    CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-20s %12s %05llu %20s %08p ",
+                                   L"SessionID_hash : ",
+                                   L"현재들어온ID:", SessionID, L"player주소", player);
+
     AccountNo_hash[AccountNo] = player;
+    CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-20s %12s %05llu %20s %08p ",
+                                   L"AccountNo_hash : ",
+                                   L"현재들어온AN:", AccountNo, L"player주소", player);
 
     prePlayer_hash.erase(SessionID);
+
 
     player->m_Timer = timeGetTime();
 
@@ -280,7 +290,14 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
     CPlayer *player;
+    if (SectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || SectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
+    {
+        __debugbreak();
+        Disconnect(SessionID);
+        stTlsObjectPool<CMessage>::Release(msg);
 
+        return;
+    }
     if (SessionID_hash.find(SessionID) == SessionID_hash.end())
     {
         __debugbreak();
@@ -296,15 +313,22 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
                                        L"%-20s %12s %05llu %12s %05lld ",
                                        L"REQ_SECTOR_MOVE m_AccountNo != AccountNo : ",
                                        L"현재들어온ID:", SessionID,
-                                       L"현재들어온Account:", AccountNo,
-                                       L"player Account:", player->m_AccountNo);
+                                       L"현재들어온Account:", AccountNo
+                                       );
 
         Disconnect(SessionID);
         stTlsObjectPool<CMessage>::Release(msg);
         
         return;
     }
+    if (player->iSectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || player->iSectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
+    {
+        __debugbreak();
+        Disconnect(SessionID);
+        stTlsObjectPool<CMessage>::Release(msg);
 
+        return;
+    }
     g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
 
     player->iSectorX = SectorX;
@@ -391,7 +415,7 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroa
         stTlsObjectPool<CMessage>::Release(msg);
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %12s %05llu %12s %05llu ",
+                                       L"%-20s %12s %05llu  ",
                                        L"HEARTBEAT SessionID_hash not Found : ",
                                        L"현재들어온ID:", SessionID);
 
@@ -403,7 +427,7 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroa
     player->m_Timer = timeGetTime();
 
     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                   L"%-20s %12s %05llu %12s %05llu ",
+                                   L"%-20s %12s %05llu ",
                                    L"HEARTBEAT Send : ",
                                    L"현재들어온ID:", SessionID);
 
@@ -436,7 +460,7 @@ void CTestServer::AllocPlayer(CMessage *msg)
 
     // 디버깅하기.
     prePlayer_hash[SessionID] = player;
-    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+    CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-20s %12s %05llu %20s %08p ",
                                    L"prePlayer_hash_Push : ",
                                    L"현재들어온ID:", SessionID, L"player주소", player);
@@ -471,6 +495,11 @@ void CTestServer::DeletePlayer(CMessage *msg)
         else
         {
             player = SessionID_hash[SessionID];
+            CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
+                                           L"%-20s %12s %05llu %20s %08p ",
+                                           L"SessionID_hash : ",
+                                           L"현재들어온ID:", SessionID, L"player주소", player);
+
             SessionID_hash.erase(SessionID);
 
             if (AccountNo_hash.find(player->m_AccountNo) == AccountNo_hash.end())
@@ -483,7 +512,16 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
             m_TotalPlayers--;
 
-            g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
+            if (player->iSectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || player->iSectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
+            {
+                __debugbreak();
+                Disconnect(SessionID);
+                stTlsObjectPool<CMessage>::Release(msg);
+
+                return;
+            }
+            else
+                g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
 
             player->m_State = en_State::DisConnect;
 
@@ -626,7 +664,7 @@ void CTestServer::Update()
                 {
                     // Login Not Recv
                     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                                   L"%-20s %12s %05llu %12s %05llu ",
+                                                   L"%-20s %12s %05llu ",
                                                    L"HEARTBEAT SessionID_hash not Found : ",
                                                    L"현재들어온ID:", l_sessionID);
 
@@ -636,6 +674,10 @@ void CTestServer::Update()
                 else
                 { // Client Message
                     CPlayer *player = SessionID_hash[l_sessionID];
+                    CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
+                                                   L"%-20s %12s %05llu %20s %08p ",
+                                                   L"SessionID_hashLoad : ",
+                                                   L"현재들어온ID:", l_sessionID, L"player주소", player);
 
                     player->m_Timer = timeGetTime();
                     if (PacketProc(l_sessionID, msg, type) == false)
@@ -721,12 +763,6 @@ bool CTestServer::OnAccept(ull SessionID)
     // Alloc Message가 너무 쏟아진다면 인큐를 안함.
     if (localAllocCnt > m_AllocLimitCnt)
     {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %10s %4llu %10s %05lld  %10s %012llu  %10s %4llu %10s %05lld ",
-                                       L"AllocMsg_Refuse",
-                                       L"LocalMsgCnt", localAllocCnt,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
-
         // 다시 감소 시키고, Session의 삭제 절차.
         localAllocCnt = _InterlockedDecrement64(&m_AllocMsgCount);
         // false를 반환하여 WSARecv를 걸지않고, Session에 대한 제거를 유도루틴을 타자.
