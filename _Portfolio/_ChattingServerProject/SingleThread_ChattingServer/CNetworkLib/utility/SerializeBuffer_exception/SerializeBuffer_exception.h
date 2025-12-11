@@ -102,7 +102,6 @@ struct CMessage
             }
             else
             {
-                HexLog(en_Tag::_ERROR);
                 throw MessageException(MessageException::NotEnoughSpace, "Buffer is fulled\n");
             }
         }
@@ -117,7 +116,6 @@ struct CMessage
         size_t len = sizeof(T);
         if (_frontPtr + len > _rearPtr)
         {
-            HexLog(en_Tag::_ERROR);
             throw MessageException(MessageException::HasNotData, "false Packet \n");
         }
 

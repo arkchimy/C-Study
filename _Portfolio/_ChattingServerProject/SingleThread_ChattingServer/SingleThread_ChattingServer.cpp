@@ -432,15 +432,12 @@ void CTestServer::AllocPlayer(CMessage *msg)
         
         return;
     }
-    // 이때 할당.
+    // 디버깅하기.
     prePlayer_hash[SessionID] = player;
-    // prePlayer_hash 는 Login을 기다리는 Session임.
-    // LoginPacket을 받았다면 ;
-    //
-    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                   L"%-20s %12s %05llu %12s %05llu ",
-                                   L"AllocPlayer SessionLock Failed : ",
-                                   L"현재들어온ID:", SessionID);
+    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-20s %12s %05llu %20s %08p ",
+                                   L"prePlayer_hash_Push : ",
+                                   L"현재들어온ID:", SessionID, L"player주소", player);
 
     player->m_Timer = timeGetTime();
 
@@ -602,69 +599,25 @@ void CTestServer::Update()
 
         *msg >> type;
 
-        if (Profiler::bOn)
         {
             switch (type)
             {
             // 현재 미 사용중
             case en_PACKET_Player_Alloc:
-
                 AllocPlayer(msg);
                 _InterlockedDecrement64(&m_NetworkMsgCount);
-
                 break;
 
             case en_PACKET_Player_Delete:
-
                 DeletePlayer(msg);
                 _InterlockedDecrement64(&m_NetworkMsgCount);
-
                 break;
             case en_PACKET_CS_CHAT_REQ_LOGIN:
-
-                PacketProc(l_sessionID, msg, type);
-
-                break;
-            default:
-            {
-                if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
+                if (PacketProc(l_sessionID, msg, type) == false)
                 {
-                    // Login Not Recv
-                    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                                   L"%-20s %12s %05llu %12s %05llu ",
-                                                   L"HEARTBEAT SessionID_hash not Found : ",
-                                                   L"현재들어온ID:", l_sessionID);
-
                     stTlsObjectPool<CMessage>::Release(msg);
                     Disconnect(l_sessionID);
                 }
-                else
-                { // Client Message
-
-                    CPlayer *player = SessionID_hash[l_sessionID];
-                    player->m_Timer = timeGetTime();
-                    PacketProc(l_sessionID, msg, type);
-                    m_RecvMsgArr[type]++;
-                }
-            }
-            }
-        }
-        else
-        {
-            switch (type)
-            {
-            // 현재 미 사용중
-            case en_PACKET_Player_Alloc:
-                AllocPlayer(msg);
-                _InterlockedDecrement64(&m_NetworkMsgCount);
-                break;
-
-            case en_PACKET_Player_Delete:
-                DeletePlayer(msg);
-                _InterlockedDecrement64(&m_NetworkMsgCount);
-                break;
-            case en_PACKET_CS_CHAT_REQ_LOGIN:
-                PacketProc(l_sessionID, msg, type);
                 break;
             default:
                 if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
@@ -683,7 +636,11 @@ void CTestServer::Update()
                     CPlayer *player = SessionID_hash[l_sessionID];
 
                     player->m_Timer = timeGetTime();
-                    PacketProc(l_sessionID, msg, type);
+                    if (PacketProc(l_sessionID, msg, type) == false)
+                    {
+                        stTlsObjectPool<CMessage>::Release(msg);
+                        Disconnect(l_sessionID);
+                    }
                     m_RecvMsgArr[type]++;
                 }
             }

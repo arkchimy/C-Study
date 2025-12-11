@@ -888,6 +888,13 @@ void CLanServer::RecvPacket(clsSession &session)
 
     directEnQsize = session.m_recvBuffer.DirectEnqueueSize(f, r);
     freeSize = session.m_recvBuffer.GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
+    if (freeSize == 0)
+    {
+        // Attack : 조작된 Len으로 인해 리시브 버퍼가 가득참.
+        InterlockedExchange(&session.m_blive, 0);
+        CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
+        return;
+    }
     if (freeSize < directEnQsize)
         __debugbreak();
     if (freeSize <= directEnQsize)
