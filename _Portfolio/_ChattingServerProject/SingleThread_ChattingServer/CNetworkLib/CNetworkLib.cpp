@@ -85,12 +85,12 @@ unsigned AcceptThread(void *arg)
      * arg[0] 에는 클라이언트에게 연결시킬 hIOCP의 HANDLE을 넣기.
      * arg[1] 에는 listen_sock의 주소를 넣기
      */
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is AcceptThread");
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is AcceptThread");
+    ////CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+    //                               L"%-20s ",
+    //                               L"This is AcceptThread");
+    ////CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+    //                               L"%-20s ",
+    //                               L"This is AcceptThread");
 
     addrlen = sizeof(addr);
     server = reinterpret_cast<CLanServer *>(arrArg[2]);
@@ -108,7 +108,7 @@ unsigned AcceptThread(void *arg)
         client_sock = accept(listen_sock, (sockaddr *)&addr, &addrlen);
         if (client_sock == INVALID_SOCKET)
         {
-            CSystemLog::GetInstance()->Log(L"Socket_Error", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET");
+            ////CSystemLog::GetInstance()->Log(L"Socket_Error", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET");
             break;
         }
         server->arrTPS[0]++; // Accept TPS 측정
@@ -157,7 +157,7 @@ unsigned AcceptThread(void *arg)
 
         server->DecrementIoCountAndMaybeDeleteSession(session);
     }
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"AcceptThread Terminated %d", 0);
+    ////CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"AcceptThread Terminated %d", 0);
     return 0;
 }
 
@@ -168,12 +168,12 @@ unsigned WorkerThread(void *arg)
      * arg[1] 에는 Server의 인스턴스
      */
 
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is WorkerThread");
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is WorkerThread");
+    //////CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+    //                               L"%-20s ",
+    //                               L"This is WorkerThread");
+    //////CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+    //                               L"%-20s ",
+    //                               L"This is WorkerThread");
     size_t *arrArg = reinterpret_cast<size_t *>(arg);
     HANDLE hIOCP = (HANDLE)*arrArg;
     CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[1]);
@@ -209,7 +209,7 @@ unsigned WorkerThread(void *arg)
             break;
         if (overlapped == nullptr)
         {
-            CSystemLog::GetInstance()->Log(L"GQCS", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
+            ////CSystemLog::GetInstance()->Log(L"GQCS", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
             continue;
         }
         session = reinterpret_cast<clsSession *>(key);
@@ -226,7 +226,7 @@ unsigned WorkerThread(void *arg)
             server->SendComplete(*session, transferred);
             break;
         default:
-            CSystemLog::GetInstance()->Log(L"GQCS", en_LOG_LEVEL::ERROR_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stOverlapped *>(overlapped)->_mode);
+            ////CSystemLog::GetInstance()->Log(L"GQCS", en_LOG_LEVEL::ERROR_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stOverlapped *>(overlapped)->_mode);
             __debugbreak();
         }
         local_IoCount = InterlockedDecrement(&session->m_ioCount);
@@ -245,7 +245,7 @@ unsigned WorkerThread(void *arg)
             server->ReleaseSession(seqID);
         }
     }
-    CSystemLog::GetInstance()->Log(L"SystemLog", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThreadID Terminated %d", 0);
+    ////CSystemLog::GetInstance()->Log(L"SystemLog", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThreadID Terminated %d", 0);
     return 0;
 }
 
@@ -260,7 +260,7 @@ CLanServer::CLanServer(bool EnCoding)
     m_listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (m_listen_sock == INVALID_SOCKET)
     {
-        CSystemLog::GetInstance()->Log(L"Socket_Error", en_LOG_LEVEL::ERROR_Mode, L"listen_sock Create Socket Error %d", GetLastError());
+        ////CSystemLog::GetInstance()->Log(L"Socket_Error", en_LOG_LEVEL::ERROR_Mode, L"listen_sock Create Socket Error %d", GetLastError());
         __debugbreak();
     }
 }
@@ -311,10 +311,10 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     bind_retval = bind(m_listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
     if (bind_retval != 0)
-        CSystemLog::GetInstance()->Log(L"Socket_Error", en_LOG_LEVEL::ERROR_Mode, L"Bind Failed %d", GetLastError());
+        ////CSystemLog::GetInstance()->Log(L"Socket_Error", en_LOG_LEVEL::ERROR_Mode, L"Bind Failed %d", GetLastError());
 
     if (GetLogicalProcess(lProcessCnt) == false)
-        CSystemLog::GetInstance()->Log(L"GetLogicalProcessError", en_LOG_LEVEL::ERROR_Mode, L"GetLogicalProcess_Error %d", GetLastError());
+        ////CSystemLog::GetInstance()->Log(L"GetLogicalProcessError", en_LOG_LEVEL::ERROR_Mode, L"GetLogicalProcess_Error %d", GetLastError());
 
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 
@@ -356,7 +356,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 void CLanServer::Stop()
 {
     closesocket(m_listen_sock);
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock", GetLastError());
+    //CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock", GetLastError());
     for (clsSession &session : sessions_vec)
     {
         Disconnect(session.m_SeqID.SeqNumberAndIdx);
@@ -464,11 +464,11 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         if (qPersentage >= 75.0)
         {
             Disconnect(SessionID);
-            CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
-                                           L"%-20s %10s %05f %10s %08llu",
-                                           L"ContentsQ Full",
-                                           L"qPersentage : ", qPersentage,
-                                           L"TargetID : ", SessionID);
+            ////CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
+            //                               L"%-20s %10s %05f %10s %08llu",
+            //                               L"ContentsQ Full",
+            //                               L"qPersentage : ", qPersentage,
+            //                               L"TargetID : ", SessionID);
             return;
         }
     }
@@ -485,9 +485,9 @@ void CLanServer::DecrementIoCountAndMaybeDeleteSession(clsSession &session)
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) != 0)
             return;
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
-                                       L"OnAcceptRelease", L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
+        ////CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+        //                               L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",
+        //                               L"OnAcceptRelease", L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
         ReleaseSession(session.m_SeqID.SeqNumberAndIdx);
     }
 }
@@ -516,11 +516,11 @@ CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header
     if (header.sDataLen + headerSize != deQsize)
     {
         // TODO : 조작된 패킷
-        CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %10s %05d %10s %05d",
-                                       L"riggedPacket",
-                                       L"DequeueSize : ", sizeof(stHeader),
-                                       L"Retval : ", deQsize);
+        ////CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
+        //                               L"%-20s %10s %05d %10s %05d",
+        //                               L"riggedPacket",
+        //                               L"DequeueSize : ", sizeof(stHeader),
+        //                               L"Retval : ", deQsize);
         msg->HexLog();
         return nullptr;
     }
@@ -917,11 +917,11 @@ void CLanServer::WSASendError(const DWORD LastError, const ull SessionID)
 
     default:
 
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"Send_UnDefineError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
+        ////CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+        //                               L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+        //                               L"Send_UnDefineError", LastError,
+        //                               L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+        //                               L"IO_Count", session.m_ioCount);
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
     }
@@ -951,11 +951,11 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
         break;
 
     default:
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"[ %-10s %05d ] %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"Recv_UnDefineError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
+        ////CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+        //                               L"[ %-10s %05d ] %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+        //                               L"Recv_UnDefineError", LastError,
+        //                               L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+        //                               L"IO_Count", session.m_ioCount);
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
     }
@@ -979,11 +979,7 @@ void CLanServer::ReleaseSession(ull SessionID)
     if (retval != 0)
     {
 
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"closesocketError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
+
     }
     else
     {

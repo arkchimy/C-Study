@@ -113,7 +113,7 @@ BOOL CSystemLog::GetLogFileName(const wchar_t *const filename, size_t strlen, SY
     cch_retval = StringCchPrintfW(out, strlen, L"%d%d_%s.txt", stNowTime.wYear, stNowTime.wMonth, filename);
     if (cch_retval != S_OK)
     {
-        CSystemLog::GetInstance()->Log(L"StringCchPrintf_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"StringCchPrintfW_Error %d", GetLastError());
+        //CSystemLog::GetInstance()->Log(L"StringCchPrintf_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"StringCchPrintfW_Error %d", GetLastError());
         __debugbreak();
         return false;
     }
