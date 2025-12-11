@@ -311,9 +311,13 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     bind_retval = bind(m_listen_sock, (sockaddr *)&serverAddr, sizeof(serverAddr));
     if (bind_retval != 0)
+    {
+    }
         ////CSystemLog::GetInstance()->Log(L"Socket_Error", en_LOG_LEVEL::ERROR_Mode, L"Bind Failed %d", GetLastError());
 
     if (GetLogicalProcess(lProcessCnt) == false)
+    {
+    }
         ////CSystemLog::GetInstance()->Log(L"GetLogicalProcessError", en_LOG_LEVEL::ERROR_Mode, L"GetLogicalProcess_Error %d", GetLastError());
 
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
@@ -356,7 +360,8 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 void CLanServer::Stop()
 {
     closesocket(m_listen_sock);
-    //CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock", GetLastError());
+    //
+    // ->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock", GetLastError());
     for (clsSession &session : sessions_vec)
     {
         Disconnect(session.m_SeqID.SeqNumberAndIdx);

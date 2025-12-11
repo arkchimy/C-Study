@@ -61,8 +61,8 @@ inline CTlsLockFreeQueue<T>::~CTlsLockFreeQueue()
 
     if (m_NullptrNode != ptr->next)
     {
-        CSystemLog::GetInstance()->Log(L"TlsQueue_Error", en_LOG_LEVEL::ERROR_Mode, L"10%s %p : %p ptr : %p",
-                                       L"m_NullptrNode != ptr->next", m_NullptrNode, ptr->next, ptr);
+        //CSystemLog::GetInstance()->Log(L"TlsQueue_Error", en_LOG_LEVEL::ERROR_Mode, L"10%s %p : %p ptr : %p",
+        //                               L"m_NullptrNode != ptr->next", m_NullptrNode, ptr->next, ptr);
         __debugbreak();
     }
 
@@ -81,9 +81,10 @@ void CTlsLockFreeQueue<T>::Push(T data)
     stNode *tailNext;
     static ull PushCnt = 0;
     
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode,
-                                   L"%-10s %05lld  ",
-                                   L"CTlsLFQ_PushCnt", InterlockedIncrement(&PushCnt));
+    //
+    // ->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode,
+    //                               L"%-10s %05lld  ",
+    //                               L"CTlsLFQ_PushCnt", InterlockedIncrement(&PushCnt));
 
     newNode = reinterpret_cast<stNode *>(stTlsObjectPool<T>::Alloc());
     newNode->next = m_NullptrNode;
@@ -141,9 +142,9 @@ bool CTlsLockFreeQueue<T>::Pop(__out T &outData)
     }
     static ull PopCnt = 0;
 
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode,
-                                   L"%-10s %05lld  ",
-                                   L"CTlsLFQ_PopCnt", InterlockedIncrement(&PopCnt));
+    //CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode,
+    //                               L"%-10s %05lld  ",
+    //                               L"CTlsLFQ_PopCnt", InterlockedIncrement(&PopCnt));
 
     do
     {

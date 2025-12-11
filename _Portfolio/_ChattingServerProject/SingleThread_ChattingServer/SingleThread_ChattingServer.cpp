@@ -141,7 +141,8 @@ unsigned ContentsThread(void *arg)
 
     // Thread Log정보 저장.
     {
-        //CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+        //
+        // ->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
         //                               L"%-20s ",
         //                               L"This is ContentsThread");
         //CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
