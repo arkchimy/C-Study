@@ -27,6 +27,17 @@ enum class en_State : int
 
 struct CPlayer
 {
+    void Initalize() 
+    {
+         m_State = en_State::Max;
+         m_sessionID = 0;
+
+         m_Timer = 0;
+         m_AccountNo = 0;
+
+        iSectorX = 0;
+        iSectorY = 0;
+    }
     en_State m_State = en_State::Max;
     ull m_sessionID = 0;
 

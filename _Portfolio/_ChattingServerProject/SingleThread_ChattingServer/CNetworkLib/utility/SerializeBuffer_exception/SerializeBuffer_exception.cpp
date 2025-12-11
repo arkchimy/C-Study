@@ -154,8 +154,6 @@ bool CMessage::DeCoding( )
     if (local_Front[0] != total)
     {
         // Attack : 내가 만든 패킷이 아닐경우.
-        HexLog(en_Tag::_ERROR);
-        HexLog(en_Tag::DECODE);
         return false;
     }
     //HexLog(en_Tag::DECODE);
@@ -266,9 +264,15 @@ void CMessage::HexLog(en_Tag tag , const wchar_t * filename)
     }
     hexBuffer[3 * current + 0] = L'\n';
     hexBuffer[3 * current + 1] = L'\0';
-
-    hexBuffer[3 * (_frontPtr - _begin)] = L'F';
-    hexBuffer[3 * (_rearPtr - _begin)] = L'R';
+    if (_frontPtr - _begin == _rearPtr - _begin)
+    {
+        hexBuffer[3 * (_frontPtr - _begin)] = L'E';
+    }
+    else
+    {
+        hexBuffer[3 * (_frontPtr - _begin)] = L'F';
+        hexBuffer[3 * (_rearPtr - _begin)] = L'R';
+    }
     if ((BYTE)tag != 0)
     {
         fwrite(hexBuffer, 2, wcslen(hexBuffer), file);

@@ -432,6 +432,8 @@ void CTestServer::AllocPlayer(CMessage *msg)
         
         return;
     }
+    player->Initalize(); 
+
     // 디버깅하기.
     prePlayer_hash[SessionID] = player;
     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
