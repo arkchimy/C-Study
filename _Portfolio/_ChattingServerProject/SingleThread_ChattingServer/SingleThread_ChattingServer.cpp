@@ -1,5 +1,7 @@
 ﻿#include "SingleThread_ChattingServer.h"
 #include <thread>
+#include <crtdbg.h>
+
 #pragma comment(lib, "Winmm.lib")
 #include <timeapi.h>
 
@@ -56,6 +58,9 @@ unsigned MonitorThread(void *arg)
 
     while (1)
     {
+        
+       
+
         nextTime += 1000;
         {
             LONG64 old_UpdateTPS = server->m_UpdateTPS;
@@ -101,6 +106,7 @@ unsigned MonitorThread(void *arg)
 
         {
             LONG64 old_RecvTPS = server->m_RecvTPS;
+            assert(_CrtCheckMemory());
             RecvTPS = old_RecvTPS - before_RecvTPS;
             before_RecvTPS = old_RecvTPS;
             printf(" Recv TPS : %lld\n", RecvTPS);
@@ -121,6 +127,8 @@ unsigned MonitorThread(void *arg)
         for (int i = 3; i < en_PACKET_CS_CHAT__Max - 1; i++)
         {
             LONG64 old_RecvMsg = server->m_RecvMsgArr[i];
+ 
+
             RecvMsgArr[i] = old_RecvMsg - before_RecvMsgArr[i];
             before_RecvMsgArr[i] = old_RecvMsg;
             MsgTypePrint(i, RecvMsgArr[i]);
@@ -193,6 +201,18 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     // 옳바른 연결인지는 Token에 의존.
     // 여기로 까지 왔다는 것은 로그인 서버의 인증을 통해 온  옳바른 연결이다.
 
+    size_t IDlen =  wcslen(ID);
+    size_t NickNamelen = wcslen(Nickname);
+
+
+    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+                            L"%-20s %20s %05lld %12s %05llu %12s %05llu %12s %05llu ",
+                            L"REQ_LOGIN  : ",
+                            L"AccountNo", AccountNo,
+                            L"IDLen", IDlen,
+                            L"NickNamelen", NickNamelen,
+                            L"현재들어온ID:", SessionID);
+     
     // Alloc을 받았다면 prePlayer_hash에 추가되어있을 것이다.
     if (prePlayer_hash.find(SessionID) == prePlayer_hash.end())
     {
@@ -290,7 +310,16 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 }
 void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
-    CPlayer *player;
+     CPlayer *player;
+     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-20s %20s %05lld %12s %05llu %12s %05llu %12s %05llu ",
+                                   L"REQ_SECTOR_MOVE  : ",
+                                   L"AccountNo", AccountNo,
+                                   L"SectorX", SectorX,
+                                   L"SectorY", SectorY,
+                                   L"현재들어온ID:", SessionID
+     );
+
     if (SectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || SectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
     {
         __debugbreak();
@@ -309,13 +338,6 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     player = SessionID_hash[SessionID];
     if (player->m_AccountNo != AccountNo)
     {
-
-        //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-        //                               L"%-20s %12s %05llu %12s %05lld ",
-        //                               L"REQ_SECTOR_MOVE m_AccountNo != AccountNo : ",
-        //                               L"현재들어온ID:", SessionID,
-        //                               L"현재들어온Account:", AccountNo
-        //                               );
 
         Disconnect(SessionID);
         stTlsObjectPool<CMessage>::Release(msg);
@@ -605,6 +627,7 @@ CTestServer::CTestServer(int iEncording)
     // TODO : 한계치를 정하는 함수 구현하기
     player_pool.Initalize(m_maxPlayers);
     player_pool.Limite_Lock(); // Pool이 늘어나지않음.
+
 }
 
 CTestServer::~CTestServer()
@@ -638,7 +661,20 @@ void CTestServer::Update()
         }
         l_sessionID = msg->ownerID;
 
-        *msg >> type;
+        try
+        {
+            *msg >> type;
+        }
+        catch (const MessageException& e)
+        {
+            stTlsObjectPool<CMessage>::Release(msg);
+            Disconnect(l_sessionID);
+            continue;
+        }
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+                                L"%-20s %20s %05d  ",
+                                L"CTestServer::Update()  : ",
+                                L"wType", type);
 
         {
             switch (type)
@@ -675,7 +711,7 @@ void CTestServer::Update()
                 else
                 { // Client Message
                     CPlayer *player = SessionID_hash[l_sessionID];
-                    //CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
+                    //CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,0xedededed || paddin12
                     //                               L"%-20s %12s %05llu %20s %08p ",
                     //                               L"SessionID_hashLoad : ",
                     //                               L"현재들어온ID:", l_sessionID, L"player주소", player);
@@ -686,7 +722,9 @@ void CTestServer::Update()
                         stTlsObjectPool<CMessage>::Release(msg);
                         Disconnect(l_sessionID);
                     }
-                    m_RecvMsgArr[type]++;
+                    else
+                        m_RecvMsgArr[type]++;
+                    
                 }
             }
         }

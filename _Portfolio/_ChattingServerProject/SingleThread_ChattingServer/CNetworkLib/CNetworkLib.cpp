@@ -612,8 +612,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
             wsaBuf[bufCnt].buf = msg->_frontPtr;
             wsaBuf[bufCnt].len = ULONG(msg->_rearPtr - msg->_frontPtr);
 
-            session.m_sendOverlapped.msgs[bufCnt] = msg;
-            bufCnt++;
+            session.m_sendOverlapped.msgs[bufCnt++] = msg;
             if (bufCnt == 500)
             {
                 break;

@@ -91,7 +91,7 @@ class CTestServer : public CLanServer
     LONG64 m_UpdateTPS;
     LONG64 m_RecvTPS; // OnRecv를 통한 RecvTPS 측정
 
-    LONG64 *m_RecvMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; // Update에서 ContentsQ에서 빼는 MsgTPS
+    LONG64 m_RecvMsgArr[en_PACKET_CS_CHAT__Max]; // Update에서 ContentsQ에서 빼는 MsgTPS
     // LONG64 *m_SendMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; //
 
     LONG64 prePlayer_hash_size = 0;
