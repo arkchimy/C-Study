@@ -507,24 +507,17 @@ void ContentsThread(void *arg)
       
         if (hSignalIdx - WAIT_OBJECT_0 == 1)
         {
-            if (Profiler::bOn)
             {
                 Profiler profile(L"Update");
                 server->Update();
             }
-            else
-                server->Update();
             break;
         }
-        if (Profiler::bOn)
+  
         {
             Profiler profile(L"Update");
             server->Update();
         }
-        else
-            server->Update();
-   /*     f = CotentsQ->_frontPtr;
-        r = CotentsQ->_rearPtr;*/
 
         ContentsUseSize = CotentsQ->m_size;
         server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
@@ -998,7 +991,7 @@ void CTestServer::Update()
     ringBufferSize  DeQSisze;
     ull l_sessionID;
 
-    WORD type;
+    WORD wType;
 
     CLockFreeQueue<CMessage*>* CotentsQ = &m_CotentsQ_vec[tls_ContentsQIdx];
     // msg  크기 메세지 하나에 8Byte
@@ -1006,22 +999,44 @@ void CTestServer::Update()
     {
         CPlayer *player = nullptr;
 
-        if (Profiler::bOn)
+
         {
             Profiler profile(L"Contents_DeQ");
             CotentsQ->Pop(msg);
         }
-        else
-            CotentsQ->Pop(msg);
 
         //msg = *addr;
         l_sessionID = msg->ownerID;
 
-        *msg >> type;
-
+        try
+        {
+            *msg >> wType;
+        }
+        catch (const MessageException &e)
+        {
+            switch (e.type())
+            {
+            case MessageException::ErrorType::HasNotData:
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L" msg >> Data  Faild ",
+                                               L"wType", wType);
+                break;
+            case MessageException::ErrorType::NotEnoughSpace:
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L"NotEnoughSpace  : ",
+                                               L"wType", wType);
+                msg->HexLog(CMessage::en_Tag::_ERROR, L"Attack.txt");
+                break;
+            }
+            stTlsObjectPool<CMessage>::Release(msg);
+            Disconnect(l_sessionID);
+            continue;
+        }
         // LoginPacket이 안오는 경우가 존재하지않음.
 
-        { //  Client Message]
+        { //  Client Message
             {
                 std::shared_lock SessionID_HashLock(srw_SessionID_Hash);
 
@@ -1034,17 +1049,18 @@ void CTestServer::Update()
                 }
             }
             InterlockedExchange(&player->m_Timer, timeGetTime());
-
-            if (Profiler::bOn)
             {
                 Profiler profiler(L"PacketProc");
-                PacketProc(l_sessionID, msg, type);
+                if (PacketProc(l_sessionID, msg, wType) == false)
+                {
+                    
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    Disconnect(l_sessionID);
+                }
+                else
+                    InterlockedIncrement64(&m_RecvMsgArr[wType]);
             }
-            else 
-                PacketProc(l_sessionID, msg, type);
-           
-
-            InterlockedIncrement64(&m_RecvMsgArr[type]);
+            
         }
         
         InterlockedIncrement64(&m_UpdateTPS);
@@ -1060,7 +1076,7 @@ void CTestServer::BalanceUpdate()
     ringBufferSize DeQSisze;
     ull l_sessionID;
 
-    WORD type;
+    WORD wType;
 
     CLockFreeQueue<CMessage*> *CotentsQ = &m_BalanceQ;
 
@@ -1076,11 +1092,35 @@ void CTestServer::BalanceUpdate()
         //msg = *addr;
         l_sessionID = msg->ownerID;
 
-        *msg >> type;
-
+        try
+        {
+            *msg >> wType;
+        }
+        catch (const MessageException &e)
+        {
+            switch (e.type())
+            {
+            case MessageException::ErrorType::HasNotData:
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L" msg >> Data  Faild ",
+                                               L"wType", wType);
+                break;
+            case MessageException::ErrorType::NotEnoughSpace:
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L"NotEnoughSpace  : ",
+                                               L"wType", wType);
+                msg->HexLog(CMessage::en_Tag::_ERROR, L"Attack.txt");
+                break;
+            }
+            stTlsObjectPool<CMessage>::Release(msg);
+            Disconnect(l_sessionID);
+            continue;
+        }
         // prePlayer의 증가, 삭제를 담당.
         // Player_hash의 증가 , 삭제를 담당.
-        switch (type)
+        switch (wType)
         {
         // 현재 미 사용중
         case en_PACKET_Player_Alloc:
@@ -1092,36 +1132,30 @@ void CTestServer::BalanceUpdate()
         // 이렇게 하면 PlayerHash와 prePlayerHash는 ContentsThread에서는 접근할 일이 없음. 
 
         case en_PACKET_Player_Delete:
-
-            {
-                std::unique_lock SessionID_Hashlock(srw_SessionID_Hash);
-                DeletePlayer(msg);
-            }
+        {
+            std::unique_lock SessionID_Hashlock(srw_SessionID_Hash);
+            DeletePlayer(msg);
             _InterlockedDecrement64(&m_NetworkMsgCount);
             break;
+        }
         case en_PACKET_CS_CHAT_REQ_LOGIN:
         {
             std::unique_lock SessionID_Hashlock(srw_SessionID_Hash);
-            PacketProc(l_sessionID, msg, type); // Login만 실행.
+            if (PacketProc(l_sessionID, msg, wType) == false) // Login만 실행.
+            {
+                stTlsObjectPool<CMessage>::Release(msg);
+                Disconnect(l_sessionID);
+            }
             break;
         }
-        default:
-            //TODO : 공격이 아닌상황에서 올수 없음.
-            __debugbreak();
         }
 
     }
-    if (Profiler::bOn)
+
     {
         Profiler profile(L"HeartBeat");
         HeartBeat();
     }
-    else
-    {
-        HeartBeat();
-    }
-
-
 
 }
 
@@ -1144,7 +1178,7 @@ void CTestServer::HeartBeat()
             playerTime = player->m_Timer;
 
             msgInterval = currentTime - playerTime;
-            if (msgInterval >= 5000 && playerTime < currentTime)
+            if (msgInterval >= 6000 && playerTime < currentTime)
             {
                 CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
                                                L"%-20s %05lld %12s %05llu",
@@ -1235,30 +1269,17 @@ void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
                
         }
     }
-
-        
-    
-
+    ppMsg = &msg;
     {
-
-        ppMsg = &msg;
-        
-        {
-            if (Profiler::bOn)
-            {
-                Profiler profile(L"Target_Enqeue");
-                TargetQ->Push(msg);
-            }
-            else
-            {
-                TargetQ->Push(msg);
-            }
-            SetEvent(hMsgQueuedEvent);
-        }
-
-        _interlockedincrement64(&m_RecvTPS);
-        ContentsUseSize = TargetQ->m_size;
+        Profiler profile(L"Target_Enqeue");
+        TargetQ->Push(msg);
     }
+    SetEvent(hMsgQueuedEvent);
+        
+
+    _interlockedincrement64(&m_RecvTPS);
+    ContentsUseSize = TargetQ->m_size;
+    
 }
 
 bool CTestServer::OnAccept(ull SessionID)

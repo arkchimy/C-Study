@@ -466,7 +466,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     ringBufferSize useSize;
     float qPersentage;
     ull SessionID;
-
+    bool bChkSum = false;
     {
         session.m_recvBuffer.MoveRear(transferred);
         SessionID = session.m_SeqID.SeqNumberAndIdx;
@@ -485,31 +485,31 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         if (msg == nullptr)
             break;
         if (bEnCording)
-            msg->DeCoding();
+        {
+            bChkSum = msg->DeCoding();
+            if (bChkSum == false)
+            {
+                // Attack : 조작된 패킷으로 checkSum이 다름.
+                InterlockedExchange(&session.m_blive, 0);
+                CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
+
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L" false Packet CheckSum Not Equle "
+                                               );
+                return;
+                
+            }
+        }
 
         InterlockedExchange(&msg->ownerID, SessionID);
 
         msg->_frontPtr = msg->_frontPtr + headerSize;
-        // PayLoad를 읽고 무엇인가 처리하는 Logic이 NetWork에 들어가선 안된다.
 
-        if (Profiler::bOn)
+        // PayLoad를 읽고 무엇인가 처리하는 Logic이 NetWork에 들어가선 안된다.
         {
             Profiler profile(L"OnRecv");
-            qPersentage = OnRecv(SessionID, msg);
-        }
-        else
-            qPersentage = OnRecv(SessionID, msg);
-        
-
-        if (qPersentage >= 75.0)
-        {
-            Disconnect(SessionID);
-            CSystemLog::GetInstance()->Log(L"Disconnect", en_LOG_LEVEL::ERROR_Mode,
-                                           L"%-20s %10s %05f %10s %08llu",
-                                           L"ContentsQ Full",
-                                           L"qPersentage : ", qPersentage,
-                                           L"TargetID : ", SessionID);
-            return;
+            OnRecv(SessionID, msg);
         }
     }
     RecvPacket(session);
@@ -541,13 +541,11 @@ CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header
 
     // 메세지 할당
     {
-        if (Profiler::bOn)
+ 
         {
             Profiler profile(L"PoolAlloc");
             msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
         }
-        else
-            msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
     }
     // 순수하게 데이터만 가져옴.  EnCording 의 경우 RandKey와 CheckSum도 가져옴.
     deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header.sDataLen + headerSize);
@@ -625,7 +623,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     bufCnt = 0;
 
 
-    if (Profiler::bOn)
+
     {
         Profiler profile(L"LFQ_Pop");
         while (session.m_sendBuffer.Pop(msg))
@@ -633,23 +631,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
             wsaBuf[bufCnt].buf = msg->_frontPtr;
             wsaBuf[bufCnt].len = ULONG(msg->_rearPtr - msg->_frontPtr);
 
-            session.m_sendOverlapped.msgs[bufCnt] = msg;
-            bufCnt++;
-            if (bufCnt == 500)
-            {
-                break;
-            }
-        }
-    }
-    else
-    {
-        while (session.m_sendBuffer.Pop(msg))
-        {
-            wsaBuf[bufCnt].buf = msg->_frontPtr;
-            wsaBuf[bufCnt].len = ULONG(msg->_rearPtr - msg->_frontPtr);
-
-            session.m_sendOverlapped.msgs[bufCnt] = msg;
-            bufCnt++;
+            session.m_sendOverlapped.msgs[bufCnt++] = msg;
             if (bufCnt == 500)
             {
                 break;
@@ -666,31 +648,15 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
         if (bZeroCopy)
         {
-            if (Profiler::bOn)
-            {
-                Profiler profile(L"ZeroCopy WSASend");
-                send_retval = WSASend(session.m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
-                LastError = GetLastError();
-            }
-            else
-            {
-                send_retval = WSASend(session.m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
-                LastError = GetLastError();
-            }
+            Profiler profile(L"ZeroCopy WSASend");
+            send_retval = WSASend(session.m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
+            LastError = GetLastError();
         }
         else
         {
-            if (Profiler::bOn)
-            {
-                Profiler profile(L"ZeroCopy WSASend");
-                send_retval = WSASend(session.m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
-                LastError = GetLastError();
-            }
-            else
-            {
-                send_retval = WSASend(session.m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
-                LastError = GetLastError();
-            }
+            Profiler profile(L"NoZeroCopy WSASend");
+            send_retval = WSASend(session.m_sock, wsaBuf, bufCnt, nullptr, 0, (OVERLAPPED *)&session.m_sendOverlapped, nullptr);
+            LastError = GetLastError();
         }
 
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
@@ -798,14 +764,11 @@ void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
 
     {
 
-        if (Profiler::bOn)
+  
         {
             Profiler profile(L"LFQ_Push");
             session.m_sendBuffer.Push(msg);
         }
-        else
-            session.m_sendBuffer.Push(msg);
-
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
                                        L"%-20s %12s %05lld  %12s %05llu %12s %05llu %10s %05llu",
                                        L"UnitCast  ",
@@ -841,20 +804,11 @@ void CLanServer::BroadCast(ull SessionID, CMessage *msg , std::vector<ull>* pIDV
         clsSession &session = sessions_vec[currentSessionID >> 47];
 
         // 여기까지 왔다면, 같은 Session으로 판단하자.
-        CMessage **ppMsg;
+
         ull local_IoCount;
-        ppMsg = &msg;
-
         {
-
-            if (Profiler::bOn)
-            {
-                Profiler profile(L"LFQ_Push");
-                session.m_sendBuffer.Push(*ppMsg);
-            }
-            else
-                session.m_sendBuffer.Push(*ppMsg);
-
+            Profiler profile(L"LFQ_Push");
+            session.m_sendBuffer.Push(msg);
         }
 
         // PQCS를 시도.
@@ -892,6 +846,15 @@ void CLanServer::RecvPacket(clsSession &session)
 
     directEnQsize = session.m_recvBuffer.DirectEnqueueSize(f, r);
     freeSize = session.m_recvBuffer.GetFreeSize(f, r); // SendBuffer에 바로넣기 위함.
+
+    if (freeSize == 0)
+    {
+        // Attack : 조작된 Len으로 인해 리시브 버퍼가 가득참.
+        InterlockedExchange(&session.m_blive, 0);
+        CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
+        return;
+    }
+
     if (freeSize < directEnQsize)
         __debugbreak();
     if (freeSize <= directEnQsize)

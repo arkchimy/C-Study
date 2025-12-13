@@ -9,7 +9,7 @@ struct stHeader
 {
   public:
     BYTE byCode;
-    SHORT sDataLen;
+    USHORT sDataLen;
     BYTE byRandKey;
     BYTE byCheckSum;
 };

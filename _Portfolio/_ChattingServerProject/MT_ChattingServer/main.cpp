@@ -58,7 +58,6 @@ int main()
     StringCchPrintfW(buffer, 100, L"Profiler_%hs.txt", __DATE__);
 
     {
-        CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         CTestServer *ChattingServer = new CTestServer(ContentsThreadCnt, iEnCording);
 
         

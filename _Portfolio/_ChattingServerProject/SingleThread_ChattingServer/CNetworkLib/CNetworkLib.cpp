@@ -432,7 +432,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     ringBufferSize useSize;
     float qPersentage;
     ull SessionID;
-
+    bool bChkSum = false;
     {
         session.m_recvBuffer.MoveRear(transferred);
         SessionID = session.m_SeqID.SeqNumberAndIdx;
@@ -451,7 +451,20 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         if (msg == nullptr)
             break;
         if (bEnCording)
-            msg->DeCoding();
+        {
+            bChkSum = msg->DeCoding();
+            if (bChkSum == false)
+            {
+                // Attack : 조작된 패킷으로 checkSum이 다름.
+                InterlockedExchange(&session.m_blive, 0);
+                CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
+
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L" false Packet CheckSum Not Equle ");
+                return;
+            }
+        }
 
         InterlockedExchange(&msg->ownerID, SessionID);
 
