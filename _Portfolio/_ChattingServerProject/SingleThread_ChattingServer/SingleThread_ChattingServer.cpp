@@ -604,7 +604,7 @@ void CTestServer::HeartBeat()
             player = element.second;
 
             msgInterval = currentTime - player->m_Timer;
-            if (msgInterval >= 3000)
+            if (msgInterval >= 6000)
             {
                 Disconnect(player->m_sessionID);
             }

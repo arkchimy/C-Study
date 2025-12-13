@@ -46,7 +46,16 @@ CMessage::~CMessage()
 
     _interlockedexchange64(&iUseCnt, 1);
 }
+void CMessage::InitMessage()
+{
+    _size = en_BufferSize::bufferSize;
 
+    _frontPtr = _begin;
+    _rearPtr = _begin;
+    _end = _begin + _size;
+
+    _interlockedexchange64(&iUseCnt, 1);
+}
 void CMessage::EnCoding( )
 {
     SerializeBufferSize len;

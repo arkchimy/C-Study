@@ -666,28 +666,46 @@ class Stub\n{ \n public:\n\
 "
 #define STUB_H_DEF_FORMAT L"\t virtual void %s {}\n"
 #define STUB_H_CLOSEFORMAT                                             \
-    L"\t void PacketProc(ull SessionID, CMessage *msg, WORD " \
+    L"\t bool PacketProc(ull SessionID, CMessage *msg, WORD " \
     L"byType); \n};\n"
 
 #define STUB_CPP_STARTFORMAT                                              \
-    L"\nvoid Stub::PacketProc(ull SessionID, CMessage *msg, WORD " \
+    L"\nbool Stub::PacketProc(ull SessionID, CMessage *msg, WORD " \
     L"byType)\n {\n \
-    \tCTestServer *server;\n \
-    \t server = static_cast<CTestServer *>(this); \n \
+    CTestServer *server;\n \
+    server = static_cast<CTestServer *>(this); \n \
     \n\tswitch(byType)\n \t{\n"
 //  int a ;
-#define STUB_CPP_OPEN_FORMAT L"\tcase %s :\n \t{ \n"
-#define STUB_CPP_DEF_FORMAT L"\t\t %s %s ;\n"
+#define STUB_CPP_OPEN_FORMAT L"\tcase %s :\n \t{ \n \t\t try \n \t\t {\n"
+#define STUB_CPP_DEF_FORMAT L"\t\t\t %s %s ;\n"
 #define STUB_CPP_DEF_FORMAT2 L" >> %s;\n"
-#define STUB_CPP_DEF_ARRFORMAT L"\t\t %s %s[%d] ;\n"
-#define STUB_CPP_DEF_ARRFORMAT2 L"\t\t msg->GetData(%s,%d);\n"
-#define STUB_CPP_DEF_ARRFORMAT3 L"\t\t msg->GetData(%s,%s);\n"
+#define STUB_CPP_DEF_ARRFORMAT L"\t\t\t %s %s[%d] ;\n"
+#define STUB_CPP_DEF_ARRFORMAT2 L"\t\t\t msg->GetData(%s,%d);\n"
+#define STUB_CPP_DEF_ARRFORMAT3 L"\t\t\t msg->GetData(%s,%s);\n"
 
 #define STUB_CPP_DEF_ARRBUFFERSIZE 2000
 
-#define STUB_CPP_FUNCTION_FORMAT L"\t\tserver->%s"
-#define STUB_CPP_DEFCLOSE_FORMAT L"\t\t break; \n \t}\n"
-#define STUB_CPP_CLOSE_FORMAT L"\n \t}\n \n }\n"
+#define STUB_CPP_FUNCTION_FORMAT  L"\t\t\t server->%s"
+#define STUB_CPP_DEFCLOSE_FORMAT L"\t\t \
+}\n \
+        catch(const MessageException &e)\n \
+        {\n \
+           switch (e.type())\n  \
+          { \n \
+           \tcase MessageException::ErrorType::HasNotData:\n \
+           \tbreak; \n \
+           \tcase MessageException::ErrorType::NotEnoughSpace:\n \
+           \tbreak; \n \
+           } \n \
+           return false; \n \
+        } \n \
+        break; \n \
+   } \n "
+
+#define STUB_CPP_CLOSE_FORMAT \
+L"   default: \n\
+         return false; \
+\n \t}\n    return true;\n } \n"
 void MakeStub()
 {
     FILE *file;
@@ -914,7 +932,7 @@ void MakeStub()
                 }
                 else
                 {
-                    fwrite(L"\t\t *msg", 2, wcslen(L"\t\t *msg"), file);
+                    fwrite(L"\t\t\t *msg", 2, wcslen(L"\t\t\t *msg"), file);
                     StringCchPrintfW(buffer2, BufferMax, STUB_CPP_DEF_FORMAT2,
                                      *iter);
          

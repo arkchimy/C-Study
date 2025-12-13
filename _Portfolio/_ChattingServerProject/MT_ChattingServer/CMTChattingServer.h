@@ -66,7 +66,7 @@ class CTestServer : public CLanServer
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
 
-    virtual float OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
+    virtual void OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
 
     virtual bool OnAccept(ull SessionID) override;
     virtual void OnRelease(ull SessionID) override;
@@ -116,11 +116,6 @@ class CTestServer : public CLanServer
     HANDLE hBalanceEvent; // EnQ를 알려주는 이벤트
     CLockFreeQueue<CMessage*> m_BalanceQ = CLockFreeQueue<CMessage*>(); 
     
-
-
-
-    inline static ringBufferSize s_ContentsQsize;
-    
     HANDLE hMonitorThread = 0;
     bool bMonitorThreadOn = true;
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
@@ -157,14 +152,12 @@ class CTestServer : public CLanServer
     std::unordered_map<ull, CPlayer *> prePlayer_hash; // 중복 접속을 제거하는 용도
 
     // SessionID 를 삽입
-    inline static std::set<ull>
+     std::set<ull>
         g_Sector[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
                 [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
 
     // Sector마다 Lock이 존재.
-    inline static std::shared_mutex srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size][dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
-    //inline static SRWLOCK srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
-    //            [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
+    std::shared_mutex srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size][dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
 
     /*
       하트비트 처리 방법.

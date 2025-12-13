@@ -955,7 +955,6 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
         for (DWORD i = 0; i < ContentsThreadCnt; i++)
         {
             balanceVec.emplace_back(i, 0);
-            //m_CotentsQ_vec.emplace_back(s_ContentsQsize, 1);
             m_CotentsQ_vec.emplace_back();
             m_ContentsQMap[&m_CotentsQ_vec[i]] = CreateEvent(nullptr, false, false, nullptr);
         }
@@ -1199,7 +1198,7 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
-float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
+void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
 {
     // double CurrentQ;
     ringBufferSize ContentsUseSize;
@@ -1260,7 +1259,6 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ )
         _interlockedincrement64(&m_RecvTPS);
         ContentsUseSize = TargetQ->m_size;
     }
-    return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
 }
 
 bool CTestServer::OnAccept(ull SessionID)
