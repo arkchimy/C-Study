@@ -462,6 +462,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
                 CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
                                                L"%-20s %20s %05d  ",
                                                L" false Packet CheckSum Not Equle ");
+                stTlsObjectPool<CMessage>::Release(msg);
                 return;
             }
         }

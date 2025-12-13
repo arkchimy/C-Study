@@ -303,18 +303,16 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD SectorX, WORD SectorY, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
      CPlayer *player;
-     CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
-                                   L"%-20s %20s %05lld %12s %05llu %12s %05llu %12s %05llu ",
-                                   L"REQ_SECTOR_MOVE  : ",
-                                   L"AccountNo", AccountNo,
-                                   L"SectorX", SectorX,
-                                   L"SectorY", SectorY,
-                                   L"현재들어온ID:", SessionID
-     );
 
     if (SectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || SectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
     {
-        __debugbreak();
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-20s %20s %05lld %12s %05llu %12s %05llu %12s %05llu ",
+                                       L"REQ_SECTOR_MOVE  : ",
+                                       L"AccountNo", AccountNo,
+                                       L"SectorX", SectorX,
+                                       L"SectorY", SectorY,
+                                       L"현재들어온ID:", SessionID);
         Disconnect(SessionID);
         stTlsObjectPool<CMessage>::Release(msg);
 
@@ -373,7 +371,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         Profiler profile(L"Session_inspect");
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
-            __debugbreak();
+            // Attack : Login을 안하고 들어옴
             Disconnect(SessionID);
             stTlsObjectPool<CMessage>::Release(msg);
 

@@ -28,6 +28,18 @@ enum class en_State : int
 
 struct CPlayer
 {
+    void Initalize()
+    {
+        m_State = en_State::Max;
+        m_sessionID = 0;
+
+        m_Timer = 0;
+        m_AccountNo = 0;
+
+        iSectorX = 0;
+        iSectorY = 0;
+    }
+
     DWORD m_ContentsQIdx = 0;
     en_State m_State = en_State::Max;
     ull m_sessionID = 0;
@@ -80,7 +92,9 @@ class CTestServer : public CLanServer
     LONG64 m_UpdateTPS;
     LONG64 m_RecvTPS; // OnRecv를 통한 RecvTPS 측정
 
-    LONG64 *m_RecvMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; // Update에서 ContentsQ에서 빼는 MsgTPS
+    LONG64 m_RecvMsgArr[en_PACKET_CS_CHAT__Max]{
+        0,
+    }; // Update에서 ContentsQ에서 빼는 MsgTPS
     // LONG64 *m_SendMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; //
 
     LONG64 prePlayer_hash_size = 0;
