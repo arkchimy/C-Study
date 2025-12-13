@@ -235,9 +235,9 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
     if (cchRetval != S_OK)
     {
-        CSystemLog::GetInstance()->Log(L"StringCchPrintf_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"StringCchPrintfW_Error %d", GetLastError());
+        __debugbreak();
+        return;
     }
-
     StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogWstring);
 
     DWORD idx = wcslen(LogHeaderBuffer);
@@ -252,7 +252,6 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
         if (LogFile == nullptr)
         {
-            CSystemLog::GetInstance()->Log(L"FileOpen_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"_wfopen_s_Error %d", GetLastError());
             ReleaseSRWLockExclusive(&srw_Errorlock);
             return;
         }
