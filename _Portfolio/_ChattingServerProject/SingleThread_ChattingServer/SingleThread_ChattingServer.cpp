@@ -261,6 +261,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 
     player->m_State = en_State::Player;
     player->m_AccountNo = AccountNo;
+    player->m_Timer = timeGetTime();
 
     memcpy(player->m_ID, ID, 20);
     memcpy(player->m_Nickname, Nickname, 20);
@@ -343,6 +344,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
 
         return;
     }
+
     g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
 
     player->iSectorX = SectorX;
@@ -351,6 +353,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
 
     Proxy::RES_SECTOR_MOVE(SessionID, msg, AccountNo, SectorX, SectorY);
     m_RecvMsgArr[en_PACKET_CS_CHAT_RES_SECTOR_MOVE]++;
+    player->m_Timer = timeGetTime();
     
 }
 void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WORD MessageLen, WCHAR *MessageBuffer, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
@@ -417,7 +420,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
             MessageLen, MessageBuffer,en_PACKET_CS_CHAT_RES_MESSAGE,
             true, &seqID, vectorReserverSize);
     }
-    
+    player->m_Timer = timeGetTime();
 }
 void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
 {
@@ -427,23 +430,12 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroa
     {
 
         stTlsObjectPool<CMessage>::Release(msg);
-
-        //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-        //                               L"%-20s %12s %05llu  ",
-        //                               L"HEARTBEAT SessionID_hash not Found : ",
-        //                               L"현재들어온ID:", SessionID);
-
         Disconnect(SessionID);
         
         return;
     }
     player = SessionID_hash[SessionID];
     player->m_Timer = timeGetTime();
-
-    //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-    //                               L"%-20s %12s %05llu ",
-    //                               L"HEARTBEAT Send : ",
-    //                               L"현재들어온ID:", SessionID);
 
     stTlsObjectPool<CMessage>::Release(msg);
     
@@ -463,15 +455,16 @@ void CTestServer::AllocPlayer(CMessage *msg)
 
     if (prePlayer_hash.find(SessionID) != prePlayer_hash.end())
     {
-        // Attack
-        //  내가 작성한 AllocPlayer가 아님.
-        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+        // Attack : LoginPacket 중복으로 보냄
+        CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-20s %20s %20s %05lld  ",
                                        L"AllocPlayer ",
-                                       L"player is Nullptr",
+                                       L"Login Packet replay attack",
                                        L"DisConnect SessionId :",
-                                       SessionID);
-
+                                       SessionID
+        );
+        stTlsObjectPool<CMessage>::Release(msg);
+        Disconnect(SessionID);
         return;
     }
 
@@ -481,7 +474,7 @@ void CTestServer::AllocPlayer(CMessage *msg)
     {
 
         // TODO :  Player가 가득 참. 이 경우에는 끊기보다는 유예를 둬야하나?
-        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+        CSystemLog::GetInstance()->Log(L"PlayerPool is Empty", en_LOG_LEVEL::ERROR_Mode,
                                 L"%-20s %20s %20s %05lld  ",
                                 L"AllocPlayer ",
                                 L"player is Nullptr",
@@ -525,21 +518,18 @@ void CTestServer::DeletePlayer(CMessage *msg)
         // Player라면
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
-            // 이 상황이 무슨 상황일까.
-            // Alloc을 처리하기도 전에. 연결이 끊어진 경우
-            CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                                           L" %-20s %20s %05lld  ",
-                                           L" DeletePlayer ",
-                                           L" prePlayer_hash Not Found element ",
-                                           L" SessionID_hash Not Found element ",
-                                           SessionID
-            );
-            // Attack : 내 만든 메세지일 경우 단 한번만 이 메세지가 오겠지만, 
+            // Attack : 내 만든 메세지일 경우 단 한번만 이 메세지가 오겠지만,
             // 근데 만일 공격 패턴에서 DeletePlayer의 Type을 맞춘다면?
             // 이쪽 루틴을 탈 것.
-            
+
             // 확인을 위해서는 같은 SessionID로  두번이상의 DeletePlayer가 발생 하였는지 알 수 있으면 됨.
-            __debugbreak();
+
+            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                           L" %-20s %20s %05lld  ",
+                                           L" DeletePlayer ",
+                                           L" Delete Packet replay attack ",
+                                           SessionID
+            );
         }
         else
         {
@@ -548,7 +538,12 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
             if (AccountNo_hash.find(player->m_AccountNo) == AccountNo_hash.end())
             {
-
+                //  Attack이 아니라 있을 수 없는 상황.
+                CSystemLog::GetInstance()->Log(L"CriticalError", en_LOG_LEVEL::ERROR_Mode,
+                                               L" %-20s %20s %05lld  ",
+                                               L" DeletePlayer ",
+                                               L" AccountNo_hash not Found ",
+                                               SessionID);
                 __debugbreak();
             }
 
@@ -558,7 +553,15 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
             if (player->iSectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || player->iSectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
             {
-                __debugbreak();
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L" %-20s %20s  %20s 05d %20s %05d  ",
+                                               L" DeletePlayer ",
+                                               L" Player Sector is not initialized ",
+                                               L" Player iSectorX ",
+                                               player->iSectorX,
+                                               L" Player iSectorY ",
+                                               player->iSectorY);
+
                 Disconnect(SessionID);
                 stTlsObjectPool<CMessage>::Release(msg);
 
@@ -568,12 +571,6 @@ void CTestServer::DeletePlayer(CMessage *msg)
                 g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
 
             player->m_State = en_State::DisConnect;
-
-            //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-            //                               L"%-20s %05lld %12s %05llu  ",
-            //                               L"LogOut - Accept : ", player->m_AccountNo,
-            //                               L"현재들어온ID:", SessionID);
-
             player_pool.Release(player);
         }
     }
@@ -585,11 +582,6 @@ void CTestServer::DeletePlayer(CMessage *msg)
         m_prePlayerCount--;
 
         player->m_State = en_State::DisConnect;
-        //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-        //                               L"%-20s %05lld %12s %05llu  ",
-        //                               L"LoginBeforeOut - WastAccept : ", player->m_AccountNo,
-        //                               L"현재들어온ID:", SessionID);
-
         player_pool.Release(player);
     }
 
@@ -612,30 +604,30 @@ void CTestServer::HeartBeat()
             player = element.second;
 
             msgInterval = currentTime - player->m_Timer;
-            if (msgInterval >= 10000)
+            if (msgInterval >= 3000)
             {
                 Disconnect(player->m_sessionID);
             }
         }
     }
-    //// LoginPacket을 받아서 승격된 하트비트 부분
-    {
+    //// TODO : 하트비트 기능 현재 사용안 함
+    //{
 
-        DWORD disTime;
-        CPlayer *player;
+    //    DWORD disTime;
+    //    CPlayer *player;
 
-        // AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
-        for (auto &element : AccountNo_hash)
-        {
-            player = element.second;
+    //    // AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
+    //    for (auto &element : AccountNo_hash)
+    //    {
+    //        player = element.second;
 
-            disTime = currentTime - player->m_Timer;
-            if (disTime >= 40000)
-            {
-                Disconnect(player->m_sessionID);
-            }
-        }
-    }
+    //        disTime = currentTime - player->m_Timer;
+    //        if (disTime >= 40000)
+    //        {
+    //            Disconnect(player->m_sessionID);
+    //        }
+    //    }
+    //}
 }
 
 CTestServer::CTestServer(int iEncording)
@@ -659,7 +651,7 @@ void CTestServer::Update()
 {
     CMessage *msg;
     ull l_sessionID;
-    WORD type;
+    WORD wType;
 
     // msg  크기 메세지 하나에 8Byte
     while (m_ContentsQ.m_size != 0)
@@ -671,20 +663,33 @@ void CTestServer::Update()
 
         try
         {
-            *msg >> type;
+            *msg >> wType;
+
         }
         catch (const MessageException& e)
         {
+            switch (e.type())
+            {
+            case MessageException::ErrorType::HasNotData :
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L" msg >> Data  Faild ",
+                                               L"wType", wType);
+                break;
+            case MessageException::ErrorType::NotEnoughSpace:
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L"NotEnoughSpace  : ",
+                                               L"wType", wType);
+                msg->HexLog(CMessage::en_Tag::_ERROR, L"Attack.txt");
+                break;
+            }
             stTlsObjectPool<CMessage>::Release(msg);
             Disconnect(l_sessionID);
             continue;
         }
-        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
-                                L"%-20s %20s %05d  ",
-                                L"CTestServer::Update()  : ",
-                                L"wType", type);
 
-        switch (type)
+        switch (wType)
         {
         // 현재 미 사용중
         case en_PACKET_Player_Alloc:
@@ -694,42 +699,16 @@ void CTestServer::Update()
         case en_PACKET_Player_Delete:
             DeletePlayer(msg);
             break;
-        case en_PACKET_CS_CHAT_REQ_LOGIN:
-            if (PacketProc(l_sessionID, msg, type) == false)
-            {
-                stTlsObjectPool<CMessage>::Release(msg);
-                Disconnect(l_sessionID);
-            }
-            break;
-        default:
-            if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
-            {
-                // Login Not Recv
-                //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                //                               L"%-20s %12s %05llu ",
-                //                               L"HEARTBEAT SessionID_hash not Found : ",
-                //                               L"현재들어온ID:", l_sessionID);
 
+        default:
+            if (PacketProc(l_sessionID, msg, wType) == false)
+            {
                 stTlsObjectPool<CMessage>::Release(msg);
                 Disconnect(l_sessionID);
             }
             else
-            { // Client Message
-                CPlayer *player = SessionID_hash[l_sessionID];
-
-                player->m_Timer = timeGetTime();
-                if (PacketProc(l_sessionID, msg, type) == false)
-                {
-                    stTlsObjectPool<CMessage>::Release(msg);
-                    Disconnect(l_sessionID);
-                }
-                else
-                    m_RecvMsgArr[type]++;
-                    
-            }
+                m_RecvMsgArr[wType]++;
         }
-        
-
         m_UpdateTPS++;
     }
 }

@@ -22,7 +22,7 @@ const wchar_t *Stringformat[(BYTE)CMessage::en_Tag::MAX] =
     L"Server가 준 디코딩 후 데이터 ",
     L"Dummy가 보낸 인코딩 전 데이터  ",
     L"Server가 준 디코딩 전 데이터  ",
-    L"dif Data",
+    L"Error Data",
 
 };
 
