@@ -610,24 +610,24 @@ void CTestServer::HeartBeat()
             }
         }
     }
-    //// TODO : 하트비트 기능 현재 사용안 함
-    //{
+    //// TODO : 하트비트 기능 현재 사용
+    {
 
-    //    DWORD disTime;
-    //    CPlayer *player;
+        DWORD disTime;
+        CPlayer *player;
 
-    //    // AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
-    //    for (auto &element : AccountNo_hash)
-    //    {
-    //        player = element.second;
+        // AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
+        for (auto &element : AccountNo_hash)
+        {
+            player = element.second;
 
-    //        disTime = currentTime - player->m_Timer;
-    //        if (disTime >= 40000)
-    //        {
-    //            Disconnect(player->m_sessionID);
-    //        }
-    //    }
-    //}
+            disTime = currentTime - player->m_Timer;
+            if (disTime >= 40000)
+            {
+                Disconnect(player->m_sessionID);
+            }
+        }
+    }
 }
 
 CTestServer::CTestServer(int iEncording)
