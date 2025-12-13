@@ -162,12 +162,22 @@ void Profiler::Reset(void)
 Profiler::Profiler(const wchar_t *const lpTagName)
     : m_lpTagName(lpTagName)
 {
-    Start(m_lpTagName);
+    if (bOn)
+    {
+        m_bStarted = true;
+        Start(m_lpTagName);
+    }
+    else
+        m_bStarted = false;
+
 }
 
 Profiler::~Profiler()
 {
-    End(m_lpTagName);
+    if (bOn && m_bStarted)
+        End(m_lpTagName);
+    m_bStarted = false;
+ 
 }
 
 void Profiler::Start(const wchar_t *const lpTagName)

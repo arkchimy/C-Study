@@ -80,6 +80,7 @@ class Profiler
     Profiler(const wchar_t *const lpTagName);
     ~Profiler();
     
+    bool m_bStarted = false; // Start에서 시간을 초기화 하였는지의 여부 판단.
     const wchar_t *m_lpTagName;
     
     inline static bool bOn = false;

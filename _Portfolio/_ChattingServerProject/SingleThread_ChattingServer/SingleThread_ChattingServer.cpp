@@ -163,25 +163,16 @@ unsigned ContentsThread(void *arg)
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
         if (hSignalIdx - WAIT_OBJECT_0 == 1)
             break;
-        if (Profiler::bOn)
+
         {
             Profiler profiler(L"Cotents_Update");
             server->Update();
         }
-        else
-        {
-            server->Update();
-        }
-
-        if (Profiler::bOn)
         {
             Profiler profiler(L"HeartBeat");
             server->HeartBeat();
         }
-        else
-        {
-            server->HeartBeat();
-        }
+
         ContentsUseSize = server->m_ContentsQ.m_size;
         // Hash크기 Monitoring 정보변수 Store
         {
@@ -468,25 +459,45 @@ void CTestServer::AllocPlayer(CMessage *msg)
     InterlockedDecrement64(&m_AllocMsgCount);
     SessionID = msg->ownerID;
     // 옳바른 연결인지는 Token에 의존.
+
+
+    if (prePlayer_hash.find(SessionID) != prePlayer_hash.end())
+    {
+        // Attack
+        //  내가 작성한 AllocPlayer가 아님.
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-20s %20s %20s %05lld  ",
+                                       L"AllocPlayer ",
+                                       L"player is Nullptr",
+                                       L"DisConnect SessionId :",
+                                       SessionID);
+
+        return;
+    }
+
+
     player = (CPlayer *)player_pool.Alloc();
     if (player == nullptr)
     {
-        // Player가 가득 참.
-        // TODO : 이 경우에는 끊기보다는 유예를 둬야하나?
+
+        // TODO :  Player가 가득 참. 이 경우에는 끊기보다는 유예를 둬야하나?
+        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_Mode,
+                                L"%-20s %20s %20s %05lld  ",
+                                L"AllocPlayer ",
+                                L"player is Nullptr",
+                                L"DisConnect SessionId :",
+                                SessionID);
 
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
-        
+        _InterlockedDecrement64(&m_NetworkMsgCount);
         return;
     }
+
     player->Initalize(); 
 
     // 디버깅하기.
     prePlayer_hash[SessionID] = player;
-    //CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
-    //                               L"%-20s %12s %05llu %20s %08p ",
-    //                               L"prePlayer_hash_Push : ",
-    //                               L"현재들어온ID:", SessionID, L"player주소", player);
 
     player->m_Timer = timeGetTime();
 
@@ -495,7 +506,9 @@ void CTestServer::AllocPlayer(CMessage *msg)
 
     m_prePlayerCount++;
     
+    _InterlockedDecrement64(&m_NetworkMsgCount);
     stTlsObjectPool<CMessage>::Release(msg);
+
 }
 
 void CTestServer::DeletePlayer(CMessage *msg)
@@ -514,15 +527,23 @@ void CTestServer::DeletePlayer(CMessage *msg)
         {
             // 이 상황이 무슨 상황일까.
             // Alloc을 처리하기도 전에. 연결이 끊어진 경우
+            CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                           L" %-20s %20s %05lld  ",
+                                           L" DeletePlayer ",
+                                           L" prePlayer_hash Not Found element ",
+                                           L" SessionID_hash Not Found element ",
+                                           SessionID
+            );
+            // Attack : 내 만든 메세지일 경우 단 한번만 이 메세지가 오겠지만, 
+            // 근데 만일 공격 패턴에서 DeletePlayer의 Type을 맞춘다면?
+            // 이쪽 루틴을 탈 것.
+            
+            // 확인을 위해서는 같은 SessionID로  두번이상의 DeletePlayer가 발생 하였는지 알 수 있으면 됨.
+            __debugbreak();
         }
         else
         {
             player = SessionID_hash[SessionID];
-            //CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,
-            //                               L"%-20s %12s %05llu %20s %08p ",
-            //                               L"SessionID_hash : ",
-            //                               L"현재들어온ID:", SessionID, L"player주소", player);
-
             SessionID_hash.erase(SessionID);
 
             if (AccountNo_hash.find(player->m_AccountNo) == AccountNo_hash.end())
@@ -591,7 +612,7 @@ void CTestServer::HeartBeat()
             player = element.second;
 
             msgInterval = currentTime - player->m_Timer;
-            if (msgInterval >= 5000)
+            if (msgInterval >= 10000)
             {
                 Disconnect(player->m_sessionID);
             }
@@ -636,29 +657,16 @@ CTestServer::~CTestServer()
 
 void CTestServer::Update()
 {
-
-    size_t addr;
     CMessage *msg;
-
-    char *f, *r;
-
-    ringBufferSize useSize, DeQSisze;
     ull l_sessionID;
-
     WORD type;
 
     // msg  크기 메세지 하나에 8Byte
     while (m_ContentsQ.m_size != 0)
     {
-        if (Profiler::bOn)
-        {
-            Profiler profiler(L"Dequeue");
-            m_ContentsQ.Pop(msg);
-        }
-        else
-        {
-            m_ContentsQ.Pop(msg);
-        }
+        // Size는 있다고 판단되었는데  실패하는것은 있을 수 없음.
+        if (m_ContentsQ.Pop(msg) == false)
+            __debugbreak();
         l_sessionID = msg->ownerID;
 
         try
@@ -676,58 +684,51 @@ void CTestServer::Update()
                                 L"CTestServer::Update()  : ",
                                 L"wType", type);
 
+        switch (type)
         {
-            switch (type)
-            {
-            // 현재 미 사용중
-            case en_PACKET_Player_Alloc:
-                AllocPlayer(msg);
-                _InterlockedDecrement64(&m_NetworkMsgCount);
-                break;
+        // 현재 미 사용중
+        case en_PACKET_Player_Alloc:
+            AllocPlayer(msg);
+            break;
 
-            case en_PACKET_Player_Delete:
-                DeletePlayer(msg);
-                _InterlockedDecrement64(&m_NetworkMsgCount);
-                break;
-            case en_PACKET_CS_CHAT_REQ_LOGIN:
+        case en_PACKET_Player_Delete:
+            DeletePlayer(msg);
+            break;
+        case en_PACKET_CS_CHAT_REQ_LOGIN:
+            if (PacketProc(l_sessionID, msg, type) == false)
+            {
+                stTlsObjectPool<CMessage>::Release(msg);
+                Disconnect(l_sessionID);
+            }
+            break;
+        default:
+            if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
+            {
+                // Login Not Recv
+                //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                //                               L"%-20s %12s %05llu ",
+                //                               L"HEARTBEAT SessionID_hash not Found : ",
+                //                               L"현재들어온ID:", l_sessionID);
+
+                stTlsObjectPool<CMessage>::Release(msg);
+                Disconnect(l_sessionID);
+            }
+            else
+            { // Client Message
+                CPlayer *player = SessionID_hash[l_sessionID];
+
+                player->m_Timer = timeGetTime();
                 if (PacketProc(l_sessionID, msg, type) == false)
                 {
                     stTlsObjectPool<CMessage>::Release(msg);
                     Disconnect(l_sessionID);
                 }
-                break;
-            default:
-                if (SessionID_hash.find(l_sessionID) == SessionID_hash.end())
-                {
-                    // Login Not Recv
-                    //CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
-                    //                               L"%-20s %12s %05llu ",
-                    //                               L"HEARTBEAT SessionID_hash not Found : ",
-                    //                               L"현재들어온ID:", l_sessionID);
-
-                    stTlsObjectPool<CMessage>::Release(msg);
-                    Disconnect(l_sessionID);
-                }
                 else
-                { // Client Message
-                    CPlayer *player = SessionID_hash[l_sessionID];
-                    //CSystemLog::GetInstance()->Log(L"HashInputData", en_LOG_LEVEL::DEBUG_Mode,0xedededed || paddin12
-                    //                               L"%-20s %12s %05llu %20s %08p ",
-                    //                               L"SessionID_hashLoad : ",
-                    //                               L"현재들어온ID:", l_sessionID, L"player주소", player);
-
-                    player->m_Timer = timeGetTime();
-                    if (PacketProc(l_sessionID, msg, type) == false)
-                    {
-                        stTlsObjectPool<CMessage>::Release(msg);
-                        Disconnect(l_sessionID);
-                    }
-                    else
-                        m_RecvMsgArr[type]++;
+                    m_RecvMsgArr[type]++;
                     
-                }
             }
         }
+        
 
         m_UpdateTPS++;
     }
@@ -771,13 +772,9 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
         CMessage **ppMsg;
         ppMsg = &msg;
         InterlockedExchange(&msg->ownerID, SessionID);
-        if (Profiler::bOn)
+
         {
             Profiler profile(L"ContentsQ_Enqueue");
-            m_ContentsQ.Push(msg);
-        }
-        else
-        {
             m_ContentsQ.Push(msg);
         }
 
@@ -816,8 +813,8 @@ bool CTestServer::OnAccept(ull SessionID)
         *msg << (unsigned short)en_PACKET_Player_Alloc;
         InterlockedExchange(&msg->ownerID, SessionID);
         // TODO : ContentsThread에서
-        OnRecv(SessionID, msg);
         _InterlockedIncrement64(&m_NetworkMsgCount);
+        OnRecv(SessionID, msg);
     }
 
     return true;
