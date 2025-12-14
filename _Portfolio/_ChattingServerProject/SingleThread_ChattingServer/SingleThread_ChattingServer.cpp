@@ -320,7 +320,18 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     }
     if (SessionID_hash.find(SessionID) == SessionID_hash.end())
     {
-        __debugbreak();
+        // Attack : Login을 안하고 들어옴
+        static bool bOn = false;
+        if (bOn == false)
+        {
+            bOn = true;
+            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                           L"%-20s %20s %20s %05lld  ",
+                                           L" REQ_SECTOR_MOVE ",
+                                           L"Not Login Session REQ_MESSAGE",
+                                           L"DisConnect SessionId :",
+                                           SessionID);
+        }
         stTlsObjectPool<CMessage>::Release(msg);
         
         return;
@@ -328,7 +339,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     player = SessionID_hash[SessionID];
     if (player->m_AccountNo != AccountNo)
     {
-
+        // 발견 
         Disconnect(SessionID);
         stTlsObjectPool<CMessage>::Release(msg);
         
@@ -336,7 +347,19 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     }
     if (player->iSectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || player->iSectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
     {
-        __debugbreak();
+        // player 초기화를 안한듯
+        static bool bOn = false;
+        if (bOn == false)
+        {
+            bOn = true;
+            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                           L"%-20s %20s %05lld %12s %05llu %12s %05llu %12s %05llu ",
+                                           L"REQ_SECTOR_MOVE PlayerData  : ",
+                                           L"AccountNo", AccountNo,
+                                           L"SectorX", SectorX,
+                                           L"SectorY", SectorY,
+                                           L"현재들어온ID:", SessionID);
+        }
         Disconnect(SessionID);
         stTlsObjectPool<CMessage>::Release(msg);
 
@@ -454,13 +477,17 @@ void CTestServer::AllocPlayer(CMessage *msg)
     if (prePlayer_hash.find(SessionID) != prePlayer_hash.end())
     {
         // Attack : LoginPacket 중복으로 보냄
-        CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
-                                       L"%-20s %20s %20s %05lld  ",
-                                       L"AllocPlayer ",
-                                       L"Login Packet replay attack",
-                                       L"DisConnect SessionId :",
-                                       SessionID
-        );
+        static bool bOn = false;
+        if (bOn == false)
+        {
+            bOn = true;
+            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                           L"%-20s %20s %20s %05lld  ",
+                                           L"AllocPlayer ",
+                                           L"Login Packet replay attack",
+                                           L"DisConnect SessionId :",
+                                           SessionID);
+        }
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
         return;
@@ -521,13 +548,16 @@ void CTestServer::DeletePlayer(CMessage *msg)
             // 이쪽 루틴을 탈 것.
 
             // 확인을 위해서는 같은 SessionID로  두번이상의 DeletePlayer가 발생 하였는지 알 수 있으면 됨.
-
-            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
-                                           L" %-20s %20s %05lld  ",
-                                           L" DeletePlayer ",
-                                           L" Delete Packet replay attack ",
-                                           SessionID
-            );
+            static bool bOn = false;
+            if (bOn == false)
+            {
+                bOn = true;
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L" %-20s %20s %05lld  ",
+                                               L" DeletePlayer ",
+                                               L" Delete Packet replay attack ",
+                                               SessionID);
+            }
         }
         else
         {
@@ -542,7 +572,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
                                                L" DeletePlayer ",
                                                L" AccountNo_hash not Found ",
                                                SessionID);
-                __debugbreak();
+     
             }
 
             AccountNo_hash.erase(player->m_AccountNo);
@@ -551,15 +581,19 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
             if (player->iSectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || player->iSectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
             {
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
-                                               L" %-20s %20s  %20s 05d %20s %05d  ",
-                                               L" DeletePlayer ",
-                                               L" Player Sector is not initialized ",
-                                               L" Player iSectorX ",
-                                               player->iSectorX,
-                                               L" Player iSectorY ",
-                                               player->iSectorY);
-
+                static bool bOn = false;
+                if (bOn == false)
+                {
+                    bOn = true;
+                    CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                                   L" %-20s %20s  %20s 05d %20s %05d  ",
+                                                   L" DeletePlayer ",
+                                                   L" Player Sector is not initialized ",
+                                                   L" Player iSectorX ",
+                                                   player->iSectorX,
+                                                   L" Player iSectorY ",
+                                                   player->iSectorY);
+                }
                 Disconnect(SessionID);
                 stTlsObjectPool<CMessage>::Release(msg);
 
@@ -668,19 +702,33 @@ void CTestServer::Update()
         {
             switch (e.type())
             {
-            case MessageException::ErrorType::HasNotData :
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
-                                               L"%-20s %20s %05d  ",
-                                               L" msg >> Data  Faild ",
-                                               L"wType", wType);
+            case MessageException::ErrorType::HasNotData:
+            {
+                static bool bOn = false;
+                if (bOn == false)
+                {
+                    bOn = true;
+                    CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                                   L"%-20s %20s %05d  ",
+                                                   L" msg >> Data  Faild ",
+                                                   L"wType", wType);
+                }
+            }
                 break;
             case MessageException::ErrorType::NotEnoughSpace:
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
-                                               L"%-20s %20s %05d  ",
-                                               L"NotEnoughSpace  : ",
-                                               L"wType", wType);
+            {
+                static bool bOn = false;
+                if (bOn == false)
+                {
+                    bOn = true;
+                    CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                                   L"%-20s %20s %05d  ",
+                                                   L"NotEnoughSpace  : ",
+                                                   L"wType", wType);
+                }
                 msg->HexLog(CMessage::en_Tag::_ERROR, L"Attack.txt");
                 break;
+            }
             }
             stTlsObjectPool<CMessage>::Release(msg);
             Disconnect(l_sessionID);

@@ -3,29 +3,40 @@
 #include <errmsg.h>
 #include <windows.h>
 #include <thread>
+#include <strsafe.h>
 
 //PATH=C:\Program Files\MySQL\MySQL Server 8.0\bin;C:\Program Files\MySQL\MySQL Server 8.0\lib;%PATH%
-
 void DB_SaveThread(void *arg);
 void EventThread(void *arg);
 
-struct stDBEvent
+struct IJob
 {
-    virtual void exe() = 0;
-
+    virtual void exe(MYSQL *connection) = 0;
 };
-struct stInsert :public stDBEvent
+struct CDB_CreateAccount :public IJob
 {
-    void exe() 
+
+    void exe(MYSQL* connection) 
     {
-
+        int query_stat;
+        char query[1000];
+        StringCchPrintfA(query, sizeof(query), "INSERT INTO `test`.`player` (`AccountNo`, `Level`, `Money`) VALUES ('%d', '%d', '%d')", AccountNo,0,0);
+        query_stat = mysql_query(connection, query);
+        if (query_stat != 0)
+        {
+            printf("Mysql query error : %s", mysql_error(connection));
+            __debugbreak();
+        }
+        my_ulonglong affected = mysql_affected_rows(connection);
+        if (affected != 1)
+        {
+            printf("Unexpected insert count: %llu\n", affected);
+        }
     }
+    int AccountNo;
+ 
 };
-//HANDLE WINAPI CreateIoCompletionPort(
-//    _In_ HANDLE FileHandle,
-//    _In_opt_ HANDLE ExistingCompletionPort,
-//    _In_ ULONG_PTR CompletionKey,
-//    _In_ DWORD NumberOfConcurrentThreads);
+
 #include <conio.h>
 
 int main()
@@ -36,8 +47,11 @@ int main()
     if (hIocp == INVALID_HANDLE_VALUE)
         __debugbreak();
 
-    std::thread DBThread(DB_SaveThread,hIocp);
-    SetThreadDescription(DBThread.native_handle(), L"DBThread");
+    std::thread hDBThread(DB_SaveThread,hIocp);
+    SetThreadDescription(hDBThread.native_handle(), L"DBThread");
+
+    std::thread hEventThread(EventThread, hIocp);
+    SetThreadDescription(hEventThread.native_handle(), L"EventThread");
 
     while (1)
     {
@@ -48,14 +62,12 @@ int main()
             {
                 CloseHandle(hIocp);
             }
-            if (ch == 'a' || ch == 'A')
-            {
-                PostQueuedCompletionStatus()
-            }
+
         }
     }
 
 }
+void InitPlayerTable(MYSQL* connection);
 
 void DB_SaveThread(void *arg)
 {
@@ -65,7 +77,6 @@ void DB_SaveThread(void *arg)
     MYSQL_ROW sql_row;
     int query_stat;
 
-    HANDLE hIOCP = arg;
     // 초기화
     mysql_init(&conn);
 
@@ -79,6 +90,8 @@ void DB_SaveThread(void *arg)
         __debugbreak();
         return;
     }
+
+    InitPlayerTable(connection);
 
     // GQCS 로 할까?  결국 PQCS 로하면 똑같은거고,,,
 
@@ -98,12 +111,37 @@ void DB_SaveThread(void *arg)
             key = 0;
             overalpped = nullptr;
         }
-        GetQueuedCompletionStatus(hIOCP, &transfferd, &key, &overalpped, INFINITE);
+        GetQueuedCompletionStatus(arg, &transfferd, &key, &overalpped, INFINITE);
         if (transfferd == 0 && key == 0 && overalpped == nullptr)
-            __debugbreak();
+            break;
+        IJob *job = reinterpret_cast<IJob *>(key);
+        job->exe(connection);
     }
+ 
 }
 
 void EventThread(void *arg)
 {
+    int accountNo = 0;
+    while (1)
+    {
+        CDB_CreateAccount *msg = new CDB_CreateAccount();
+        msg->AccountNo = accountNo++;
+        PostQueuedCompletionStatus(arg, 0, (ULONG_PTR)msg, nullptr);
+    }
+}
+
+void InitPlayerTable(MYSQL* connection)
+{
+    int query_stat;
+    char query[1000];
+    query_stat = mysql_query(connection, "DELETE FROM test.player");
+    if (query_stat != 0)
+    {
+        printf("Mysql query error : %s", mysql_error(connection));
+        __debugbreak();
+    }
+    my_ulonglong affected = mysql_affected_rows(connection);
+    printf("Deleted rows: %llu\n", affected);
+
 }
