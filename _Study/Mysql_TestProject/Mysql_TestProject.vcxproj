@@ -78,6 +78,7 @@
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalIncludeDirectories>C:\Program Files\MySQL\MySQL Server 8.0\includeC:\Program Files\MySQL\MySQL Server 8.0\lib;C:\Program Files\MySQL\MySQL Server 8.0\includeC:\Program Files\MySQL\MySQL Server 8.0\lib;C:\Program Files\MySQL\MySQL Server 8.0\include;C:\Program Files\MySQL\MySQL Server 8.0\include;</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -95,6 +96,7 @@
       <AdditionalIncludeDirectories>C:\Program Files\MySQL\MySQL Server 8.0\includeC:\Program Files\MySQL\MySQL Server 8.0\lib;C:\Program Files\MySQL\MySQL Server 8.0\include;C:\Program Files\MySQL\MySQL Server 8.0\include;</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -109,6 +111,7 @@
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalIncludeDirectories>C:\Program Files\MySQL\MySQL Server 8.0\includeC:\Program Files\MySQL\MySQL Server 8.0\lib;C:\Program Files\MySQL\MySQL Server 8.0\includeC:\Program Files\MySQL\MySQL Server 8.0\lib;C:\Program Files\MySQL\MySQL Server 8.0\include;C:\Program Files\MySQL\MySQL Server 8.0\include;</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -126,6 +129,7 @@
       <AdditionalIncludeDirectories>C:\Program Files\MySQL\MySQL Server 8.0\includeC:\Program Files\MySQL\MySQL Server 8.0\lib;C:\Program Files\MySQL\MySQL Server 8.0\include;C:\Program Files\MySQL\MySQL Server 8.0\include;</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -134,12 +138,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Mysql_TestProject.cpp" />
+    <ClCompile Include="Profiler_MultiThread.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="libmysql.lib" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Readme.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\_3Course\lib\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj">
+      <Project>{75b1f209-92d7-4410-bf05-3c1effab017b}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Profiler_MultiThread.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

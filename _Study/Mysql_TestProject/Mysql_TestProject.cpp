@@ -4,14 +4,24 @@
 #include <windows.h>
 #include <thread>
 #include <strsafe.h>
+#include <timeapi.h>
+
+#pragma comment(lib, "winmm.lib")
+
+#include "../../_3Course/lib/CLockFreeMemoryPool/CLockFreeMemoryPool.h"
+#include "Profiler_MultiThread.h"
 
 //PATH=C:\Program Files\MySQL\MySQL Server 8.0\bin;C:\Program Files\MySQL\MySQL Server 8.0\lib;%PATH%
 void DB_SaveThread(void *arg);
 void EventThread(void *arg);
 
+
+LONG64 iMsgCount;
+
 struct IJob
 {
-    virtual void exe(MYSQL *connection) = 0;
+    virtual void exe(MYSQL *connection) {};
+    int AccountNo;
 };
 struct CDB_CreateAccount :public IJob
 {
@@ -69,6 +79,9 @@ int main()
 }
 void InitPlayerTable(MYSQL* connection);
 
+#define ORIGINAL_FRAME 20
+DWORD frameTime = ORIGINAL_FRAME;
+bool bOn = true;
 void DB_SaveThread(void *arg)
 {
     MYSQL conn;
@@ -104,30 +117,97 @@ void DB_SaveThread(void *arg)
         //    _Out_ PULONG_PTR lpCompletionKey,
         //    _Out_ LPOVERLAPPED *lpOverlapped,
     }
-    while (1)
     {
+        LARGE_INTEGER freq{}, last{};
+        QueryPerformanceFrequency(&freq);
+        QueryPerformanceCounter(&last);
+
+        uint64_t tickCount = 0;  // 1초 구간 처리량
+
+        while (1)
         {
-            transfferd = 0;
-            key = 0;
-            overalpped = nullptr;
+            {
+                transfferd = 0;
+                key = 0;
+                overalpped = nullptr;
+            }
+            GetQueuedCompletionStatus(arg, &transfferd, &key, &overalpped, INFINITE);
+            if (transfferd == 0 && key == 0 && overalpped == nullptr)
+                break;
+            IJob *job = reinterpret_cast<IJob *>(key);
+            {
+                Profiler profile(L"Job_exe");
+                job->exe(connection);
+                _InterlockedDecrement64(&iMsgCount);
+            }
+
+            delete job;
+
+            {
+                // TPS 카운트
+                ++tickCount;
+
+                // 1초 경과 시 TPS 계산
+                LARGE_INTEGER now{};
+                QueryPerformanceCounter(&now);
+
+                double elapsedSec = double(now.QuadPart - last.QuadPart) / double(freq.QuadPart);
+                if (elapsedSec >= 1.0)
+                {
+                    double tps = double(tickCount) / elapsedSec;
+                    printf("[DB] TPS: %.1f ( frameTime = %05d msgCnt = %05lld)\n",
+                           tps, frameTime , iMsgCount);
+
+                    // 다음 구간 리셋
+                    tickCount = 0;
+                    last = now;
+                }
+            }
         }
-        GetQueuedCompletionStatus(arg, &transfferd, &key, &overalpped, INFINITE);
-        if (transfferd == 0 && key == 0 && overalpped == nullptr)
-            break;
-        IJob *job = reinterpret_cast<IJob *>(key);
-        job->exe(connection);
     }
  
 }
 
-void EventThread(void *arg)
+void Logic(void* arg) 
 {
-    int accountNo = 0;
-    while (1)
+    static int accountNo = 0;
+    int loopCnt = rand() % 500;
+    LONG64 currentMsgCnt;
+    for (int i = 0; i < loopCnt; i++)
     {
         CDB_CreateAccount *msg = new CDB_CreateAccount();
         msg->AccountNo = accountNo++;
-        PostQueuedCompletionStatus(arg, 0, (ULONG_PTR)msg, nullptr);
+        if (bOn)
+        {
+            PostQueuedCompletionStatus(arg, 0, (ULONG_PTR)msg, nullptr);
+            currentMsgCnt = _InterlockedIncrement64(&iMsgCount);
+            if (currentMsgCnt > 100000)
+            {
+                frameTime += 100;
+            }
+            else if (frameTime > ORIGINAL_FRAME)
+            {
+                frameTime = ORIGINAL_FRAME;
+            }
+        }
+    }
+}
+
+void EventThread(void *arg)
+{
+    
+    DWORD currentTime = timeGetTime();
+    DWORD nextTime = currentTime;
+
+    while (1)
+    {
+        nextTime += frameTime;
+        Logic(arg);
+        currentTime = timeGetTime();
+        if (nextTime > currentTime)
+        {
+            Sleep(nextTime - currentTime);
+        }
     }
 }
 
