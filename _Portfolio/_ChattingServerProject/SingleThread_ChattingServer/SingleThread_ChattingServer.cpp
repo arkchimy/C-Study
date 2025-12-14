@@ -170,7 +170,7 @@ unsigned ContentsThread(void *arg)
         }
         {
             Profiler profiler(L"HeartBeat");
-            server->HeartBeat();
+            //server->HeartBeat();
         }
 
         ContentsUseSize = server->m_ContentsQ.m_size;
