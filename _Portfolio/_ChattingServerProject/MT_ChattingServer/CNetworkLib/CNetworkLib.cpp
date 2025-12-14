@@ -452,7 +452,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
                 InterlockedExchange(&session.m_blive, 0);
                 CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
 
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_Mode,
                                                L"%-20s ",
                                                L" false Packet CheckSum Not Equle "
                                                );

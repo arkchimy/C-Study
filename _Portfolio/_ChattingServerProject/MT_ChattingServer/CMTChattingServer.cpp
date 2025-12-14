@@ -620,7 +620,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
 
     if (SectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || SectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
     {
-        CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+        CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                        L"%-20s %20s %05lld %12s %05llu %12s %05llu %12s %05llu ",
                                        L"REQ_SECTOR_MOVE  : ",
                                        L"AccountNo", AccountNo,
@@ -639,7 +639,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
             // Attack : Login을 안하고 들어옴
-            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                            L"%-20s %20s %20s %05lld  ",
                                            L" REQ_SECTOR_MOVE ",
                                            L"Not Login Session REQ_MESSAGE",
@@ -711,7 +711,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         {
             // Attack : Login을 안하고 들어옴
-            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                            L"%-20s %20s %20s %05lld  ",
                                            L" REQ_MESSAGE ",
                                            L"Not Login Session REQ_MESSAGE",
@@ -811,10 +811,6 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroa
     player = SessionID_hash[SessionID];
     InterlockedExchange(&player->m_Timer, timeGetTime());
 
-    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                   L"%-20s %12s %05llu",
-                                   L"HEARTBEAT Send : ",
-                                   L"현재들어온ID:", SessionID);
 
     stTlsObjectPool<CMessage>::Release(msg);
 }
@@ -833,7 +829,7 @@ void CTestServer::AllocPlayer(CMessage *msg)
     if (prePlayer_hash.find(SessionID) != prePlayer_hash.end())
     {
         // Attack : LoginPacket 중복으로 보냄
-        CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+        CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                        L"%-20s %20s %20s %05lld  ",
                                        L"AllocPlayer ",
                                        L"Login Packet replay attack",
@@ -869,10 +865,6 @@ void CTestServer::AllocPlayer(CMessage *msg)
     // prePlayer_hash 는 Login을 기다리는 Session임.
     // LoginPacket을 받았다면 ;
 
-    CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                   L"%-20s %12s %05llu ",
-                                   L"AllocPlayer SessionLock Failed : ",
-                                   L"현재들어온ID:", SessionID);
     InterlockedExchange(&player->m_Timer, timeGetTime());
 
     player->m_sessionID = SessionID;
@@ -906,7 +898,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
             // 확인을 위해서는 같은 SessionID로  두번이상의 DeletePlayer가 발생 하였는지 알 수 있으면 됨.
 
-            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+            CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                            L" %-20s %20s %05lld  ",
                                            L" DeletePlayer ",
                                            L" Delete Packet replay attack ",
@@ -933,7 +925,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
             if (player->iSectorY >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size || player->iSectorX >= dfRANGE_MOVE_BOTTOM / dfSECTOR_Size)
             {
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                                L" %-20s %20s  %20s 05d %20s %05d  ",
                                                L" DeletePlayer ",
                                                L" Player Sector is not initialized ",
@@ -954,10 +946,6 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
             player->m_State = en_State::DisConnect;
 
-            CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                           L"%-20s %05lld %12s %05llu  ",
-                                           L"LogOut - Accept : ", player->m_AccountNo,
-                                           L"현재들어온ID:", SessionID);
 
             for (auto& element : balanceVec)
             {
@@ -979,10 +967,6 @@ void CTestServer::DeletePlayer(CMessage *msg)
         m_prePlayerCount--;
 
         player->m_State = en_State::DisConnect;
-        CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::DEBUG_TargetMode,
-                                       L"%-20s %05lld %12s %05llu  ",
-                                       L"LoginBeforeOut - WastAccept : ", player->m_AccountNo,
-                                       L"현재들어온ID:", SessionID);
 
         player_pool.Release(player);
     }
@@ -1086,13 +1070,13 @@ void CTestServer::Update()
             switch (e.type())
             {
             case MessageException::ErrorType::HasNotData:
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                                L"%-20s %20s %05d  ",
                                                L" msg >> Data  Faild ",
                                                L"wType", wType);
                 break;
             case MessageException::ErrorType::NotEnoughSpace:
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                                L"%-20s %20s %05d  ",
                                                L"NotEnoughSpace  : ",
                                                L"wType", wType);
@@ -1176,13 +1160,13 @@ void CTestServer::BalanceUpdate()
             switch (e.type())
             {
             case MessageException::ErrorType::HasNotData:
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                                L"%-20s %20s %05d  ",
                                                L" msg >> Data  Faild ",
                                                L"wType", wType);
                 break;
             case MessageException::ErrorType::NotEnoughSpace:
-                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::DEBUG_TargetMode,
                                                L"%-20s %20s %05d  ",
                                                L"NotEnoughSpace  : ",
                                                L"wType", wType);

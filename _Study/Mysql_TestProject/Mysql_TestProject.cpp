@@ -1,12 +1,63 @@
-﻿// Mysql_TestProject.cpp : 이 파일에는 'main' 함수가 포함됩니다. 거기서 프로그램 실행이 시작되고 종료됩니다.
-//
-
-#include <iostream>
+﻿#include <iostream>
 #include <mysql.h>
 #include <errmsg.h>
+#include <windows.h>
+#include <thread>
 
 //PATH=C:\Program Files\MySQL\MySQL Server 8.0\bin;C:\Program Files\MySQL\MySQL Server 8.0\lib;%PATH%
+
+void DB_SaveThread(void *arg);
+void EventThread(void *arg);
+
+struct stDBEvent
+{
+    virtual void exe() = 0;
+
+};
+struct stInsert :public stDBEvent
+{
+    void exe() 
+    {
+
+    }
+};
+//HANDLE WINAPI CreateIoCompletionPort(
+//    _In_ HANDLE FileHandle,
+//    _In_opt_ HANDLE ExistingCompletionPort,
+//    _In_ ULONG_PTR CompletionKey,
+//    _In_ DWORD NumberOfConcurrentThreads);
+#include <conio.h>
+
 int main()
+{
+    HANDLE hIocp = nullptr;
+    
+    hIocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+    if (hIocp == INVALID_HANDLE_VALUE)
+        __debugbreak();
+
+    std::thread DBThread(DB_SaveThread,hIocp);
+    SetThreadDescription(DBThread.native_handle(), L"DBThread");
+
+    while (1)
+    {
+        if (_kbhit())
+        {
+            char ch = _getch();
+            if (ch == VK_ESCAPE)
+            {
+                CloseHandle(hIocp);
+            }
+            if (ch == 'a' || ch == 'A')
+            {
+                PostQueuedCompletionStatus()
+            }
+        }
+    }
+
+}
+
+void DB_SaveThread(void *arg)
 {
     MYSQL conn;
     MYSQL *connection = NULL;
@@ -14,45 +65,45 @@ int main()
     MYSQL_ROW sql_row;
     int query_stat;
 
+    HANDLE hIOCP = arg;
     // 초기화
     mysql_init(&conn);
 
     // DB 연결
-
-    connection = mysql_real_connect(&conn, "127.0.0.1", "root", "123123", "test", 3306, (char *)NULL, 0);
+    connection = mysql_real_connect(&conn, "127.0.0.1", "root", "123123", "Test", 3306, (char *)NULL, 0);
     if (connection == NULL)
     {
-        // mysql_errno(&_MySQL);
+
         fprintf(stderr, "Mysql connection error : %s", mysql_error(&conn));
-        return 1;
+        mysql_errno(&conn);
+        __debugbreak();
+        return;
     }
 
-    // Select 쿼리문
-    const char *query = "SELECT * FROM account"; // From 다음 DB에 존재하는 테이블 명으로 수정하세요
-    query_stat = mysql_query(connection, query);
-    if (query_stat != 0)
+    // GQCS 로 할까?  결국 PQCS 로하면 똑같은거고,,,
+
+    DWORD transfferd;
+    ULONG64 key;
+    OVERLAPPED *overalpped;
+
     {
-        printf("Mysql query error : %s", mysql_error(&conn));
-        return 1;
+        //_Out_ LPDWORD lpNumberOfBytesTransferred,
+        //    _Out_ PULONG_PTR lpCompletionKey,
+        //    _Out_ LPOVERLAPPED *lpOverlapped,
     }
-
-    // 결과출력
-    sql_result = mysql_store_result(connection); // 결과 전체를 미리 가져옴
-                                                 //	sql_result=mysql_use_result(connection);		// fetch_row 호출시 1개씩 가져옴
-
-    while ((sql_row = mysql_fetch_row(sql_result)) != NULL)
+    while (1)
     {
-        printf("%2s %2s %s\n", sql_row[0], sql_row[1], sql_row[2]);
+        {
+            transfferd = 0;
+            key = 0;
+            overalpped = nullptr;
+        }
+        GetQueuedCompletionStatus(hIOCP, &transfferd, &key, &overalpped, INFINITE);
+        if (transfferd == 0 && key == 0 && overalpped == nullptr)
+            __debugbreak();
     }
-    mysql_free_result(sql_result);
-
-    // DB 연결닫기
-    mysql_close(connection);
-
-    //	int a = mysql_insert_id(connection);
-
-    //	query_stat = mysql_set_server_option(connection, MYSQL_OPTION_MULTI_STATEMENTS_ON);
-    //	mysql_next_result(connection);				// 멀티쿼리 사용시 다음 결과 얻기
-    //	sql_result=mysql_store_result(connection);	// next_result 후 결과 얻음
 }
 
+void EventThread(void *arg)
+{
+}

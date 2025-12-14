@@ -22,4 +22,9 @@
   <ItemGroup>
     <Library Include="libmysql.lib" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="Readme.txt">
+      <Filter>리소스 파일</Filter>
+    </Text>
+  </ItemGroup>
 </Project>
