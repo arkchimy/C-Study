@@ -144,9 +144,13 @@
     <Library Include="libmysql.lib" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="Config.txt" />
     <Text Include="Readme.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\_1Course\lib\Parser_lib\Parser_lib.vcxproj">
+      <Project>{aeaec43e-1516-4224-889b-858c678ce028}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\_3Course\lib\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj">
       <Project>{75b1f209-92d7-4410-bf05-3c1effab017b}</Project>
     </ProjectReference>

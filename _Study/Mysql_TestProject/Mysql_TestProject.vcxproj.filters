@@ -29,6 +29,9 @@
     <Text Include="Readme.txt">
       <Filter>리소스 파일</Filter>
     </Text>
+    <Text Include="Config.txt">
+      <Filter>리소스 파일</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Profiler_MultiThread.h">

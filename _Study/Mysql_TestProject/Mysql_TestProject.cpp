@@ -1,22 +1,35 @@
-﻿#include <iostream>
+﻿#define WIN32_LEAN_AND_MEAN
+#include <iostream>
 #include <mysql.h>
 #include <errmsg.h>
-#include <windows.h>
+
 #include <thread>
 #include <strsafe.h>
 #include <timeapi.h>
 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+
 #pragma comment(lib, "winmm.lib")
+
+#pragma comment(lib, "Ws2_32.lib")
 
 #include "../../_3Course/lib/CLockFreeMemoryPool/CLockFreeMemoryPool.h"
 #include "Profiler_MultiThread.h"
+#include "../../_1Course/lib/Parser_lib/Parser_lib.h"
 
 //PATH=C:\Program Files\MySQL\MySQL Server 8.0\bin;C:\Program Files\MySQL\MySQL Server 8.0\lib;%PATH%
 void DB_SaveThread(void *arg);
 void EventThread(void *arg);
+void MonitorThread(void *arg);
 
-
+int DBThreadCnt;
 LONG64 iMsgCount;
+std::vector<HANDLE> hIocp_vec;
+std::vector<std::thread> hDBThread_vec;
+std::vector<ull> tpsvec;
+LONG64 tpsIdx = -1;
 
 struct IJob
 {
@@ -48,20 +61,47 @@ struct CDB_CreateAccount :public IJob
 };
 
 #include <conio.h>
+#include <string>
 
 int main()
 {
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+        __debugbreak();
     HANDLE hIocp = nullptr;
     
-    hIocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
-    if (hIocp == INVALID_HANDLE_VALUE)
-        __debugbreak();
+      if (mysql_library_init(0, nullptr, nullptr))
+    {
+        __debugbreak(); // MySQL 라이브러리 초기화 실패
+    }
 
-    std::thread hDBThread(DB_SaveThread,hIocp);
-    SetThreadDescription(hDBThread.native_handle(), L"DBThread");
+    {
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
+        parser.GetValue(L"DBThreadCnt", DBThreadCnt);
 
-    std::thread hEventThread(EventThread, hIocp);
+        
+    }
+
+    hIocp_vec.reserve(DBThreadCnt);
+    hDBThread_vec.reserve(DBThreadCnt);
+    tpsvec.resize(DBThreadCnt);
+
+    for (int i = 0; i < DBThreadCnt; i++)
+    {
+        hIocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+        if (hIocp == NULL)
+            __debugbreak();
+        hIocp_vec.push_back(hIocp);
+        hDBThread_vec.emplace_back(DB_SaveThread, hIocp);
+        SetThreadDescription(hDBThread_vec.back().native_handle(), L"DBThread");
+    }
+
+    std::thread hEventThread(EventThread, &hIocp_vec);
     SetThreadDescription(hEventThread.native_handle(), L"EventThread");
+
+    std::thread hMonitorThread(MonitorThread, nullptr);
+    SetThreadDescription(hMonitorThread.native_handle(), L"MonitorThread");
 
     while (1)
     {
@@ -75,13 +115,14 @@ int main()
 
         }
     }
-
+    WSACleanup();
 }
 void InitPlayerTable(MYSQL* connection);
 
 #define ORIGINAL_FRAME 20
 DWORD frameTime = ORIGINAL_FRAME;
 bool bOn = true;
+
 void DB_SaveThread(void *arg)
 {
     MYSQL conn;
@@ -111,6 +152,8 @@ void DB_SaveThread(void *arg)
     DWORD transfferd;
     ULONG64 key;
     OVERLAPPED *overalpped;
+
+    LONG64 localtpsIdx = _interlockedincrement64(&tpsIdx);
 
     {
         //_Out_ LPDWORD lpNumberOfBytesTransferred,
@@ -155,9 +198,8 @@ void DB_SaveThread(void *arg)
                 if (elapsedSec >= 1.0)
                 {
                     double tps = double(tickCount) / elapsedSec;
-                    printf("[DB] TPS: %.1f ( frameTime = %05d msgCnt = %05lld)\n",
-                           tps, frameTime , iMsgCount);
 
+                    tpsvec[localtpsIdx] = tickCount;
                     // 다음 구간 리셋
                     tickCount = 0;
                     last = now;
@@ -167,29 +209,58 @@ void DB_SaveThread(void *arg)
     }
  
 }
+void MonitorThread(void *arg) 
+{
+    DWORD currentTime = timeGetTime();
+    DWORD nextTime = currentTime;
 
-void Logic(void* arg) 
+    while (1)
+    {
+        nextTime += 1000;
+        ull total = 0;
+
+        for (int i = 0; i < DBThreadCnt; i++)
+        {
+            total += tpsvec[i];
+        }
+        printf("[DB] TPS: %5lld ( frameTime = %05d msgCnt = %05lld)\n",
+               total, frameTime, iMsgCount);
+        currentTime = timeGetTime();
+
+        if (nextTime >= currentTime)
+        {
+
+            Sleep(nextTime - currentTime);
+        }
+
+    }
+}
+void Logic(void *arg)
 {
     static int accountNo = 0;
     int loopCnt = rand() % 500;
-    LONG64 currentMsgCnt;
+    LONG64 currentMsgCnt = 0;
+
     for (int i = 0; i < loopCnt; i++)
     {
         CDB_CreateAccount *msg = new CDB_CreateAccount();
         msg->AccountNo = accountNo++;
         if (bOn)
         {
-            PostQueuedCompletionStatus(arg, 0, (ULONG_PTR)msg, nullptr);
+            int idx = accountNo % DBThreadCnt;
+
+            PostQueuedCompletionStatus(hIocp_vec[idx], 0, (ULONG_PTR)msg, nullptr);
             currentMsgCnt = _InterlockedIncrement64(&iMsgCount);
-            if (currentMsgCnt > 100000)
-            {
-                frameTime += 100;
-            }
-            else if (frameTime > ORIGINAL_FRAME)
-            {
-                frameTime = ORIGINAL_FRAME;
-            }
         }
+
+    }
+    if (currentMsgCnt > 100000)
+    {
+        frameTime += 1;
+    }
+    else if (frameTime > ORIGINAL_FRAME)
+    {
+        frameTime = ORIGINAL_FRAME;
     }
 }
 
