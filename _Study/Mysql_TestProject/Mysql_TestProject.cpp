@@ -111,16 +111,19 @@ struct CDB_CreateAccount : public IJob
             AccountNo, 0, rand()%100);
 
         stRAIIBegin transaction(connection);
-        query_stat = mysql_query(connection, query);
-        if (query_stat != 0)
         {
-            printf("Mysql query error : %s", mysql_error(connection));
-            __debugbreak();
-        }
-        my_ulonglong affected = mysql_affected_rows(connection);
-        if (affected != 1)
-        {
-            printf("Unexpected insert count: %llu\n", affected);
+            Profiler profile(L"CreateAccount_exe");
+            query_stat = mysql_query(connection, query);
+            if (query_stat != 0)
+            {
+                printf("Mysql query error : %s", mysql_error(connection));
+                __debugbreak();
+            }
+            my_ulonglong affected = mysql_affected_rows(connection);
+            if (affected != 1)
+            {
+                printf("Unexpected insert count: %llu\n", affected);
+            }
         }
  
 
@@ -148,16 +151,19 @@ struct CDB_BroadInsert : public IJob
         for (int i = 0; i < TABLE_TYPE; i++)
         {
             StringCchPrintfA(query, sizeof(query), Insertformat[i], AccountNo);
-            query_stat = mysql_query(connection, query);
-            if (query_stat != 0)
             {
-                printf("Mysql query error : %s", mysql_error(connection));
-                __debugbreak();
-            }
-            my_ulonglong affected = mysql_affected_rows(connection);
-            if (affected != 1)
-            {
-                printf("Unexpected insert count: %llu\n", affected);
+                Profiler profile(L"BroadInsert_exe");
+                query_stat = mysql_query(connection, query);
+                if (query_stat != 0)
+                {
+                    printf("Mysql query error : %s", mysql_error(connection));
+                    __debugbreak();
+                }
+                my_ulonglong affected = mysql_affected_rows(connection);
+                if (affected != 1)
+                {
+                    printf("Unexpected insert count: %llu\n", affected);
+                }
             }
         }
 
@@ -175,18 +181,20 @@ struct CDB_SearchAccount : public IJob
         stRAIIBegin transaction(connection);
 
         StringCchPrintfA(query, sizeof(query), "SELECT * FROM player WHERE AccountNo = %d", AccountNo);
-        query_stat = mysql_query(connection, query);
-         if (query_stat != 0)
         {
-             printf("Mysql query error : %s", mysql_error(connection));
-            __debugbreak();
-         }
-        
-        // 결과출력
-         sql_result = mysql_store_result(connection); // 결과 전체를 미리 가져옴
-                                                      //	sql_result=mysql_use_result(connection);		// fetch_row 호출시 1개씩 가져옴
-         sql_row = mysql_fetch_row(sql_result);
+            Profiler profile(L"SearchAccount_exe");
+            query_stat = mysql_query(connection, query);
+            if (query_stat != 0)
+            {
+                printf("Mysql query error : %s", mysql_error(connection));
+                __debugbreak();
+            }
 
+            // 결과출력
+            sql_result = mysql_store_result(connection); // 결과 전체를 미리 가져옴
+                                                         //	sql_result=mysql_use_result(connection);		// fetch_row 호출시 1개씩 가져옴
+            sql_row = mysql_fetch_row(sql_result);
+        }
          while ((sql_row = mysql_fetch_row(sql_result)) != NULL)
          {
              // 실제 컬럼이 int형 타입이었다. 우리가 이거를 문자열에서 다시 숫자로 변환시켜야 돼요
@@ -368,21 +376,20 @@ void DB_SaveThread(void *arg)
             {
             case stMyOverlapped::en_MsgType::CDB_CreateAccount:
             {
-                Profiler profile(L"CreateAccount_exe");
+
                 job->exe(connection);
                 _InterlockedDecrement64(&iMsgCount);
             }
             break;
             case stMyOverlapped::en_MsgType::CDB_BroadInsert:
             {
-                Profiler profile(L"BroadInsert_exe");
+       
                 job->exe(connection);
                 _InterlockedDecrement64(&iMsgCount);
             }
             break;
             case stMyOverlapped::en_MsgType::CDB_SearchAccount:
             {
-                Profiler profile(L"SearchAccount_exe");
                 job->exe(connection);
                 _InterlockedDecrement64(&iMsgCount);
             }
