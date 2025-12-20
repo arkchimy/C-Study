@@ -52,8 +52,8 @@ std::string utf8_DBName;
 USHORT DBPort;
 int bAutoCommit = false;
 
+CObjectPool<stMyOverlapped> OverlappedPool;
 CBlockPool pool;
-
 
 
 struct stMyOverlapped : public OVERLAPPED

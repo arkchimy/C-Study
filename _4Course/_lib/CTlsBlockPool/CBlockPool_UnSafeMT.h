@@ -81,7 +81,7 @@ class CBlockPool_UnSafeMT
     template <typename T>
     T *Alloc()
     {
-        Block *node ;
+        Block *node;
         node = _top;
         _top = node->next;
         m_Size--;
@@ -122,12 +122,13 @@ class CBlockPool_UnSafeMT
         _top = node;
         m_Size++;
     }
-    void Initalize(size_t capacity,size_t BlockSize);
+    void Initalize(size_t capacity, size_t BlockSize);
+
   private:
     size_t m_Blocksize = 0;
     size_t m_newCnt = 0;
     Block *_top;
 
-  public:   
+  public:
     size_t m_Size = 0;
 };
