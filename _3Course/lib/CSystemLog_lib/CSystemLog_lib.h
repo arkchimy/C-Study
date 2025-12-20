@@ -6,7 +6,7 @@
 #include <iostream>
 #include <queue>
 
-#include "../MT_CRingBuffer_lib/MT_CRingBuffer_lib.h"
+#include "MT_CRingBuffer.h"
 
 enum class en_LOG_LEVEL : DWORD
 {

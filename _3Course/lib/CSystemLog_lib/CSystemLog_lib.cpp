@@ -1,7 +1,5 @@
 ﻿// CSystemLog_lib.cpp : 정적 라이브러리를 위한 함수를 정의합니다.
 //
-
-#include "pch.h"
 #include "CSystemLog_lib.h"
 
 #include <strsafe.h>
@@ -253,7 +251,6 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
         if (LogFile == nullptr)
         {
-            CSystemLog::GetInstance()->Log(L"FileOpen_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"_wfopen_s_Error %d", GetLastError());
             ReleaseSRWLockExclusive(&srw_Errorlock);
             return;
         }

@@ -1,10 +1,11 @@
 ﻿#pragma once
 
 #define WIN32_LEAN_AND_MEAN             // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
-#pragma once
 
 #include "CLockFreeStack.h"
 #include "CBlockPool_UnSafeMT.h"
+#include "../../../_3Course/lib/CSystemLog_lib/CSystemLog_lib.h"
+
 using CPoolType = CBlockPool_UnSafeMT;
 
 // 정적 tls로 사용하는편이 깔끔.
@@ -15,7 +16,7 @@ class CTlsBlockPoolManager
     using ManagerPool = CLockFreeStack<CPoolType *>;
 
   public:
-    CTlsBlockPoolManager(size_t tlsPool_init_Capacity, size_t BlockSize)
+    CTlsBlockPoolManager(int tlsPool_init_Capacity, int BlockSize)
     {
         m_tlsPool_init_Capacity = 300;
         m_BlockSize = BlockSize;
@@ -31,11 +32,15 @@ class CTlsBlockPoolManager
             if (emptyPools.Pop(retval))
             {
                 retval->Initalize(m_tlsPool_init_Capacity, m_BlockSize);
+                CSystemLog::GetInstance()->Log(L"tlsBlockPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
+                                               L"[ new tlsPool_init_Capacity => FullPool ]", retval);
             }
             else
             {
                 retval = new CPoolType();
                 retval->Initalize(m_tlsPool_init_Capacity, m_BlockSize);
+                CSystemLog::GetInstance()->Log(L"tlsBlockPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
+                                               L"[ Create New FullPool ]", retval);
             }
             return retval;
         }
@@ -51,14 +56,15 @@ class CTlsBlockPoolManager
         if (emptyPools.Pop(retval) == false)
         {
             retval = new CPoolType();
-
+            CSystemLog::GetInstance()->Log(L"tlsBlockPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - emptyPools.m_size == 0 ",
+                                           L"[ Create New EmptyPool ]", retval);
             return retval;
         }
 
         return retval;
     }
-    size_t m_tlsPool_init_Capacity = 0;
-    size_t m_BlockSize;
+    int m_tlsPool_init_Capacity = 0;
+    int m_BlockSize;
 
     ManagerPool fullPools;
     ManagerPool emptyPools;
@@ -68,7 +74,14 @@ class CTlsBlockPoolManager
 class CTlsBlockPool
 {
   public:
-    void InitTlsPool(CTlsBlockPoolManager *pManagersize_t);
+    inline void InitTlsPool(CTlsBlockPoolManager* pManagersize_t)
+    {
+          m_ManagerInstance = pManagersize_t;
+          m_AllocPool = new CPoolType();
+          m_AllocPool->Initalize(m_ManagerInstance->m_tlsPool_init_Capacity, m_ManagerInstance->m_BlockSize);
+          m_ReleasePool = new CPoolType();
+          m_ReleasePool->Initalize(m_ManagerInstance->m_tlsPool_init_Capacity, 0);
+    }
     template <typename T>
     T *Alloc()
     {

@@ -3,7 +3,7 @@
 #include <stack>
 
 using FlowChkType = int64_t;
-
+using NodeCntType = int; // m_Size 체크
 static constexpr FlowChkType Alloc_Data = 0xFDFDFDFDFDFDFDFD;
 static constexpr FlowChkType Relase_Data = 0xDDDDDDDDDDDDDDDD;
 
@@ -34,9 +34,9 @@ class CBlockPool_UnSafeMT
 
             _blockPtr = (unsigned char *)_begin + sizeof(FlowChkType);
 
-            *(FlowChkType *)_begin = Alloc_Data; // underflowChk
+            *(FlowChkType *)_begin = Relase_Data; // underflowChk
             overPtr = _begin + sizeof(Block) + objSize + sizeof(FlowChkType);
-            *(FlowChkType *)overPtr = Alloc_Data; // OverflowChk
+            *(FlowChkType *)overPtr = Relase_Data; // OverflowChk
             blockPtr = reinterpret_cast<Block *>(_begin + sizeof(FlowChkType));
             blockPtr->_overPtr = (FlowChkType *)overPtr; //  끝부분은 어쩔수없이 여기서 초기화. 생성자에서 금지.
 
@@ -85,6 +85,8 @@ class CBlockPool_UnSafeMT
         node = _top;
         _top = node->next;
         m_Size--;
+        if (m_Size < 0)
+            __debugbreak();
 
 #ifdef BlockDebugMode
         {
@@ -122,7 +124,18 @@ class CBlockPool_UnSafeMT
         _top = node;
         m_Size++;
     }
-    void Initalize(size_t capacity, size_t BlockSize);
+    void Initalize(int capacity, int BlockSize) 
+    {
+        Block *newBlock;
+
+        for (int i = 0; i < capacity; i++)
+        {
+            newBlock = new (BlockSize) Block();
+            newBlock->next = _top;
+            _top = newBlock;
+        }
+        m_Size = capacity;
+    }
 
   private:
     size_t m_Blocksize = 0;
@@ -130,5 +143,5 @@ class CBlockPool_UnSafeMT
     Block *_top;
 
   public:
-    size_t m_Size = 0;
+    NodeCntType m_Size = 0;
 };
