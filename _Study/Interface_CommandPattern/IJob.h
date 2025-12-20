@@ -15,11 +15,8 @@ class IJob
 
 class CreaetMsg : public IJob
 {
-    void *operator new(size_t size)
-    {
-       
-    }
-    void exe()
+  public:
+    virtual void exe()
     {
         printf("CreaetMsg exe \n");
     }
@@ -28,11 +25,8 @@ class CreaetMsg : public IJob
 
 class CreaetMsg2 : public IJob
 {
-    void *operator new(size_t size)
-    {
-      
-    }
-    void exe()
+  public:
+    virtual void exe()
     {
         printf("CreaetMsg2 exe \n");
     }

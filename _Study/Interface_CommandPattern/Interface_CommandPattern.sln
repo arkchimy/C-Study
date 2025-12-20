@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36212.18 d17.14
+VisualStudioVersion = 17.14.36212.18
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Interface_CommandPattern", "Interface_CommandPattern.vcxproj", "{54198EF5-9E14-4F46-AE86-D6E7614B10A8}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CLockFreeMemoryPool", "..\..\_3Course\lib\CLockFreeMemoryPool\CLockFreeMemoryPool.vcxproj", "{75B1F209-92D7-4410-BF05-3C1EFFAB017B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CLockFreeQueue_lib", "..\..\_3Course\lib\CLockFreeQueue_lib\CLockFreeQueue_lib.vcxproj", "{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +33,14 @@ Global
 		{75B1F209-92D7-4410-BF05-3C1EFFAB017B}.Release|x64.Build.0 = Release|x64
 		{75B1F209-92D7-4410-BF05-3C1EFFAB017B}.Release|x86.ActiveCfg = Release|Win32
 		{75B1F209-92D7-4410-BF05-3C1EFFAB017B}.Release|x86.Build.0 = Release|Win32
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Debug|x64.ActiveCfg = Debug|x64
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Debug|x64.Build.0 = Debug|x64
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Debug|x86.ActiveCfg = Debug|Win32
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Debug|x86.Build.0 = Debug|Win32
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Release|x64.ActiveCfg = Release|x64
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Release|x64.Build.0 = Release|x64
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Release|x86.ActiveCfg = Release|Win32
+		{61DF4FB5-0AA0-42E6-A798-65BD8B835D2C}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
