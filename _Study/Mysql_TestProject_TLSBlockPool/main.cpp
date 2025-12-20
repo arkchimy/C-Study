@@ -386,7 +386,9 @@ void Logic()
     }
     else if (frameTime > ORIGINAL_FRAME )
     {
-        frameTime -= 1;
+        frameTime -= 10;
+        if (frameTime < ORIGINAL_FRAME)
+            frameTime = ORIGINAL_FRAME;
     }
 }
 

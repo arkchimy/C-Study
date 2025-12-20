@@ -87,7 +87,7 @@ class CTlsBlockPool
     {
         if (m_AllocPool->m_Size == 0)
         {
-            m_ManagerInstance->GetFullPool(m_AllocPool);
+            m_AllocPool = m_ManagerInstance->GetFullPool(m_AllocPool);
             return m_AllocPool->Alloc<T>();
         }
         return m_AllocPool->Alloc<T>();
@@ -101,7 +101,7 @@ class CTlsBlockPool
 
         if (m_ReleasePool->m_Size == m_Capacity)
         {
-            m_ManagerInstance->GetEmptyPool(m_ReleasePool);
+            m_ReleasePool = m_ManagerInstance->GetEmptyPool(m_ReleasePool);
             return m_ReleasePool->Release<T>(inputNode);
         }
         m_ReleasePool->Release<T>(inputNode);
