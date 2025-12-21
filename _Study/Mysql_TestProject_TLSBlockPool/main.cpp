@@ -323,7 +323,7 @@ int accountNo = 0;
 void Logic()
 {
     
-    int loopCnt = rand() % 500;
+    int loopCnt = rand() % 5;
     LONG64 currentMsgCnt = 0;
     static bool bInsert = true;
     for (int i = 0; i < loopCnt; i++)

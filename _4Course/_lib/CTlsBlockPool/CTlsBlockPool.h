@@ -29,19 +29,11 @@ class CTlsBlockPoolManager
 
         if (fullPools.Pop(retval) == false)
         {
-            if (emptyPools.Pop(retval))
-            {
-                retval->Initalize(m_tlsPool_init_Capacity, m_BlockSize);
-                CSystemLog::GetInstance()->Log(L"tlsBlockPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
-                                               L"[ new tlsPool_init_Capacity => FullPool ]", retval);
-            }
-            else
-            {
-                retval = new CPoolType();
-                retval->Initalize(m_tlsPool_init_Capacity, m_BlockSize);
-                CSystemLog::GetInstance()->Log(L"tlsBlockPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
-                                               L"[ Create New FullPool ]", retval);
-            }
+            retval = new CPoolType();
+            retval->Initalize(m_tlsPool_init_Capacity, m_BlockSize);
+            CSystemLog::GetInstance()->Log(L"tlsBlockPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
+                                            L"[ Create New FullPool ]", retval);
+            
             return retval;
         }
 
@@ -79,8 +71,10 @@ class CTlsBlockPool
           m_ManagerInstance = pManagersize_t;
           m_AllocPool = new CPoolType();
           m_AllocPool->Initalize(m_ManagerInstance->m_tlsPool_init_Capacity, m_ManagerInstance->m_BlockSize);
+
           m_ReleasePool = new CPoolType();
-          m_ReleasePool->Initalize(m_ManagerInstance->m_tlsPool_init_Capacity, 0);
+          m_ReleasePool->Initalize(0, m_ManagerInstance->m_BlockSize);
+          m_Capacity = m_ManagerInstance->m_tlsPool_init_Capacity;
     }
     template <typename T>
     T *Alloc()
