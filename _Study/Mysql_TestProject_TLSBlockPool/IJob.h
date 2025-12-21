@@ -6,6 +6,7 @@
 #include "Profiler_MultiThread.h"
 
 #define TABLE_TYPE 4
+extern int ASyncMode;
 
 struct stRAIIBegin
 {
@@ -122,6 +123,7 @@ struct CDB_SearchAccount : public IJob
         {
             Profiler profile(L"SearchAccount_exe");
             query_stat = mysql_query(connection, query);
+
             if (query_stat != 0)
             {
                 printf("Mysql query error : %s", mysql_error(connection));

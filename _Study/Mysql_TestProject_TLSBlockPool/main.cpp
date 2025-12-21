@@ -48,7 +48,7 @@ std::string utf8_DBPassword;
 std::string utf8_DBName;
 USHORT DBPort;
 int bAutoCommit = false;
-
+int ASyncMode = 0;
 
 thread_local CTlsBlockPool pool;
 CTlsBlockPoolManager *IJobManagerPool;
@@ -112,6 +112,7 @@ int main()
         parser.GetValue(L"DBName", DBName, 100);
         parser.GetValue(L"bAutoCommit", bAutoCommit);
         parser.GetValue(L"ProfilerName", ProfilerName,100);
+        parser.GetValue(L"ASyncMode", ASyncMode);
 
 
         utf8_DBIPAddress = ToUtf8(DBIPAddress);
@@ -323,7 +324,7 @@ int accountNo = 0;
 void Logic()
 {
     
-    int loopCnt = rand() % 5;
+    int loopCnt = rand() % 500;
     LONG64 currentMsgCnt = 0;
     static bool bInsert = true;
     for (int i = 0; i < loopCnt; i++)

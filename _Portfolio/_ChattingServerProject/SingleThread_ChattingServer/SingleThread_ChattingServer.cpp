@@ -158,6 +158,8 @@ unsigned ContentsThread(void *arg)
         //                               L"This is ContentsThread");
     }
     ringBufferSize ContentsUseSize;
+    SectorManager::Initalize();
+
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
@@ -415,7 +417,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
 
     {
         Profiler profile(L"AroundSectorSearch");
-        SectorManager::GetSectorAround(SectorX, SectorY, &AroundSectors);
+        SectorManager::GetSectorAround(SectorX, SectorY, AroundSectors);
     }
 
     {
@@ -618,6 +620,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
     }
 
     stTlsObjectPool<CMessage>::Release(msg);
+    _InterlockedDecrement64(&m_NetworkMsgCount);
 }
 
 void CTestServer::HeartBeat()

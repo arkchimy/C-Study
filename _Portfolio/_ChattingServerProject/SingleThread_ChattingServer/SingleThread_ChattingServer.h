@@ -197,7 +197,18 @@ struct st_Sector_Around
 class SectorManager
 {
   public:
-    static void GetSectorAround(int iX, int iY,
+    static void Initalize()
+    {
+        cacheSectorAround.resize(SectorMax * SectorMax);
+        
+        for (int iX = 0; iX < SectorMax; iX++)
+        {
+            for (int iY = 0; iY < SectorMax; iY++)
+                SetSectorAround(iX, iY, &cacheSectorAround[iX + SectorMax * iY]);
+        }
+          
+    }
+    static void SetSectorAround(int iX, int iY,
                                 st_Sector_Around *pSectorAround)
     {
 
@@ -214,4 +225,12 @@ class SectorManager
             }
         }
     }
+    static void GetSectorAround(int iX, int iY,
+        st_Sector_Around& pSectorAround)
+    {
+        int idx = iX + SectorMax * iY;
+        pSectorAround = cacheSectorAround[idx];
+    }
+    
+    inline static std::vector<st_Sector_Around> cacheSectorAround;
 };

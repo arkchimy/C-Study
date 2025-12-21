@@ -453,22 +453,22 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         if (bEnCording)
         {
             bChkSum = msg->DeCoding();
-            if (bChkSum == false)
-            {
-                // Attack : 조작된 패킷으로 checkSum이 다름.
-                InterlockedExchange(&session.m_blive, 0);
-                CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
-                static bool bOn = false;
-                if (bOn == false)
-                {
-                    bOn = true;
-                    CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
-                                                   L"%-20s %20s %05d  ",
-                                                   L" false Packet CheckSum Not Equle ");
-                }
-                stTlsObjectPool<CMessage>::Release(msg);
-                return;
-            }
+            //if (bChkSum == false)
+            //{
+            //    // Attack : 조작된 패킷으로 checkSum이 다름.
+            //    InterlockedExchange(&session.m_blive, 0);
+            //    CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
+            //    static bool bOn = false;
+            //    if (bOn == false)
+            //    {
+            //        bOn = true;
+            //        CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+            //                                       L"%-20s %20s %05d  ",
+            //                                       L" false Packet CheckSum Not Equle ");
+            //    }
+            //    stTlsObjectPool<CMessage>::Release(msg);
+            //    return;
+            //}
         }
 
         InterlockedExchange(&msg->ownerID, SessionID);
