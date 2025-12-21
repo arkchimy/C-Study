@@ -62,6 +62,7 @@ struct stMyOverlapped : public OVERLAPPED
         CDB_BroadInsert,
         CDB_SearchAccount,
         MAX,
+        CDB_AllDelete,
     };
     en_MsgType m_Type;
 };
@@ -191,36 +192,17 @@ inline std::string ToUtf8(const std::wstring &w)
     return s;
 }
 
+thread_local DB db;
 void DB_SaveThread(void *arg)
 {
-    MYSQL conn;
-    MYSQL *connection = NULL;
-    MYSQL_RES *sql_result;
-    MYSQL_ROW sql_row;
-    int query_stat;
-
+    db.Connect(utf8_DBIPAddress.c_str(), utf8_DBId.c_str(), utf8_DBPassword.c_str(), utf8_DBName.c_str(), DBPort);
     pool.InitTlsPool(IJobManagerPool);
-
-    // 초기화
-    mysql_init(&conn);
-    // DB 연결
-    connection = mysql_real_connect(&conn, utf8_DBIPAddress.c_str(), utf8_DBId.c_str(), utf8_DBPassword.c_str(), utf8_DBName.c_str(), DBPort, (char *)NULL, 0);
-    if (connection == NULL)
+     
     {
-
-        fprintf(stderr, "Mysql connection error : %s", mysql_error(&conn));
-        mysql_errno(&conn);
-        __debugbreak();
-        return;
+        CDB_AllDelete *msg = pool.Alloc<CDB_AllDelete>();
+        msg->exe(&db);
+        pool.Release<CDB_CreateAccount>(msg);
     }
-    
-    if (!bAutoCommit)
-    {
-        if (mysql_autocommit(connection, 0) != 0)
-            __debugbreak();
-    }
-
-    InitTables(connection);
 
     DWORD transfferd;
     ULONG64 key;
@@ -251,7 +233,7 @@ void DB_SaveThread(void *arg)
             case stMyOverlapped::en_MsgType::CDB_CreateAccount:
             {
 
-                job->exe(connection);
+                job->exe(&db);
                 _InterlockedDecrement64(&iMsgCount);
 
                 pool.Release<CDB_CreateAccount>(job);
@@ -260,14 +242,21 @@ void DB_SaveThread(void *arg)
             case stMyOverlapped::en_MsgType::CDB_BroadInsert:
             {
        
-                job->exe(connection);
+                job->exe(&db);
                 _InterlockedDecrement64(&iMsgCount);
                 pool.Release<CDB_BroadInsert>(job);
             }
             break;
             case stMyOverlapped::en_MsgType::CDB_SearchAccount:
             {
-                job->exe(connection);
+                job->exe(&db);
+                _InterlockedDecrement64(&iMsgCount);
+                pool.Release<CDB_SearchAccount>(job);
+            }
+            break;
+            case stMyOverlapped::en_MsgType::CDB_AllDelete:
+            {
+                job->exe(&db);
                 _InterlockedDecrement64(&iMsgCount);
                 pool.Release<CDB_SearchAccount>(job);
             }
@@ -329,7 +318,7 @@ void Logic()
     static bool bInsert = true;
     for (int i = 0; i < loopCnt; i++)
     {
-        IJob *msg = nullptr;
+        
         int idx = accountNo % DBThreadCnt;
         stMyOverlapped *overlapped = nullptr;
 
@@ -341,42 +330,43 @@ void Logic()
                 case 0:
                 {
                     Profiler profile(L"CDB_CreateAccount");
-                    msg = pool.Alloc<CDB_CreateAccount>();
+                    CDB_CreateAccount* msg = pool.Alloc<CDB_CreateAccount>();
                     //msg = new CDB_CreateAccount();
                     
                     msg->AccountNo = accountNo++;
                     overlapped = reinterpret_cast<stMyOverlapped *>(OverlappedPool.Alloc());
                     overlapped->m_Type = stMyOverlapped::en_MsgType::CDB_CreateAccount;
+                    PostQueuedCompletionStatus(hIocp_vec[idx], 0, (ULONG_PTR)msg, overlapped);
                 }
                 break;
             case 1:
                 {
                     Profiler profile(L"CDB_BroadInsert");
-                    msg = pool.Alloc<CDB_BroadInsert>();
+                    CDB_BroadInsert* msg = pool.Alloc<CDB_BroadInsert>();
 
                     //msg = new CDB_BroadInsert();
                     msg->AccountNo = accountNo++;
                     overlapped = reinterpret_cast<stMyOverlapped *>(OverlappedPool.Alloc());
                     overlapped->m_Type = stMyOverlapped::en_MsgType::CDB_BroadInsert;
+                    PostQueuedCompletionStatus(hIocp_vec[idx], 0, (ULONG_PTR)msg, overlapped);
                 }
                 break;
             case 2:
                 {
                     Profiler profile(L"CDB_SearchAccount");
-                    msg = pool.Alloc<CDB_SearchAccount>();
+                    CDB_SearchAccount* msg = pool.Alloc<CDB_SearchAccount>();
 
                     //msg = new CDB_SearchAccount();
                     msg->AccountNo = accountNo++;
                     overlapped = reinterpret_cast<stMyOverlapped *>(OverlappedPool.Alloc());
                     overlapped->m_Type = stMyOverlapped::en_MsgType::CDB_SearchAccount;
+                    PostQueuedCompletionStatus(hIocp_vec[idx], 0, (ULONG_PTR)msg, overlapped);
                 }
                 break;
             default:
                 __debugbreak();
             }
-            if (msg == nullptr || overlapped ==nullptr) 
-                __debugbreak();
-            PostQueuedCompletionStatus(hIocp_vec[idx], 0, (ULONG_PTR)msg, overlapped);
+
             currentMsgCnt = _InterlockedIncrement64(&iMsgCount);
         }
 
@@ -411,30 +401,5 @@ void LogicThread(void *arg)
     }
 }
 
-void InitTables(MYSQL *connection)
-{
-    int query_stat;
-    char query[1000];
-    const char *DeleteFormat[TABLE_TYPE] =
-    {
-        "DELETE FROM sys.player",
-        "DELETE FROM sys.log",
-        "DELETE FROM sys.quest_complete",
-        "DELETE FROM sys.quest_progress",
-    };
-    for (int i = 0; i < TABLE_TYPE; i++)
-    {
-        printf("start: %05d\n", i);
-        query_stat = mysql_query(connection, DeleteFormat[i]);
-        if (query_stat != 0)
-        {
-            printf("Mysql query error : %s", mysql_error(connection));
-            __debugbreak();
-        }
-        my_ulonglong affected = mysql_affected_rows(connection);
-        printf("Deleted rows: %llu\n", affected);
-    }
-
-}
 
 

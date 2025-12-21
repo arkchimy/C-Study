@@ -1,17 +1,18 @@
 #pragma once
-#include <mysql.h>
 #include <iostream>
-#include <strsafe.h>
 
-#include "Profiler_MultiThread.h"
+#include "C:\Program Files\MySQL\MySQL Server 8.0\include\mysql.h"
+
+#include "DB.h"
+#include <strsafe.h>
 
 #define TABLE_TYPE 4
 extern int ASyncMode;
 
 struct stRAIIBegin
 {
-    stRAIIBegin(MYSQL *connection)
-        : _connection(connection)
+    stRAIIBegin(DB *db)
+        : _connection(db->_conn)
     {
 
         if (_connection == nullptr)
@@ -37,109 +38,107 @@ struct stRAIIBegin
     MYSQL *_connection = nullptr;
 };
 
-
 struct IJob
 {
-    virtual void exe(MYSQL *connection) {};
-    int AccountNo;
+    virtual void exe(DB *db) {};
 };
 struct CDB_CreateAccount : public IJob
 {
 
-    void exe(MYSQL *connection)
+    void exe(DB *db)
     {
-        int query_stat;
-        char query[1000];
-
-        StringCchPrintfA(query, sizeof(query), "INSERT INTO `sys`.`player` (`AccountNo`, `Level`, `Money`) VALUES ('%d', '%d', '%d')",
-                         AccountNo, 0, rand() % 100);
-
-        stRAIIBegin transaction(connection);
+        stRAIIBegin transaction(db);
+        DB::ResultSet rs = db->Query("INSERT INTO `sys`.`player` (`AccountNo`, `Level`, `Money`) VALUES ('%d', '%d', '%d')", AccountNo, 0, rand() % 100);
+        if (!rs.Ok())
         {
-            Profiler profile(L"CreateAccount_exe");
-            query_stat = mysql_query(connection, query);
-            if (query_stat != 0)
-            {
-                printf("Mysql query error : %s", mysql_error(connection));
-                __debugbreak();
-            }
-            my_ulonglong affected = mysql_affected_rows(connection);
-            if (affected != 1)
-            {
-                printf("Unexpected insert count: %llu\n", affected);
-            }
+            /* rs.Error() */
+        }
+
+        for (const auto &row : rs)
+        {
+            int acc = row["AccountNo"].AsInt();
         }
     }
+    int AccountNo;
 };
 struct CDB_BroadInsert : public IJob
 {
 
-    void exe(MYSQL *connection)
+    void exe(DB *db)
     {
 
-        const char *Insertformat[TABLE_TYPE] = {
-            "INSERT INTO `sys`.`player` (`AccountNo`) values(%d)",
-            "insert into `sys`.`log`  (`AccountNo`) values(%d)",
-            "insert into `sys`.`quest_complete`  (`AccountNo`) values(%d)",
-            "insert into `sys`.`quest_progress`  (`AccountNo`) values(%d)"};
-        //MYSQL_RES *sql_result;
-        //MYSQL_ROW sql_row;
+        const char *Insertformat[TABLE_TYPE] =
+            {
+                "INSERT INTO `sys`.`player` (`AccountNo`) values(%d)",
+                "insert into `sys`.`log`  (`AccountNo`) values(%d)",
+                "insert into `sys`.`quest_complete`  (`AccountNo`) values(%d)",
+                "insert into `sys`.`quest_progress`  (`AccountNo`) values(%d)"};
+
         int query_stat;
         char query[1000];
 
-        stRAIIBegin transaction(connection);
+        stRAIIBegin transaction(db);
         for (int i = 0; i < TABLE_TYPE; i++)
         {
-            StringCchPrintfA(query, sizeof(query), Insertformat[i], AccountNo);
+            DB::ResultSet rs = db->Query(Insertformat[i], AccountNo);
+            if (!rs.Ok())
             {
-                Profiler profile(L"BroadInsert_exe");
-                query_stat = mysql_query(connection, query);
-                if (query_stat != 0)
-                {
-                    printf("Mysql query error : %s", mysql_error(connection));
-                    __debugbreak();
-                }
-                my_ulonglong affected = mysql_affected_rows(connection);
-                if (affected != 1)
-                {
-                    printf("Unexpected insert count: %llu\n", affected);
-                }
+                /* rs.Error() */
+            }
+
+            for (const auto &row : rs)
+            {
+                int acc = row["AccountNo"].AsInt();
             }
         }
     }
+    int AccountNo;
+};
+struct CDB_AllDelete : public IJob
+{
+
+    void exe(DB *db)
+    {
+
+        const char *DeleteFormat[TABLE_TYPE] =
+            {
+                "DELETE FROM sys.player",
+                "DELETE FROM sys.log",
+                "DELETE FROM sys.quest_complete",
+                "DELETE FROM sys.quest_progress",
+            };
+        for (int i = 0; i < TABLE_TYPE; i++)
+        {
+            DB::ResultSet rs = db->Query(DeleteFormat[i]);
+            if (!rs.Ok())
+            {
+                /* rs.Error() */
+            }
+
+            for (const auto &row : rs)
+            {
+                int acc = row["AccountNo"].AsInt();
+            }
+        }
+    }
+    int AccountNo;
 };
 struct CDB_SearchAccount : public IJob
 {
 
-    void exe(MYSQL *connection)
+    void exe(DB *db)
     {
-        MYSQL_RES *sql_result;
-        MYSQL_ROW sql_row;
-        int query_stat;
-        char query[1000];
-        stRAIIBegin transaction(connection);
-
-        StringCchPrintfA(query, sizeof(query), "SELECT * FROM player WHERE AccountNo = %d", AccountNo);
+        // stRAIIBegin transaction(db);
+        DB::ResultSet rs = db->Query("SELECT * FROM player WHERE AccountNo = %d", AccountNo);
+        if (!rs.Ok())
         {
-            Profiler profile(L"SearchAccount_exe");
-            query_stat = mysql_query(connection, query);
-
-            if (query_stat != 0)
-            {
-                printf("Mysql query error : %s", mysql_error(connection));
-                __debugbreak();
-            }
-
-            // 결과출력
-            sql_result = mysql_store_result(connection); // 결과 전체를 미리 가져옴
-                                                         //	sql_result=mysql_use_result(connection);		// fetch_row 호출시 1개씩 가져옴
-            sql_row = mysql_fetch_row(sql_result);
+            /* rs.Error() */
         }
-        while ((sql_row = mysql_fetch_row(sql_result)) != NULL)
+
+        for (const auto &row : rs)
         {
-            // 실제 컬럼이 int형 타입이었다. 우리가 이거를 문자열에서 다시 숫자로 변환시켜야 돼요
-            // printf("%2d %2d %d\n", atoi(sql_row[0]), atoi(sql_row[1]), atoi(sql_row[2]));
+            int acc = row["AccountNo"].AsInt();
         }
-        mysql_free_result(sql_result);
     }
+    int AccountNo;
 };

@@ -24,6 +24,9 @@
     <ClCompile Include="IJob.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="DB.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Library Include="libmysql.lib" />
@@ -41,6 +44,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="IJob.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DB.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

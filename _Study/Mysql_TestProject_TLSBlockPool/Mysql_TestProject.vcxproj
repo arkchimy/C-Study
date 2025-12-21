@@ -143,6 +143,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DB.cpp" />
     <ClCompile Include="IJob.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Profiler_MultiThread.cpp" />
@@ -155,6 +156,7 @@
     <Text Include="Readme.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DB.h" />
     <ClInclude Include="IJob.h" />
     <ClInclude Include="Profiler_MultiThread.h" />
   </ItemGroup>

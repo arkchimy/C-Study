@@ -172,7 +172,7 @@ unsigned ContentsThread(void *arg)
         }
         {
             Profiler profiler(L"HeartBeat");
-            //server->HeartBeat();
+            server->HeartBeat();
         }
 
         ContentsUseSize = server->m_ContentsQ.m_size;
@@ -422,21 +422,26 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
 
     {
         Profiler profile(L"RAII_CntIncrement");
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
+
+       
+        seqID.reserve(1000);
+        for (const st_Sector_Pos &pos : AroundSectors.Around)
         {
-            vectorReserverSize += g_Sector[targetSector._iY][targetSector._iX].size();
-        }
-        seqID.reserve( vectorReserverSize );
-        for (const st_Sector_Pos targetSector : AroundSectors.Around)
-        {
-            for (ull id : g_Sector[targetSector._iY][targetSector._iX])
-            {
-                m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]++;
+            const auto &sectorSet = g_Sector[pos._iY][pos._iX]; // std::set<ull>
+
+            if (sectorSet.empty())
+                continue;
+
+            for (ull id : sectorSet)
                 seqID.push_back(id);
-            }
+
+            vectorReserverSize += sectorSet.size();
         }
-    }   
-           // TODO : Broad Cast  방식 수정하기.
+        m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE] += vectorReserverSize;
+
+    }
+
+    // TODO : Broad Cast  방식 수정하기.
     {
         Profiler profile(L"BroadCast_Loop_Total");
         Proxy::RES_MESSAGE(SessionID, msg, AccountNo, player->m_ID, player->m_Nickname,
