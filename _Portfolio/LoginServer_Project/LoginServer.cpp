@@ -5,6 +5,11 @@
 
 #include "../../_4Course/_lib/CDB/CDB.h"
 
+#include <cpp_redis/cpp_redis>
+#include <iostream>
+#pragma comment(lib, "cpp_redis.lib")
+#pragma comment(lib, "tacopie.lib")
+#pragma comment(lib, "ws2_32.lib")
 
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
@@ -48,8 +53,27 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
     {
         std::string token = row["sessionkey"].AsString();
         //token.compare((const char *)SessionKey);
+        cpp_redis::client client;
+        client.connect("127.0.0.1", 6379);
+        std::string key, value;
+        char sessionKey_A[64];
+
+        key = std::to_string(AccountNo);
+        {
+            size_t i;
+            value = wcstombs_s(&i, sessionKey_A, 64, SessionKey, 64);
+
+            int ttl_ms = 6000;
+            std::cout << " ======================================== \n";
+            std::cout << " Search [ Key ] " << key << "[value]  " << value << "\n";
+
+            client.psetex(key, ttl_ms, value);
+            std::cout << " ======================================== \n";
+        }
+        return dfLOGIN_STATUS_OK;
     }
-    return dfLOGIN_STATUS_OK;
+
+    return dfLOGIN_STATUS_SESSION_MISS;
 }
 
 
@@ -65,6 +89,12 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
     msg->GetData(SessionKey, 64);
 
     retval = WaitDB(AccountNo, SessionKey, ID,Nickname);
+    if (retval != dfLOGIN_STATUS_OK)
+    {
+        Disconnect(SessionID);
+        return;
+    }
+
     RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
 
 }
