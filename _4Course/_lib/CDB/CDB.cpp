@@ -13,7 +13,7 @@ void fnCDB()
     stRAIIBegin transaction(&db);//트랜잭션을 희망할 경우.
     int AccountNo = 10;
 
-    CDB::ResultSet rs = db.Query("INSERT INTO `sys`.`player` (`AccountNo`, `Level`, `Money`) VALUES ('%d', '%d', '%d')", AccountNo, 0, rand() % 100);
+    CDB::ResultSet rs = std::move(db.Query("INSERT INTO `sys`.`player` (`AccountNo`, `Level`, `Money`) VALUES ('%d', '%d', '%d')", AccountNo, 0, rand() % 100));
     if (!rs.Sucess())
     {
         printf("Query Error %s \n", rs.Error().c_str());

@@ -2,6 +2,10 @@
 #include <Windows.h>
 #include <timeapi.h>
 
+
+#include "../../_4Course/_lib/CDB/CDB.h"
+
+
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
 
@@ -11,6 +15,8 @@ extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴
 
 // OnRecv를 통해 Player객체에 접근 Player에 Overapped 을 두고 
 // 
+
+thread_local CDB db;
 
 enum en_PACKET_CS_LOGIN_RES_LOGIN : BYTE
 {
@@ -30,6 +36,19 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
     ZeroMemory(ID, 40);
     ZeroMemory(Nick, 40);
 
+    //SELECT 컬럼명 FROM 테이블명 WHERE 조건
+    CDB::ResultSet result = std::move(db.Query("select sessionkey from sessionkey where accountno = %lld", AccountNo));
+    if (result.Sucess() == false)
+    {
+        printf("\tQuery Error %s \n", result.Error().c_str());
+        __debugbreak();
+    }
+    // select의 경우
+    for (const auto &row : result)
+    {
+        std::string token = row["sessionkey"].AsString();
+        //token.compare((const char *)SessionKey);
+    }
     return dfLOGIN_STATUS_OK;
 }
 
@@ -89,6 +108,8 @@ void DBworkerThread(void *arg)
 
     stDBOverlapped *dbOverlapped;
 
+    db.Connect(server->AccountDB_IPAddress,server->DBuser,server->password,server->schema,server->DBPort);
+    
     while (1)
     {
         // 지역변수 초기화
@@ -147,7 +168,32 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThreadCount)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt)
 {
+    int DBThreadCnt;
+    {
+        WCHAR DBIPAddress[16];
+        WCHAR DBId[100];
+        WCHAR DBPassword[100];
+        WCHAR DBName[100];
 
+
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
+
+        parser.GetValue(L"DBThreadCnt", DBThreadCnt);
+        parser.GetValue(L"DBPort", DBPort);
+
+        parser.GetValue(L"DBIPAddress", DBIPAddress, IP_LEN);
+        parser.GetValue(L"DBId", DBId, ID_LEN);
+        parser.GetValue(L"DBPassword", DBPassword, Password_LEN);
+        parser.GetValue(L"DBName", DBName, DBName_LEN);
+
+        size_t i;
+        wcstombs_s(&i, AccountDB_IPAddress, IP_LEN, DBIPAddress, IP_LEN * sizeof(wchar_t));
+        wcstombs_s(&i, DBuser, ID_LEN, DBId, ID_LEN * sizeof(wchar_t));
+        wcstombs_s(&i, password, Password_LEN, DBPassword, Password_LEN * sizeof(wchar_t));
+        wcstombs_s(&i, schema, schema_LEN, DBName, schema_LEN * sizeof(wchar_t));
+  
+    }
     // DBConcurrent Thread 세팅
     m_hDBIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, m_lProcessCnt - reduceThreadCount);
 
@@ -168,9 +214,9 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
     hMonitorThread = std::move(std::thread(MonitorThread, this));
     hr = SetThreadDescription(hMonitorThread.native_handle(), L"MonitorThread");
     RT_ASSERT(!FAILED(hr));
-    hDBThread_vec.resize(ContentsThreadCnt);
+    hDBThread_vec.resize(DBThreadCnt);
 
-    for (DWORD i = 0; i < ContentsThreadCnt; i++)
+    for (DWORD i = 0; i < DBThreadCnt; i++)
     {
         std::wstring ContentsThreadName = L"\tDBThread" + std::to_wstring(i);
 

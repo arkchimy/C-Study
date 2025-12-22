@@ -6,7 +6,7 @@
 #include <string>
 #include <strsafe.h>
 #include <unordered_map>
-
+#pragma comment(lib, "libmysql.lib")
 class CDB
 {
   public:
@@ -54,7 +54,12 @@ class CDB
         std::string AsString() const
         {
             if (_p == nullptr || _len < 0)
-                __debugbreak();
+            {
+                // _p 값이 null인 경우가 존재. DB에서 값을 안넣음.
+                if (_len != 0)
+                    __debugbreak();
+                return std::string();
+            }
 
             return std::string(_p, _len);
         }
@@ -133,6 +138,19 @@ class CDB
             if (_pResult != nullptr)
                 mysql_free_result(_pResult);
         }
+        ResultSet(const ResultSet &) = delete;
+        ResultSet &operator=(const ResultSet &) = delete;
+
+        ResultSet (ResultSet&& other) noexcept
+            : _pResult(other._pResult),
+              _bSuccess(other._bSuccess),
+              _err(std::move(other._err)),
+              _HashMap(std::move(other._HashMap))
+        {
+            other._pResult = nullptr;
+            other._bSuccess = false;
+        }
+
         inline bool Sucess() const { return _bSuccess; }
         const std::string &Error() const { return _err; }
 

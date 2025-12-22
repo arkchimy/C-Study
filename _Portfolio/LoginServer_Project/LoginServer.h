@@ -30,6 +30,15 @@ struct CPlayer
     char m_SessionKey[64]{0};
 };
 
+    // DB연동서버
+enum
+{
+    IP_LEN = 16,
+    DBName_LEN = 16,
+    schema_LEN = 16,
+    ID_LEN = 16,
+    Password_LEN = 16,
+};
 
 class CTestServer :public CLanServer
 {
@@ -103,7 +112,15 @@ class CTestServer :public CLanServer
     WCHAR ChatServerIP[16] = L"127.0.0.1";
     USHORT ChatServerPort = 6000;
 
-    
+    //DB연동서버 
+
+    char AccountDB_IPAddress[IP_LEN];
+    USHORT DBPort;
+    char DBName[DBName_LEN];
+    char schema[schema_LEN];
+
+    char DBuser[ID_LEN];
+    char password[Password_LEN];
 
 };
 //// Debuging 정보
