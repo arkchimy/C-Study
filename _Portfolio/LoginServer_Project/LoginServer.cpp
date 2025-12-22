@@ -54,7 +54,7 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
         std::string token = row["sessionkey"].AsString();
         //token.compare((const char *)SessionKey);
         cpp_redis::client client;
-        client.connect("127.0.0.1", 6379);
+        client.connect("10.0.2.2", 6379);
         std::string key, value;
         char sessionKey_A[64];
 
