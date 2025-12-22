@@ -23,7 +23,7 @@ extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴
 
 thread_local CDB db;
 thread_local cpp_redis::client* client;
-
+static ull cnt = 0;
 
 enum en_PACKET_CS_LOGIN_RES_LOGIN : BYTE
 {
@@ -57,14 +57,13 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
 
         key = std::to_string(AccountNo);
         {
-            static ull cnt = 0;
             size_t i;
             wcstombs_s(&i, sessionKey_A, 64, SessionKey, 32);
             value = sessionKey_A;
             int ttl_ms = 6000;
-            printf("Account [ %lld ]\n", ++cnt);
+            InterlockedIncrement(&cnt);
             client->psetex(key, ttl_ms, value);
-
+            client->sync_commit();
         }
         return dfLOGIN_STATUS_OK;
     }
@@ -103,7 +102,10 @@ void MonitorThread(void *arg)
         Sleep(1000);
         printf("======================================================================");
         printf("%20s : %10lld\n", "DBQuery_Count", server->m_DBMessageCnt);
+        printf("%20s : %10lld\n", "Total Account", cnt);
         printf("%20s : %10lld\n", "SessionID_hash.size", server->SessionID_hash.size());
+        printf("%20s : %10lld\n", "player_pool.iNodeCnt", server->player_pool.iNodeCnt);
+        printf("%20s : %10lld\n", "dbOverlapped_pool.iNodeCnt", server->dbOverlapped_pool.iNodeCnt);
         printf("======================================================================");
     }
 }
@@ -369,21 +371,21 @@ void CTestServer::Update()
 {
     std::shared_lock sessionHashLock(SessionID_hash_Lock);
     
-    //DWORD currentTime = timeGetTime();
-    //DWORD distance;
+    DWORD currentTime = timeGetTime();
+    DWORD distance;
 
-    //for (auto& element : SessionID_hash)
-    //{
-    //    DWORD targetTime = element.second->m_Timer;
-    //    if (currentTime < targetTime)
-    //    {
-    //        continue;
-    //    }
-    //    distance = currentTime - targetTime;
-    //    if (distance > 10000)
-    //    {
-    //        Disconnect(element.first);
-    //    }
-    //}
+    for (auto& element : SessionID_hash)
+    {
+        DWORD targetTime = element.second->m_Timer;
+        if (currentTime < targetTime)
+        {
+            continue;
+        }
+        distance = currentTime - targetTime;
+        if (distance > 10000)
+        {
+            Disconnect(element.first);
+        }
+    }
 
 }
