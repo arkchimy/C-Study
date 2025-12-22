@@ -16,8 +16,8 @@ class CDB
             return;
         mysql_close(_connection);
     }
-    void Connect(const char* host, const char* user, const char* pass,
-        const char* db, unsigned int port = 3306) 
+    void Connect(const char *host, const char *user, const char *pass,
+                 const char *db, unsigned int port = 3306)
     {
 
         _connection = mysql_init(nullptr);
@@ -148,7 +148,7 @@ class CDB
                 _HashMap.emplace(fields[i].name, i);
             }
         }
-  
+
         Row Fetch()
         {
             // Query 내부에서 InitHashTable를 호출 함.
@@ -211,7 +211,7 @@ class CDB
 struct stRAIIBegin
 {
 
-    stRAIIBegin(CDB * db)
+    stRAIIBegin(CDB *db)
         : _connection(db->_connection)
     {
         if (_connection == nullptr)

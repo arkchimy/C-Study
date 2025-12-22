@@ -192,7 +192,7 @@ inline std::string ToUtf8(const std::wstring &w)
     return s;
 }
 
-thread_local DB db;
+thread_local CDB db;
 void DB_SaveThread(void *arg)
 {
     db.Connect(utf8_DBIPAddress.c_str(), utf8_DBId.c_str(), utf8_DBPassword.c_str(), utf8_DBName.c_str(), DBPort);
@@ -357,7 +357,7 @@ void Logic()
                     CDB_SearchAccount* msg = pool.Alloc<CDB_SearchAccount>();
 
                     //msg = new CDB_SearchAccount();
-                    msg->AccountNo = accountNo++;
+                    msg->AccountNo = accountNo;
                     overlapped = reinterpret_cast<stMyOverlapped *>(OverlappedPool.Alloc());
                     overlapped->m_Type = stMyOverlapped::en_MsgType::CDB_SearchAccount;
                     PostQueuedCompletionStatus(hIocp_vec[idx], 0, (ULONG_PTR)msg, overlapped);
