@@ -115,6 +115,7 @@ class CTestServer :public CLanServer
     //DB연동서버 
 
     char AccountDB_IPAddress[IP_LEN];
+    char RedisIpAddress[IP_LEN];
     USHORT DBPort;
     char DBName[DBName_LEN];
     char schema[schema_LEN];

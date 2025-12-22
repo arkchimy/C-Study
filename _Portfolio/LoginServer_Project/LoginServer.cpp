@@ -22,6 +22,8 @@ extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴
 // 
 
 thread_local CDB db;
+thread_local cpp_redis::client* client;
+
 
 enum en_PACKET_CS_LOGIN_RES_LOGIN : BYTE
 {
@@ -38,9 +40,6 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
 {
     //일단은 성공만 반환 나중에 db에서 가져와서 확인.
 
-    ZeroMemory(ID, 40);
-    ZeroMemory(Nick, 40);
-
     //SELECT 컬럼명 FROM 테이블명 WHERE 조건
     CDB::ResultSet result = std::move(db.Query("select sessionkey from sessionkey where accountno = %lld", AccountNo));
     if (result.Sucess() == false)
@@ -52,23 +51,20 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
     for (const auto &row : result)
     {
         std::string token = row["sessionkey"].AsString();
-        //token.compare((const char *)SessionKey);
-        cpp_redis::client client;
-        client.connect("10.0.2.2", 6379);
+
         std::string key, value;
         char sessionKey_A[64];
 
         key = std::to_string(AccountNo);
         {
+            static ull cnt = 0;
             size_t i;
-            value = wcstombs_s(&i, sessionKey_A, 64, SessionKey, 64);
-
+            wcstombs_s(&i, sessionKey_A, 64, SessionKey, 32);
+            value = sessionKey_A;
             int ttl_ms = 6000;
-            std::cout << " ======================================== \n";
-            std::cout << " Search [ Key ] " << key << "[value]  " << value << "\n";
+            printf("Account [ %lld ]\n", ++cnt);
+            client->psetex(key, ttl_ms, value);
 
-            client.psetex(key, ttl_ms, value);
-            std::cout << " ======================================== \n";
         }
         return dfLOGIN_STATUS_OK;
     }
@@ -137,6 +133,10 @@ void DBworkerThread(void *arg)
     clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
 
     stDBOverlapped *dbOverlapped;
+    cpp_redis::client a;
+    client = &a;
+
+    client->connect(server->RedisIpAddress, 6379);
 
     db.Connect(server->AccountDB_IPAddress,server->DBuser,server->password,server->schema,server->DBPort);
     
@@ -182,7 +182,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         }
         // TODO : dbOverlapped_pool.pool 모니터링 필요
         stDBOverlapped *overlapped = reinterpret_cast<stDBOverlapped *>(dbOverlapped_pool.Alloc());
-        ZeroMemory(overlapped, sizeof(OVERLAPPED));
+        ZeroMemory(overlapped, sizeof(stDBOverlapped));
 
         msg->InitMessage();
         *msg << AccountNo;
@@ -201,6 +201,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
     int DBThreadCnt;
     {
         WCHAR DBIPAddress[16];
+        WCHAR RedisIp[16];
         WCHAR DBId[100];
         WCHAR DBPassword[100];
         WCHAR DBName[100];
@@ -217,11 +218,17 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
         parser.GetValue(L"DBPassword", DBPassword, Password_LEN);
         parser.GetValue(L"DBName", DBName, DBName_LEN);
 
+        parser.GetValue(L"RedisIp", RedisIp, IP_LEN);
+
+
+
         size_t i;
-        wcstombs_s(&i, AccountDB_IPAddress, IP_LEN, DBIPAddress, IP_LEN * sizeof(wchar_t));
-        wcstombs_s(&i, DBuser, ID_LEN, DBId, ID_LEN * sizeof(wchar_t));
-        wcstombs_s(&i, password, Password_LEN, DBPassword, Password_LEN * sizeof(wchar_t));
-        wcstombs_s(&i, schema, schema_LEN, DBName, schema_LEN * sizeof(wchar_t));
+        wcstombs_s(&i, AccountDB_IPAddress, IP_LEN, DBIPAddress, IP_LEN );
+        wcstombs_s(&i, RedisIpAddress, IP_LEN, RedisIp, IP_LEN);
+
+        wcstombs_s(&i, DBuser, ID_LEN, DBId, ID_LEN );
+        wcstombs_s(&i, password, Password_LEN, DBPassword, Password_LEN );
+        wcstombs_s(&i, schema, schema_LEN, DBName, schema_LEN );
   
     }
     // DBConcurrent Thread 세팅
