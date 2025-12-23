@@ -53,7 +53,23 @@ struct CPlayer
 
     int iSectorX = 0;
     int iSectorY = 0;
+
+    char m_ipAddress[16];
+    USHORT m_port;
+
 };
+
+
+// DB연동서버
+enum
+{
+    IP_LEN = 16,
+    DBName_LEN = 16,
+    schema_LEN = 16,
+    ID_LEN = 16,
+    Password_LEN = 16,
+};
+
 
 class CTestServer : public CLanServer
 {
@@ -80,7 +96,7 @@ class CTestServer : public CLanServer
 
     virtual void OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
 
-    virtual bool OnAccept(ull SessionID) override;
+    virtual bool OnAccept(ull SessionID,SOCKADDR_IN& addr) override;
     virtual void OnRelease(ull SessionID) override;
 
     virtual LONG64 GetPlayerCount() { return m_TotalPlayers; }
@@ -183,6 +199,9 @@ class CTestServer : public CLanServer
       Contetns는 인증되지않는 Player를 주기적으로 검사한다.
 
     */
+
+    char RedisIpAddress[IP_LEN];//port 6379
+
 };
 
 struct st_Sector_Pos

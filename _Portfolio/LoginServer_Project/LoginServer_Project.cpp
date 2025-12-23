@@ -19,6 +19,8 @@ int main()
     short bindPort;
 
     wchar_t ChatServerbindAddr[16];
+    wchar_t Dummy1_ChatServerbindAddr[16];
+    wchar_t Dummy2_ChatServerbindAddr[16];
     short ChatServerbindPort;
 
     int iZeroCopy;
@@ -45,6 +47,9 @@ int main()
         parser.GetValue(L"ServerPort", bindPort);
 
         parser.GetValue(L"ChatServerIP", ChatServerbindAddr, 16);
+        parser.GetValue(L"Dummy1_ChatServerIP", Dummy1_ChatServerbindAddr, 16);
+        parser.GetValue(L"Dummy2_ChatServerIP", Dummy2_ChatServerbindAddr, 16);
+
         parser.GetValue(L"ChatServerPort", ChatServerbindPort);
 
    /*     WCHAR GameServerIP[16] = L"0.0.0.0";
@@ -80,6 +85,8 @@ int main()
         // 생성자에서 넘겨주는 것이 DB컨커런트
         CTestServer *LoginServer = new CTestServer(DBWorkerThreadCnt, iEnCording, DBContentsThreadCnt);
         memcpy(LoginServer->ChatServerIP, ChatServerbindAddr, 32);
+        memcpy(LoginServer->Dummy1_ChatServerIP, Dummy1_ChatServerbindAddr, 32);
+        memcpy(LoginServer->Dummy2_ChatServerIP, Dummy2_ChatServerbindAddr, 32);
         LoginServer->ChatServerPort = ChatServerbindPort;
 
         LoginServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);

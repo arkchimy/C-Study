@@ -87,7 +87,7 @@ class CLanServer : public Stub, public Proxy
     public:
     bool Disconnect(const ull SessionID);
     void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
-    virtual bool OnAccept(ull SessionID) = 0;
+    virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) = 0;
     virtual float OnRecv(ull SessionID, struct CMessage *msg, bool bBalanceQ = false) = 0;
     virtual void OnRelease(ull SessionID) = 0;
 

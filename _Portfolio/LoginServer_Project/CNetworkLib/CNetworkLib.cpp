@@ -152,7 +152,7 @@ unsigned AcceptThread(void *arg)
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)&session, 0);
 
         // AllocMsg의 처리가 너무 많이 발생한다면 False를 반환.
-        if (server->OnAccept(session.m_SeqID.SeqNumberAndIdx) == false)
+        if (server->OnAccept(session.m_SeqID.SeqNumberAndIdx, addr) == false)
         {
             CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                            L"%-10s %10s %05lld  %10s %012llu  %10s %4llu\n",

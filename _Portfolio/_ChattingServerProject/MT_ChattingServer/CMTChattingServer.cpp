@@ -24,6 +24,15 @@
 
 #include "./CNetworkLib/utility/CCpuUsage/CCpuUsage.h"
 
+#include <cpp_redis/cpp_redis>
+
+#pragma comment(lib, "cpp_redis.lib")
+#pragma comment(lib, "tacopie.lib")
+#pragma comment(lib, "ws2_32.lib")
+
+
+thread_local cpp_redis::client *client;
+thread_local ull tls_ContentsQIdx; // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
 
 
 extern SRWLOCK srw_Log;
@@ -430,6 +439,11 @@ void BalanceThread(void *arg)
     }
 
 
+    cpp_redis::client a;
+    client = &a;
+
+    client->connect(server->RedisIpAddress, 6379);
+
     while (1)
     {
         hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
@@ -463,7 +477,6 @@ void BalanceThread(void *arg)
 }
 
 
-thread_local ull tls_ContentsQIdx;  // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
 void ContentsThread(void *arg)
 {
     DWORD hSignalIdx;
@@ -472,6 +485,10 @@ void ContentsThread(void *arg)
     CLockFreeQueue<CMessage*> *CotentsQ;
     HANDLE local_ContentsEvent;
 
+    cpp_redis::client a;
+    client = &a;
+
+    client->connect(server->RedisIpAddress, 6379);
 
 
     {
@@ -607,6 +624,29 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 
     {
         // Login응답.
+        // redis에서 읽기, 가져오고 token을 비교 같다면 
+        std::string key = std::to_string(AccountNo);
+        auto future = client->get(key.c_str());
+        client->sync_commit();
+        cpp_redis::reply reply = future.get();
+
+        if (reply.is_null())
+        {
+            printf("AccountNo %lld not found in redis\n", AccountNo);
+            __debugbreak();
+            return;
+        }
+        std::string sessionKey = reply.as_string();
+
+        char SessionKeyA[66];
+        memcpy(SessionKeyA, SessionKey, 64);
+        SessionKeyA[64] = '\0';
+        SessionKeyA[65] = '\0';
+
+        key = std::to_string(AccountNo);
+
+        if (sessionKey.compare(SessionKeyA) != 0)
+            __debugbreak();
         Proxy::RES_LOGIN(SessionID, msg, true, AccountNo);
 
         InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_LOGIN]);
@@ -908,6 +948,8 @@ void CTestServer::AllocPlayer(CMessage *msg)
     player->m_sessionID = SessionID;
     player->m_State = en_State::Session;
 
+    msg->GetData(player->m_ipAddress, 16);
+    *msg >> player->m_port;
 
     m_prePlayerCount++;
     _InterlockedDecrement64(&m_NetworkMsgCount);
@@ -1417,7 +1459,7 @@ void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
     
 }
 
-bool CTestServer::OnAccept(ull SessionID)
+bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
 {
     // Accept의 요청이 밀리고 있다고한다면, 그 이후에 Accept로 들어오는 Session을 끊겠다.
     // m_AllocMsgCount 처리량을 보여주는 변수.
@@ -1439,12 +1481,24 @@ bool CTestServer::OnAccept(ull SessionID)
         return false;
     }
 
+
+
     {
+        char ipAddress[16];
+        USHORT port;
+        {
+            sockaddr_in *ipv4 = (sockaddr_in *)&addr;
+            inet_ntop(AF_INET, &ipv4->sin_addr, ipAddress, sizeof(ipAddress));
+            port = ntohs(ipv4->sin_port);
+        }
+
         CMessage *msg;
 
         msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
 
         *msg << (unsigned short)en_PACKET_Player_Alloc;
+        msg->PutData(ipAddress, 16);
+        *msg << port; 
         InterlockedExchange(&msg->ownerID, SessionID);
         // TODO : 실패의 경우의 수
         OnRecv(SessionID, msg,true);

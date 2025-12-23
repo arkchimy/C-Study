@@ -28,6 +28,9 @@ struct CPlayer
     WCHAR m_ID[20]{0};
     WCHAR m_Nickname[20]{0};
     char m_SessionKey[64]{0};
+
+    std::string m_ipAddress;
+    USHORT m_port;
 };
 
     // DB연동서버
@@ -60,7 +63,7 @@ class CTestServer :public CLanServer
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
     virtual float OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
 
-    virtual bool OnAccept(ull SessionID) override;
+     virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) override;
     virtual void OnRelease(ull SessionID) override;
 
     std::thread hMonitorThread;
@@ -109,7 +112,9 @@ class CTestServer :public CLanServer
     WCHAR GameServerIP[16] = L"0.0.0.0";
     USHORT GameServerPort = 0;
 
-    WCHAR ChatServerIP[16] = L"127.0.0.1";
+    WCHAR ChatServerIP[16]{};
+    WCHAR Dummy1_ChatServerIP[16]{};
+    WCHAR Dummy2_ChatServerIP[16]{};
     USHORT ChatServerPort = 6000;
 
     //DB연동서버 

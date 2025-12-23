@@ -87,7 +87,7 @@ class CLanServer : public Stub, public Proxy
 
     void RecvPacket(class clsSession &session);
 
-    virtual bool OnAccept(ull SessionID) = 0;
+    virtual bool OnAccept(ull SessionID , SOCKADDR_IN& addr) = 0;
     virtual void OnRecv(ull SessionID, struct CMessage *msg, bool bBalanceQ = false) = 0;
     virtual void OnRelease(ull SessionID) = 0;
 

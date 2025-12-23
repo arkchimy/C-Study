@@ -11,6 +11,7 @@ int main()
     st_WSAData wsa;
 
     wchar_t bindAddr[16];
+    wchar_t RedisIpAddress[16];
     short bindPort;
 
     int iZeroCopy;
@@ -48,6 +49,7 @@ int main()
         parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
         parser.GetValue(L"EnCording", iEnCording);
 
+        parser.GetValue(L"RedisIpAddress", RedisIpAddress, IP_LEN);
 
         CRingBuffer::s_BufferSize = iRingBufferSize;
     }
@@ -59,6 +61,10 @@ int main()
 
     {
         CTestServer *ChattingServer = new CTestServer(ContentsThreadCnt, iEnCording);
+
+        size_t i;
+        wcstombs_s(&i, ChattingServer->RedisIpAddress, IP_LEN, RedisIpAddress, IP_LEN);
+
 
         
         ChattingServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);

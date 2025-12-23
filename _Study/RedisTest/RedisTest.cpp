@@ -35,6 +35,7 @@ int main()
             std::cout << " Search [ Key ]  [ value ] \n";
             std::cin >> key >> value;
             client.psetex(key, ttl_ms, value);
+            client.sync_commit();
             std::cout << " ======================================== \n";
         }
         if (ch == 'S' || ch == 's')

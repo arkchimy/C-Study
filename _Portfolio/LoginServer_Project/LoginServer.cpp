@@ -53,14 +53,16 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
         std::string token = row["sessionkey"].AsString();
 
         std::string key, value;
-        char sessionKey_A[64];
-
+        char SessionKeyA[66]; 
+        memcpy(SessionKeyA, SessionKey, 64);
+        SessionKeyA[64] = '\0';
+        SessionKeyA[65] = '\0';
         key = std::to_string(AccountNo);
         {
             size_t i;
-            wcstombs_s(&i, sessionKey_A, 64, SessionKey, 32);
-            value = sessionKey_A;
-            int ttl_ms = 6000;
+  
+            value = SessionKeyA;
+            int ttl_ms = 50000;
             InterlockedIncrement(&cnt);
             client->psetex(key, ttl_ms, value);
             client->sync_commit();
@@ -89,8 +91,26 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
         Disconnect(SessionID);
         return;
     }
+    {
+        std::shared_lock lock(SessionID_hash_Lock);
 
-    RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
+        auto iter = SessionID_hash.find(SessionID);
+        if (iter != SessionID_hash.end())
+        {
+            if (iter->second->m_ipAddress.compare("10.0.1.2") == 0)
+            {
+                RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, Dummy1_ChatServerIP, ChatServerPort);
+                return;
+            }
+            else if (iter->second->m_ipAddress.compare("10.0.2.2") == 0)
+            {
+                RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, Dummy2_ChatServerIP, ChatServerPort);
+                return;
+            }
+        }
+        RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
+        
+    }
 
 }
 void MonitorThread(void *arg)
@@ -104,8 +124,8 @@ void MonitorThread(void *arg)
         printf("%20s : %10lld\n", "DBQuery_Count", server->m_DBMessageCnt);
         printf("%20s : %10lld\n", "Total Account", cnt);
         printf("%20s : %10lld\n", "SessionID_hash.size", server->SessionID_hash.size());
-        printf("%20s : %10lld\n", "player_pool.iNodeCnt", server->player_pool.iNodeCnt);
-        printf("%20s : %10lld\n", "dbOverlapped_pool.iNodeCnt", server->dbOverlapped_pool.iNodeCnt);
+        printf("%20s : %10d\n", "player_pool.iNodeCnt", server->player_pool.iNodeCnt);
+        printf("%20s : %10d\n", "dbOverlapped_pool.iNodeCnt", server->dbOverlapped_pool.iNodeCnt);
         printf("======================================================================");
     }
 }
@@ -305,7 +325,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
     return 0.0f;
 }
 
-bool CTestServer::OnAccept(ull SessionID)
+bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
 {
     std::unique_lock sessionHashLock(SessionID_hash_Lock);
 
@@ -319,14 +339,24 @@ bool CTestServer::OnAccept(ull SessionID)
         return false;
     }
 
-  
-        //TODO : 이부분 Flush 되나?
-        SessionID_hash[SessionID] = player;
-        InterlockedExchange((ull *)&player->m_State, (ull)en_State::None);
-        //player->m_State = en_State::None;
-        player->m_Timer = timeGetTime();
-        player->m_sessionID = SessionID;
-    
+    char ipAddress[16];
+    USHORT port;
+    {
+        sockaddr_in *ipv4 = (sockaddr_in *)&addr;
+        inet_ntop(AF_INET, &ipv4->sin_addr, ipAddress, sizeof(ipAddress));
+        port = ntohs(ipv4->sin_port);
+    }
+
+    //TODO : 이부분 Flush 되나?
+    SessionID_hash[SessionID] = player;
+    InterlockedExchange((ull *)&player->m_State, (ull)en_State::None);
+    //player->m_State = en_State::None;
+    player->m_Timer = timeGetTime();
+    player->m_sessionID = SessionID;
+
+    player->m_ipAddress = ipAddress;
+    player->m_port = port;
+
     return true;
 }
 

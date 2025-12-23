@@ -112,6 +112,10 @@ unsigned AcceptThread(void *arg)
             CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET");
             break;
         }
+     
+
+        
+
         server->arrTPS[0]++; // Accept TPS 측정
         server->m_TotalAccept++;
 
@@ -148,7 +152,7 @@ unsigned AcceptThread(void *arg)
         CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)&session, 0);
 
         // AllocMsg의 처리가 너무 많이 발생한다면 False를 반환.
-        if (server->OnAccept(session.m_SeqID.SeqNumberAndIdx) == false)
+        if (server->OnAccept(session.m_SeqID.SeqNumberAndIdx,addr) == false)
         {
             server->DecrementIoCountAndMaybeDeleteSession(session);
             continue;
