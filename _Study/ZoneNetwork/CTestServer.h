@@ -17,6 +17,8 @@
 // #define dfRANGE_MOVE_BOTTOM 640
 #define dfSECTOR_Size 128
 
+
+
 enum class en_State : int
 {
     Session,
@@ -162,7 +164,18 @@ class CTestServer : public CLanServer
 
     */
 };
+// Zone
+class clsLoginZone : public IZone
+{
+  public:
+    virtual void OnAccept(ull SessionId, SOCKADDR_IN &addr);
+    virtual void OnRecv(ull SessionId, struct CMessage *msg);
+    virtual void OnUpdate();
+    virtual void OnRelease(ull SessiondId);
 
+    CTestServer *server;
+};
+/////////////////////////////////////////
 struct st_Sector_Pos
 {
     st_Sector_Pos() = default;

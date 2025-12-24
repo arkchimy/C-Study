@@ -476,7 +476,8 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
         // PayLoad를 읽고 무엇인가 처리하는 Logic이 NetWork에 들어가선 안된다.
         {
             Profiler profile(L"OnRecv");
-            OnRecv(SessionID, msg);
+            session.m_ZoneBuffer.Push(msg);
+            //OnRecv(SessionID, msg);
         }
     }
     RecvPacket(session);
@@ -947,6 +948,12 @@ void CLanServer::ReleaseSession(ull SessionID)
 }
 
 ////////////////////////////////// Zone //////////////////////////////////
+
+void CLanServer::CreateLoginZone(IZone *zone, const wchar_t *ThreadName, int cnt)
+{
+    ZoneSet *zoneSet = new ZoneSet(zone, L"LoginZoneThread",&bOn);
+    m_LoginZone = zoneSet;
+}
 
 void CLanServer::CreateZone(IZone *zone, const wchar_t *ThreadName, int threadCnt)
 {

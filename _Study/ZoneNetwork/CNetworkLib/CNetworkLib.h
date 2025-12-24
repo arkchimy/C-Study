@@ -33,22 +33,27 @@ class IZone
     virtual void OnUpdate() = 0;
     virtual void OnRelease(ull SessiondId) = 0;
 };
+
+
 class ZoneSet
 {
   public:
     ZoneSet(IZone* zone,const wchar_t* ThreadName , bool* bOn , int threadCnt = 1)
         : m_zone(zone), m_bOn(bOn)
     {
-        m_Thread = std::thread(ZoneSet::ThreadMain, this);
+        m_Thread = std::thread(&ZoneSet::ThreadMain, this);
         SetThreadDescription(m_Thread.native_handle(), ThreadName);
     }
     ~ZoneSet()
     {
         m_Thread.join();
     }
-
+    void Push( CMessage* msg)
+    {
+        q.Push(msg);
+    }
   private:
-    void ThreadMain(void* arg)
+    void ThreadMain()
     {
         while (*m_bOn == true)
         {
@@ -163,6 +168,7 @@ class CLanServer : public Stub, public Proxy
 
     //////////////////////////////////////// Zone
 
+    void CreateLoginZone(IZone *zone, const wchar_t *ThreadName, int cnt = 1);
     void CreateZone(IZone *zone, const wchar_t *ThreadName, int cnt = 1);
     //////////////////////////////////////////
   public:
@@ -197,4 +203,5 @@ class CLanServer : public Stub, public Proxy
     LONG64 m_NetworkMsgCount = 0;
 
     int m_AllocLimitCnt = 10000;
+    ZoneSet * m_LoginZone;
 };

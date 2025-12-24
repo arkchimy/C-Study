@@ -666,6 +666,10 @@ CTestServer::CTestServer(int iEncording)
     // TODO : 한계치를 정하는 함수 구현하기
     player_pool.Initalize(m_maxPlayers);
     player_pool.Limite_Lock(); // Pool이 늘어나지않음.
+
+    clsLoginZone *zone = new clsLoginZone();
+    CreateLoginZone(zone, L"TestZone");
+
 }
 
 CTestServer::~CTestServer()
@@ -772,7 +776,7 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
-float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
+void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
 {
     // double CurrentQ;
     ringBufferSize ContentsUseSize;
@@ -780,7 +784,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
     if (msg == nullptr)
     {
         // ContentsQ 상태 확인용
-        return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
+
     }
 
     {
@@ -788,8 +792,8 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
         // 포인터를 넣고
         CMessage **ppMsg;
         ppMsg = &msg;
-        InterlockedExchange(&msg->ownerID, SessionID);
-
+        //InterlockedExchange(&msg->ownerID, SessionID);
+        msg->ownerID = SessionID;
         {
             Profiler profile(L"ContentsQ_Enqueue");
             m_ContentsQ.Push(msg);
@@ -799,7 +803,6 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalance)
         _interlockedincrement64(&m_RecvTPS);
     }
 
-    return float(ContentsUseSize) / float(CTestServer::s_ContentsQsize) * 100.f;
 }
 
 bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
@@ -808,8 +811,6 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
     // m_AllocMsgCount 처리량을 보여주는 변수.
 
     LONG64 localAllocCnt;
-
-    clsSession &session = sessions_vec[SessionID >> 47];
 
     localAllocCnt = _InterlockedIncrement64(&m_AllocMsgCount);
 
@@ -828,10 +829,11 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
         msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
 
         *msg << (unsigned short)en_PACKET_Player_Alloc;
-        InterlockedExchange(&msg->ownerID, SessionID);
+        msg->ownerID= SessionID;
         // TODO : ContentsThread에서
         _InterlockedIncrement64(&m_NetworkMsgCount);
-        OnRecv(SessionID, msg);
+        m_LoginZone->Push(msg);
+        //OnRecv(SessionID, msg);
     }
 
     return true;
@@ -845,12 +847,13 @@ void CTestServer::OnRelease(ull SessionID)
         msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
 
         *msg << (unsigned short)en_PACKET_Player_Delete;
-        InterlockedExchange(&msg->ownerID, SessionID);
-
+        //InterlockedExchange(&msg->ownerID, SessionID);
+        msg->ownerID = SessionID;
         _InterlockedIncrement64(&m_NetworkMsgCount);
         OnRecv(SessionID, msg);
     }
 }
+
 
 void MsgTypePrint(WORD type, LONG64 val)
 {
@@ -867,4 +870,70 @@ void MsgTypePrint(WORD type, LONG64 val)
 
     };
     printf("%20s : %05llu\n", Msgformat[type], val);
+}
+
+//Zone
+void clsLoginZone::OnAccept(ull SessionId, SOCKADDR_IN &addr)
+{
+}
+
+void clsLoginZone::OnRecv(ull SessionId, CMessage *msg)
+{
+    WORD wType;
+    try
+    {
+        *msg >> wType;
+    }
+    catch (const MessageException &e)
+    {
+        switch (e.type())
+        {
+        case MessageException::ErrorType::HasNotData:
+        {
+            static bool bOn = false;
+            if (bOn == false)
+            {
+                bOn = true;
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L" msg >> Data  Faild ",
+                                               L"wType", wType);
+            }
+        }
+        break;
+        case MessageException::ErrorType::NotEnoughSpace:
+        {
+            static bool bOn = false;
+            if (bOn == false)
+            {
+                bOn = true;
+                CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %20s %05d  ",
+                                               L"NotEnoughSpace  : ",
+                                               L"wType", wType);
+            }
+            msg->HexLog(CMessage::en_Tag::_ERROR, L"Attack.txt");
+            break;
+        }
+        }
+        stTlsObjectPool<CMessage>::Release(msg);
+        server->Disconnect(SessionId);
+        return;
+    }
+    if (wType != en_PACKET_Player_Alloc)
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        server->Disconnect(SessionId);
+        return;
+    }
+    server->PacketProc(SessionId, msg, wType);
+}
+
+void clsLoginZone::OnUpdate()
+{
+    
+}
+
+void clsLoginZone::OnRelease(ull SessiondId)
+{
 }

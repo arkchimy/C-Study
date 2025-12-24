@@ -3,14 +3,10 @@
 #include <iostream>
 #include "CTestServer.h"
 
-class Lobby :public IZone
-{
-    
-};
+
 int main()
 {
     CTestServer* server = new CTestServer();
-    server->CreateZone()
 }
 
 // 프로그램 실행: <Ctrl+F5> 또는 [디버그] > [디버깅하지 않고 시작] 메뉴
