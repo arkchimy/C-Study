@@ -131,7 +131,7 @@ struct stTlsLockInfo
         GetThreadDescription(hThread, &threadName);
         if (wcslen(threadName) == 0)
         {
-            StringCchPrintfW(buffer, _countof(buffer), ThreadStartIDFormat, hThread);
+            StringCchPrintfW(buffer, _countof(buffer), ThreadStartIDFormat, GetThreadId(hThread));
             fwrite(buffer, sizeof(wchar_t), wcslen(buffer), file);
         }
         else
