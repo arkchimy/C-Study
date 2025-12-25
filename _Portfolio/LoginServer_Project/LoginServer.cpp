@@ -14,6 +14,7 @@
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
 
+
 // Chatting Server와의 연결
 // Redis와의 연결
 // Client와의 연결
