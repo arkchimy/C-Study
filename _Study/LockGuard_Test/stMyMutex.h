@@ -5,7 +5,7 @@
 
 #include <Windows.h>
 #include <conio.h>
-#include <mutex>
+#include <shared_mutex>
 #include <thread>
 
 #include <map>
@@ -16,7 +16,34 @@ struct stTlsLockInfo;
 class MyMutexManager
 {
   private:
-    MyMutexManager() = default;
+    MyMutexManager() 
+        : hMutexLogEvent(nullptr)
+    {
+        // 만일 재귀 lock이 걸린다면 생성자에서 생성한 이벤트로 Signal이 온다.
+        // 여기서 생성한 Thread는 해당 signal을 기다리고있으므로 해당 쓰레드에서 Log를 작성.
+        
+        hMutexLogEvent = CreateEvent(nullptr, false, false, nullptr);
+        hManagerThread = std::thread(&MyMutexManager::MyMutexManagerThread, this);
+        // Join 안함.
+    };
+    void MyMutexManagerThread()
+    {
+       
+
+        if (hMutexLogEvent == nullptr)
+            __debugbreak();
+
+        SetThreadDescription(hManagerThread.native_handle(), L"MyMutexManagerThread");
+        
+        WaitForSingleObject(hMutexLogEvent, INFINITE);    
+
+        LogTlsInfo();
+
+
+        // 에러로인한 Log작성임.
+        __debugbreak();
+        
+    }
 
   public:
     static MyMutexManager *GetInstance()
@@ -46,20 +73,26 @@ class MyMutexManager
     }
     void RegisterTlsInfoAndHandle(stTlsLockInfo *info)
     {
-        std::lock_guard<std::mutex> m_lock(m);
+        std::lock_guard<std::shared_mutex> m_lock(m);
         LockInfos.insert(info);
     }
     void LogTlsInfo(const wchar_t *filename = L"TlsLockInfo.txt");
-
+    void RequestCreateLogFile_And_Debugbreak();
     std::unordered_set<stTlsLockInfo *> LockInfos;
-    std::mutex m;
+    std::shared_mutex m;
+
+    HANDLE hMutexLogEvent;
+    std::thread hManagerThread;
+
+    std::mutex Log_m; // ManagerThread에서 접근 And 외부 mainThread에서 접근할 경우가 존재.
 };
 struct stTlsLockInfo
 {
     stTlsLockInfo()
-        : _size(0), waitLock(nullptr)
+        : _size(0), waitLock(nullptr), _shared_size(0)
     {
         holding.reserve(30); // 30개의 Lock을 잡을일은 없겠지
+        shared_holding.reserve(30); // 30개의 Lock을 잡을일은 없겠지
 
         HANDLE hThread2 = GetCurrentThread();
         DuplicateHandle(GetCurrentProcess(), hThread2, GetCurrentProcess(), &hThread, 0, false, DUPLICATE_SAME_ACCESS);
@@ -123,17 +156,22 @@ struct stTlsLockInfo
     // tls를 사용하여 동기화없이 접근하기.
     void *waitLock;
     std::vector<void *> holding; // bool 이 false 면 Shared , 1이면 Exclusive
-    int _size;                   // holding의 길이.
+    std::vector<void *> shared_holding;
+    int _size;                   // holding의 길이. 외부에서 Lock없이 size만큼만 읽으려는 용도.
+    int _shared_size;
     HANDLE hThread;
 };
 
 struct stMyMutex
 {
-    std::mutex m;
-    _Acquires_lock_(m) void lock();
-    _Releases_lock_(m) void unlock();
+    std::shared_mutex m;
+    _Acquires_exclusive_lock_(m) void lock();
+    _Releases_exclusive_lock_(m) void unlock();
+
+    _Acquires_shared_lock_(m) void lock_shared();
+    _Releases_shared_lock_(m) void unlock_shared();
 };
 
 #ifdef MY_MUTEX
-#define mutex stMyMutex
+#define shared_mutex stMyMutex
 #endif

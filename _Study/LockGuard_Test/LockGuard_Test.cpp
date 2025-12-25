@@ -26,7 +26,7 @@ bool bOn =true;
 using namespace std;
 
 thread_local stTlsLockInfo tls_LockInfo;
-mutex m;
+shared_mutex m;
 void workThread()
 {
     long long idx = InterlockedIncrement64(&g_idx);
@@ -39,7 +39,7 @@ void workThread()
         WaitForSingleObject(hStartEvent, INFINITE);
         for (int i = 0; i < 10000; i++)
         {
-            std::lock_guard<mutex> m_lock(m);
+            std::lock_guard<shared_mutex> m_lock(m);
 
             num++;
 
@@ -58,9 +58,11 @@ void workThread2()
     {
         for (int i = 0; i < 10000; i++)
         {
-            std::lock_guard<mutex> m_lock(m);
+            std::lock_guard<shared_mutex> m_lock(m);
             {
-                Sleep(100000);
+                {
+                    std::lock_guard<shared_mutex> m_lock(m);
+                }
             }
         }
 
