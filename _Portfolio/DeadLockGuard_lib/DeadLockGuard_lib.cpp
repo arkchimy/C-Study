@@ -1,9 +1,33 @@
-#include "stMyMutex.h"
+﻿#include "DeadLockGuard_lib.h"
 
+// 사용법
+void func()
+{
+    // std::shared_mutex 대신에 SharedMutex  를 사용할 것.
+    // 반드시 해당 라이브러리 include 이전에 #define DEADLOCK_GUARD 를 사용할 것.
+#ifdef DEADLOCK_GUARD
+    using SharedMutex = DeadLockGuard;
+#else
+    using SharedMutex = std::shared_mutex;
+#endif
+
+    //                         사용법 
+
+    SharedMutex m;
+
+    {
+        thread_local stTlsLockInfo tls_LockInfo;
+        MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); // 등록을 해야함.
+
+        std::lock_guard<SharedMutex> m_lock(m);
+        std::shared_lock<SharedMutex> lock(m);
+    }
+
+}
 
 extern thread_local stTlsLockInfo tls_LockInfo;
 
-_Acquires_exclusive_lock_(m) void stMyMutex::lock()
+_Acquires_exclusive_lock_(m) void DeadLockGuard::lock()
 {
     auto iter = tls_LockInfo.holding.begin();
     tls_LockInfo.waitLock = &m;
@@ -22,9 +46,8 @@ _Acquires_exclusive_lock_(m) void stMyMutex::lock()
     tls_LockInfo.waitLock = nullptr;
     tls_LockInfo.holding.push_back(&m);
     tls_LockInfo._size++;
-    
 }
-_Releases_exclusive_lock_(m) void stMyMutex::unlock()
+_Releases_exclusive_lock_(m) void DeadLockGuard::unlock()
 {
     auto iter = tls_LockInfo.holding.begin();
     for (iter; iter != tls_LockInfo.holding.end(); iter++)
@@ -40,7 +63,7 @@ _Releases_exclusive_lock_(m) void stMyMutex::unlock()
     m.unlock();
 }
 
-_Acquires_shared_lock_(m) void stMyMutex::lock_shared()
+_Acquires_shared_lock_(m) void DeadLockGuard::lock_shared()
 {
     tls_LockInfo.waitLock = &m;
 
@@ -55,14 +78,12 @@ _Acquires_shared_lock_(m) void stMyMutex::lock_shared()
 
     m.lock_shared();
     tls_LockInfo.waitLock = nullptr;
-    // LockShared���� Holding�� ǥ���صѱ�?
-
+    // LockShared에서 Holding을 표시해둘까?
 
     tls_LockInfo.shared_holding.push_back(&m);
     tls_LockInfo._shared_size++;
-    
 }
-_Releases_shared_lock_(m) void stMyMutex::unlock_shared()
+_Releases_shared_lock_(m) void DeadLockGuard::unlock_shared()
 {
     auto iter = tls_LockInfo.shared_holding.begin();
     for (iter; iter != tls_LockInfo.shared_holding.end(); iter++)
@@ -80,7 +101,7 @@ _Releases_shared_lock_(m) void stMyMutex::unlock_shared()
 
 void MyMutexManager::LogTlsInfo(const wchar_t *filename)
 {
-    // Log�� ���� Lock
+    // Log를 위한 Lock
     std::lock_guard<std::mutex> m_lock(Log_m);
     {
         std::lock_guard<std::shared_mutex> m_lock(m);

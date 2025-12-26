@@ -11,6 +11,8 @@
 #include <unordered_set>
 #include <string>
 
+#include "../../_Portfolio/DeadLockGuard_lib/DeadLockGuard_lib.h"
+
 
 HANDLE hStartEvent = CreateEvent(nullptr, true, false, nullptr);
 HANDLE* hWaitEvent ;
@@ -20,13 +22,10 @@ int num = 0;
 bool bOn =true;
 
 
-#define MY_MUTEX
-#include "stMyMutex.h"
 
-using namespace std;
 
 thread_local stTlsLockInfo tls_LockInfo;
-shared_mutex m;
+SharedMutex m;
 void workThread()
 {
     long long idx = InterlockedIncrement64(&g_idx);
@@ -39,7 +38,7 @@ void workThread()
         WaitForSingleObject(hStartEvent, INFINITE);
         for (int i = 0; i < 10000; i++)
         {
-            std::lock_guard<shared_mutex> m_lock(m);
+            std::lock_guard<SharedMutex> m_lock(m);
 
             num++;
 
@@ -58,10 +57,10 @@ void workThread2()
     {
         for (int i = 0; i < 10000; i++)
         {
-            std::lock_guard<shared_mutex> m_lock(m);
+            std::lock_guard<SharedMutex> m_lock(m);
             {
                 {
-                    std::lock_guard<shared_mutex> m_lock(m);
+                    std::lock_guard<SharedMutex> m_lock(m);
                 }
             }
         }

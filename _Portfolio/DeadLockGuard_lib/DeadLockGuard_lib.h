@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #define WIN32_LEAN_AND_MEAN
 #include <iostream>
@@ -16,46 +16,43 @@ struct stTlsLockInfo;
 class MyMutexManager
 {
   private:
-    MyMutexManager() 
+    MyMutexManager()
         : hMutexLogEvent(nullptr)
     {
-        // ¸¸ÀÏ Àç±Í lockÀÌ °É¸°´Ù¸é »ı¼ºÀÚ¿¡¼­ »ı¼ºÇÑ ÀÌº¥Æ®·Î SignalÀÌ ¿Â´Ù.
-        // ¿©±â¼­ »ı¼ºÇÑ Thread´Â ÇØ´ç signalÀ» ±â´Ù¸®°íÀÖÀ¸¹Ç·Î ÇØ´ç ¾²·¹µå¿¡¼­ Log¸¦ ÀÛ¼º.
-        
+        // ë§Œì¼ ì¬ê·€ lockì´ ê±¸ë¦°ë‹¤ë©´ ìƒì„±ìì—ì„œ ìƒì„±í•œ ì´ë²¤íŠ¸ë¡œ Signalì´ ì˜¨ë‹¤.
+        // ì—¬ê¸°ì„œ ìƒì„±í•œ ThreadëŠ” í•´ë‹¹ signalì„ ê¸°ë‹¤ë¦¬ê³ ìˆìœ¼ë¯€ë¡œ í•´ë‹¹ ì“°ë ˆë“œì—ì„œ Logë¥¼ ì‘ì„±.
+
         hMutexLogEvent = CreateEvent(nullptr, false, false, nullptr);
         hManagerThread = std::thread(&MyMutexManager::MyMutexManagerThread, this);
-        // Join ¾ÈÇÔ.
+        // Join ì•ˆí•¨.
     };
     void MyMutexManagerThread()
     {
-       
 
         if (hMutexLogEvent == nullptr)
             __debugbreak();
 
         SetThreadDescription(hManagerThread.native_handle(), L"MyMutexManagerThread");
-        
-        WaitForSingleObject(hMutexLogEvent, INFINITE);    
+
+        WaitForSingleObject(hMutexLogEvent, INFINITE);
 
         LogTlsInfo();
 
-
-        // ¿¡·¯·ÎÀÎÇÑ LogÀÛ¼ºÀÓ.
+        // ì—ëŸ¬ë¡œì¸í•œ Logì‘ì„±ì„.
         __debugbreak();
-        
     }
 
   public:
     static MyMutexManager *GetInstance()
     {
-        // ÇÔ¼ö°¡ ½ÇÆĞÇÏ¸é ¹İÈ¯ °ªÀº NULL.
+        // í•¨ìˆ˜ê°€ ì‹¤íŒ¨í•˜ë©´ ë°˜í™˜ ê°’ì€ NULL.
         static HANDLE hInitEvent = CreateEvent(nullptr, true, false, nullptr);
         if (hInitEvent == nullptr)
             __debugbreak();
 
         static MyMutexManager *instance = nullptr;
         static long Once = false;
-        // ´Ü ÇÑ¹ø¸¸
+        // ë‹¨ í•œë²ˆë§Œ
 
         if (InterlockedCompareExchange(&Once, true, false) == false)
         {
@@ -84,40 +81,38 @@ class MyMutexManager
     HANDLE hMutexLogEvent;
     std::thread hManagerThread;
 
-    std::mutex Log_m; // ManagerThread¿¡¼­ Á¢±Ù And ¿ÜºÎ mainThread¿¡¼­ Á¢±ÙÇÒ °æ¿ì°¡ Á¸Àç.
+    std::mutex Log_m; // ManagerThreadì—ì„œ ì ‘ê·¼ And ì™¸ë¶€ mainThreadì—ì„œ ì ‘ê·¼í•  ê²½ìš°ê°€ ì¡´ì¬.
 };
 struct stTlsLockInfo
 {
     stTlsLockInfo()
         : _size(0), waitLock(nullptr), _shared_size(0)
     {
-        holding.reserve(30); // 30°³ÀÇ LockÀ» ÀâÀ»ÀÏÀº ¾ø°ÚÁö
-        shared_holding.reserve(30); // 30°³ÀÇ LockÀ» ÀâÀ»ÀÏÀº ¾ø°ÚÁö
+        holding.reserve(30);        // 30ê°œì˜ Lockì„ ì¡ì„ì¼ì€ ì—†ê² ì§€
+        shared_holding.reserve(30); // 30ê°œì˜ Lockì„ ì¡ì„ì¼ì€ ì—†ê² ì§€
 
         HANDLE hThread2 = GetCurrentThread();
         DuplicateHandle(GetCurrentProcess(), hThread2, GetCurrentProcess(), &hThread, 0, false, DUPLICATE_SAME_ACCESS);
-
     }
 
     void WriteLog(const wchar_t *filename)
     {
         const wchar_t ThreadStartFormat[] =
-            L"¦£¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¤\n"
-            L"¦¢ Thread : %-52s ¦¢\n"
-            L"¦§¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦©\n";
+            L"â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”\n"
+            L"â”‚ Thread : %-52s â”‚\n"
+            L"â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤\n";
         const wchar_t ThreadStartIDFormat[] =
-            L"¦£¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¤\n"
-            L"¦¢ Thread ID : %-48lu ¦¢\n"
-            L"¦§¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦©\n";
+            L"â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”\n"
+            L"â”‚ Thread ID : %-48lu â”‚\n"
+            L"â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤\n";
         const wchar_t WaitStartFormat[] =
-            L"¦¢ WAIT  : %016p                                           ¦¢\n";
+            L"â”‚ WAIT  : %016p                                           â”‚\n";
 
         const wchar_t HoldStartFormat[] =
-            L"¦¢ HOLD  : %016p                                           ¦¢\n";
+            L"â”‚ HOLD  : %016p                                           â”‚\n";
 
         const wchar_t ThreadCloseFormat[] =
-            L"¦¦¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¡¦¥\n\n";
-
+            L"â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜\n\n";
 
         wchar_t buffer[200];
 
@@ -148,21 +143,21 @@ struct stTlsLockInfo
         for (int i = 0; i < _size; i++)
         {
             StringCchPrintfW(buffer, _countof(buffer), HoldStartFormat, holding[i]);
-            fwrite(buffer, sizeof(wchar_t), wcslen(buffer) , file);
+            fwrite(buffer, sizeof(wchar_t), wcslen(buffer), file);
         }
         fwrite(ThreadCloseFormat, sizeof(wchar_t), wcslen(ThreadCloseFormat), file);
         fclose(file);
     }
-    // tls¸¦ »ç¿ëÇÏ¿© µ¿±âÈ­¾øÀÌ Á¢±ÙÇÏ±â.
+    // tlsë¥¼ ì‚¬ìš©í•˜ì—¬ ë™ê¸°í™”ì—†ì´ ì ‘ê·¼í•˜ê¸°.
     void *waitLock;
-    std::vector<void *> holding; // bool ÀÌ false ¸é Shared , 1ÀÌ¸é Exclusive
+    std::vector<void *> holding; // bool ì´ false ë©´ Shared , 1ì´ë©´ Exclusive
     std::vector<void *> shared_holding;
-    int _size;                   // holdingÀÇ ±æÀÌ. ¿ÜºÎ¿¡¼­ Lock¾øÀÌ size¸¸Å­¸¸ ÀĞÀ¸·Á´Â ¿ëµµ.
+    int _size; // holdingì˜ ê¸¸ì´. ì™¸ë¶€ì—ì„œ Lockì—†ì´ sizeë§Œí¼ë§Œ ì½ìœ¼ë ¤ëŠ” ìš©ë„.
     int _shared_size;
     HANDLE hThread;
 };
 
-struct stMyMutex
+struct DeadLockGuard
 {
     std::shared_mutex m;
     _Acquires_exclusive_lock_(m) void lock();
@@ -172,6 +167,8 @@ struct stMyMutex
     _Releases_shared_lock_(m) void unlock_shared();
 };
 
-#ifdef MY_MUTEX
-#define shared_mutex stMyMutex
+#ifdef DEADLOCK_GUARD
+    using SharedMutex = DeadLockGuard;
+#else
+    using SharedMutex = std::shared_mutex ;
 #endif

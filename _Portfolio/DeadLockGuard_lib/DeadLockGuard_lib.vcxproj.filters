@@ -15,7 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="LockGuard_Test.cpp">
+    <ClInclude Include="DeadLockGuard_lib.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DeadLockGuard_lib.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
