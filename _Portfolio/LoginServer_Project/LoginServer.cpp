@@ -22,6 +22,7 @@ extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴
 // OnRecv를 통해 Player객체에 접근 Player에 Overapped 을 두고 
 // 
 
+extern thread_local stTlsLockInfo tls_LockInfo;
 thread_local CDB db;
 thread_local cpp_redis::client* client;
 static ull cnt = 0;
@@ -93,8 +94,8 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
         return;
     }
     {
-        std::shared_lock lock(SessionID_hash_Lock);
-
+        //std::shared_lock lock(SessionID_hash_Lock);
+        std::shared_lock<SharedMutex> lock(SessionID_hash_Lock);
         auto iter = SessionID_hash.find(SessionID);
         if (iter != SessionID_hash.end())
         {
@@ -121,20 +122,26 @@ void MonitorThread(void *arg)
     while (1)
     {
         Sleep(1000);
+
         printf("======================================================================");
-        printf("%20s : %10lld\n", "DBQuery_Count", server->m_DBMessageCnt);
+        printf("%20s : %10lld\n", "DBQuery_RemainCount", server->m_DBMessageCnt);
         printf("%20s : %10lld\n", "Total Account", cnt);
         printf("%20s : %10lld\n", "SessionID_hash.size", server->SessionID_hash.size());
         printf("%20s : %10d\n", "player_pool.iNodeCnt", server->player_pool.iNodeCnt);
         printf("%20s : %10d\n", "dbOverlapped_pool.iNodeCnt", server->dbOverlapped_pool.iNodeCnt);
         printf("======================================================================");
+
     }
 }
 
 void HeartBeatThread(void *arg) 
 {
+    MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
+
     DWORD retval;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
+
+
     while (1)
     {
         retval = WaitForSingleObject(server->m_ServerOffEvent, 20);
@@ -148,6 +155,8 @@ void HeartBeatThread(void *arg)
 
 void DBworkerThread(void *arg)
 {
+    MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
+
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
     DWORD transferred;
@@ -190,7 +199,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     // NetworkThread가 진입.
     CPlayer *player;
     {
-        std::shared_lock sessionHashLock(SessionID_hash_Lock);
+        std::shared_lock<SharedMutex> sessionHashLock(SessionID_hash_Lock);
 
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
             return;
@@ -328,7 +337,7 @@ float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
 
 bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
 {
-    std::unique_lock sessionHashLock(SessionID_hash_Lock);
+    std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
 
     if (SessionID_hash.find(SessionID) != SessionID_hash.end())
     {
@@ -365,7 +374,7 @@ void CTestServer::OnRelease(ull SessionID)
 {
     CPlayer *player;
 
-    std::unique_lock sessionHashLock(SessionID_hash_Lock);
+    std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
 
     if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         __debugbreak();
@@ -386,7 +395,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
     *msg >> SessionID;
 
-    std::unique_lock sessionHashLock(SessionID_hash_Lock);
+    std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
 
     if (SessionID_hash.find(SessionID) == SessionID_hash.end())
         __debugbreak();
@@ -400,7 +409,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
 void CTestServer::Update()
 {
-    std::shared_lock sessionHashLock(SessionID_hash_Lock);
+    std::shared_lock<SharedMutex> sessionHashLock(SessionID_hash_Lock);
     
     DWORD currentTime = timeGetTime();
     DWORD distance;

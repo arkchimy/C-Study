@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CNetworkLib", "CNetworkLib\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CDB", "..\..\_4Course\_lib\CDB\CDB.vcxproj", "{82ED263A-7832-4E00-B957-52A8B4134B1E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DeadLockGuard_lib", "..\DeadLockGuard_lib\DeadLockGuard_lib.vcxproj", "{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -51,6 +53,14 @@ Global
 		{82ED263A-7832-4E00-B957-52A8B4134B1E}.Release|x64.Build.0 = Release|x64
 		{82ED263A-7832-4E00-B957-52A8B4134B1E}.Release|x86.ActiveCfg = Release|Win32
 		{82ED263A-7832-4E00-B957-52A8B4134B1E}.Release|x86.Build.0 = Release|Win32
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Debug|x64.ActiveCfg = Debug|x64
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Debug|x64.Build.0 = Debug|x64
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Debug|x86.ActiveCfg = Debug|Win32
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Debug|x86.Build.0 = Debug|Win32
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Release|x64.ActiveCfg = Release|x64
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Release|x64.Build.0 = Release|x64
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Release|x86.ActiveCfg = Release|Win32
+		{C9AE35D7-DF22-41DD-B69F-337A4584E1A0}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

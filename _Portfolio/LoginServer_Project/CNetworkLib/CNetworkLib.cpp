@@ -7,6 +7,7 @@
 
 extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
 extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
+thread_local stTlsLockInfo tls_LockInfo;
 
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
@@ -64,6 +65,8 @@ SRWLOCK srw_Log;
 
 unsigned AcceptThread(void *arg)
 {
+    MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
+
     SOCKET client_sock;
     SOCKADDR_IN addr;
 
@@ -176,7 +179,7 @@ unsigned WorkerThread(void *arg)
      * arg[0] 에는 hIOCP의 가짜핸들을
      * arg[1] 에는 Server의 인스턴스
      */
-
+    MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
     CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                    L"%-20s ",
                                    L"This is WorkerThread");

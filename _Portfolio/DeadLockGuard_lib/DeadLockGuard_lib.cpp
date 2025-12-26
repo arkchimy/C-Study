@@ -96,7 +96,7 @@ _Releases_shared_lock_(m) void DeadLockGuard::unlock_shared()
 
     tls_LockInfo.shared_holding.erase(iter);
     tls_LockInfo._shared_size--;
-    m.unlock();
+    m.unlock_shared();
 }
 
 void MyMutexManager::LogTlsInfo(const wchar_t *filename)

@@ -8,6 +8,8 @@
 #include <thread>
 #include <shared_mutex>
 
+#include "../../_Portfolio/DeadLockGuard_lib/DeadLockGuard_lib.h"
+
 
 enum class en_State : ull
 {
@@ -73,7 +75,7 @@ class CTestServer :public CLanServer
     ////////////////////////// jobQueue of DBThread  //////////////////////////
     HANDLE m_hDBIOCP = INVALID_HANDLE_VALUE;
     std::queue<CMessage *> JobQueue;
-    std::shared_mutex JobQueue_Lock;
+    SharedMutex JobQueue_Lock;
 
     DWORD m_ContentsThreadCnt;
 
@@ -103,7 +105,7 @@ class CTestServer :public CLanServer
     // TODO: 특정 인원이상 안늘어나게 조치.
     CObjectPool_UnSafeMT<CPlayer> player_pool;
     CObjectPool<stDBOverlapped> dbOverlapped_pool;
-    std::shared_mutex SessionID_hash_Lock;
+    SharedMutex SessionID_hash_Lock;
 
     // SessionID Key , Player접근.
     std::unordered_map<ull, CPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도

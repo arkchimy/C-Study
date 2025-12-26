@@ -7,7 +7,7 @@
 #include <thread>
 
 #include "CrushDump_lib/CrushDump_lib.h"
-
+#include "../DeadLockGuard_lib/DeadLockGuard_lib.h"
 int main()
 {
 
@@ -114,6 +114,10 @@ int main()
                 if (ch == 'D' || ch == 'd')
                 {
                     Profiler::Reset();
+                }
+                if (ch == 'L' || ch == 'l')
+                {
+                    MyMutexManager::GetInstance()->LogTlsInfo();
                 }
                 if (ch == '1')
                 {

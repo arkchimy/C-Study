@@ -109,7 +109,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)DEADLOCK_GUARD;</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <Optimization>Disabled</Optimization>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -139,7 +139,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)DEADLOCK_GUARD;</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <Optimization>Disabled</Optimization>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -160,6 +160,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\_4Course\_lib\CDB\CDB.vcxproj">
       <Project>{82ed263a-7832-4e00-b957-52a8b4134b1e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\DeadLockGuard_lib\DeadLockGuard_lib.vcxproj">
+      <Project>{c9ae35d7-df22-41dd-b69f-337a4584e1a0}</Project>
     </ProjectReference>
     <ProjectReference Include="CNetworkLib\CNetworkLib.vcxproj">
       <Project>{bc14b27d-d39d-458e-be1f-20c972c7220e}</Project>
