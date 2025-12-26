@@ -123,6 +123,11 @@ unsigned AcceptThread(void *arg)
             // 예상한 Session을 초과한다면 새로 들어온 연결을 끊음.
             if (server->m_SessionIdxStack.Pop(idx) == false)
             {
+                CSystemLog::GetInstance()->Log(L"Contents_DisConnect", en_LOG_LEVEL::SYSTEM_Mode,
+                                               L"%-10s %10s %05lld ",
+                                               L"OnAccept", L"m_SessionIdxStack is empty",
+                                               server->m_SessionIdxStack.m_size);
+
                 closesocket(client_sock);
                 InterlockedIncrement(&server->iDisCounnectCount);
                 continue;

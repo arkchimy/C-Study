@@ -90,6 +90,10 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
     retval = WaitDB(AccountNo, SessionKey, ID,Nickname);
     if (retval != dfLOGIN_STATUS_OK)
     {
+        CSystemLog::GetInstance()->Log(L"Contents_DisConnect", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld ",
+                                       L"DB_VerifySession", L"WaitDB retval !=  1",
+                                       retval);
         Disconnect(SessionID);
         return;
     }
@@ -126,6 +130,7 @@ void MonitorThread(void *arg)
         printf("======================================================================");
         printf("%20s : %10lld\n", "DBQuery_RemainCount", server->m_DBMessageCnt);
         printf("%20s : %10lld\n", "Total Account", cnt);
+        printf("%20s : %10lld\n", "DisConnectConunt", server->iDisCounnectCount);
         printf("%20s : %10lld\n", "SessionID_hash.size", server->SessionID_hash.size());
         printf("%20s : %10d\n", "player_pool.iNodeCnt", server->player_pool.iNodeCnt);
         printf("%20s : %10d\n", "dbOverlapped_pool.iNodeCnt", server->dbOverlapped_pool.iNodeCnt);
@@ -147,7 +152,7 @@ void HeartBeatThread(void *arg)
         retval = WaitForSingleObject(server->m_ServerOffEvent, 20);
         if (retval != WAIT_TIMEOUT)
             return;
-        server->Update();
+        //server->Update();
 
     }
     
@@ -199,19 +204,35 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     // NetworkThread가 진입.
     CPlayer *player;
     {
-        std::shared_lock<SharedMutex> sessionHashLock(SessionID_hash_Lock);
+        std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
 
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
             return;
-
+        if (Account_hash.find(AccountNo) != Account_hash.end())
+        {
+            CSystemLog::GetInstance()->Log(L"Contents_DisConnect", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld ",
+                                           L"REQ_LOGIN", L"AccountNo Already exists ",
+                                           SessionID);
+            Disconnect(SessionID);
+            return;
+        }
         player = SessionID_hash[SessionID];
+        //Account_Hash 추가
+        Account_hash[AccountNo] = player;
 
         // 이미 LoginReq를 보낸적이 있다면,
         if (InterlockedCompareExchange((ull *)&player->m_State, (ull)en_State::LoginWait, (ull)en_State::None) != (ull)en_State::None)
         {
+            CSystemLog::GetInstance()->Log(L"Contents_DisConnect", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"%-10s %10s %05lld ",
+                                           L"REQ_LOGIN", L"Already Send Login Packet",
+                                           SessionID);
+
             Disconnect(SessionID);
             return;
         }
+        player->m_AccountNo = AccountNo;
         // TODO : dbOverlapped_pool.pool 모니터링 필요
         stDBOverlapped *overlapped = reinterpret_cast<stDBOverlapped *>(dbOverlapped_pool.Alloc());
         ZeroMemory(overlapped, sizeof(stDBOverlapped));
@@ -341,11 +362,19 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
 
     if (SessionID_hash.find(SessionID) != SessionID_hash.end())
     {
+        CSystemLog::GetInstance()->Log(L"Contents_DisConnect", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld ",
+                                       L"OnAccept", L"SessionID != SessionID_hash.end()",
+                                       SessionID);
         return false;
     }
     CPlayer *player = reinterpret_cast<CPlayer*>(player_pool.Alloc());
     if (player == nullptr)
     {
+        CSystemLog::GetInstance()->Log(L"Contents_DisConnect", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-10s %10s %05lld ",
+                                       L"OnAccept", L"Player == nullptr",
+                                       SessionID);
         return false;
     }
 
@@ -381,6 +410,8 @@ void CTestServer::OnRelease(ull SessionID)
     player = SessionID_hash[SessionID];
 
     SessionID_hash.erase(SessionID);
+    if (Account_hash.find(player->m_AccountNo) != Account_hash.end())
+        Account_hash.erase(player->m_AccountNo);
 
     player_pool.Release(player);
 
@@ -388,24 +419,24 @@ void CTestServer::OnRelease(ull SessionID)
 
 
 
-void CTestServer::DeletePlayer(CMessage *msg)
-{    
-    ull SessionID;
-    CPlayer *player;
-
-    *msg >> SessionID;
-
-    std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
-
-    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
-        __debugbreak();
-    player = SessionID_hash[SessionID];
-
-    SessionID_hash.erase(SessionID);
-
-    player_pool.Release(player);
-    stTlsObjectPool<CMessage>::Release(msg);
-}
+//void CTestServer::DeletePlayer(CMessage *msg)
+//{    
+//    ull SessionID;
+//    CPlayer *player;
+//
+//    *msg >> SessionID;
+//
+//    std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
+//
+//    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+//        __debugbreak();
+//    player = SessionID_hash[SessionID];
+//
+//    SessionID_hash.erase(SessionID);
+//
+//    player_pool.Release(player);
+//    stTlsObjectPool<CMessage>::Release(msg);
+//}
 
 void CTestServer::Update()
 {

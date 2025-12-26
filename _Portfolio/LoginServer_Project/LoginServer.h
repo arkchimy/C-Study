@@ -51,8 +51,8 @@ class CTestServer :public CLanServer
     virtual void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType = en_PACKET_CS_LOGIN_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0);
 
      public:
-    void AllocPlayer(CMessage *msg);
-    void DeletePlayer(CMessage *msg);
+    //void AllocPlayer(CMessage *msg);
+    //void DeletePlayer(CMessage *msg);
     //////////////////////////////////////////////////////// 하트 비트 전용////////////////////////////////////////////////////////
     void Update(); 
     //////////////////////////////////////////////////////// DB에서 토큰 대조하는 함수 ////////////////////////////////////////////////////////
@@ -109,6 +109,7 @@ class CTestServer :public CLanServer
 
     // SessionID Key , Player접근.
     std::unordered_map<ull, CPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
+    std::unordered_map<ull, CPlayer *> Account_hash; // 중복 접속을 제거하는 용도
 
 
     WCHAR GameServerIP[16] = L"0.0.0.0";
