@@ -110,6 +110,8 @@ struct stTlsLockInfo
 
         const wchar_t HoldStartFormat[] =
             L"│ HOLD  : %016p                                           │\n";
+        const wchar_t ShardHoldStartFormat[] =
+            L"│ HOLD  : %016p                                           │\n";
 
         const wchar_t ThreadCloseFormat[] =
             L"└──────────────────────────────────────────────────────────────┘\n\n";
@@ -143,6 +145,11 @@ struct stTlsLockInfo
         for (int i = 0; i < _size; i++)
         {
             StringCchPrintfW(buffer, _countof(buffer), HoldStartFormat, holding[i]);
+            fwrite(buffer, sizeof(wchar_t), wcslen(buffer), file);
+        }
+        for (int i = 0; i < _shared_size; i++)
+        {
+            StringCchPrintfW(buffer, _countof(buffer), ShardHoldStartFormat, shared_holding[i]);
             fwrite(buffer, sizeof(wchar_t), wcslen(buffer), file);
         }
         fwrite(ThreadCloseFormat, sizeof(wchar_t), wcslen(ThreadCloseFormat), file);

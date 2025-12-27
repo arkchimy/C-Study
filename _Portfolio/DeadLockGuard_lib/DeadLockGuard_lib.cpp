@@ -37,6 +37,15 @@ _Acquires_exclusive_lock_(m) void DeadLockGuard::lock()
         if (*iter == &m)
             break;
     }
+    auto s_iter = tls_LockInfo.shared_holding.begin();
+    for (s_iter; s_iter != tls_LockInfo.shared_holding.end(); s_iter++)
+    {
+        if (*s_iter == &m)
+            break;
+    }
+    if (s_iter != tls_LockInfo.shared_holding.end())
+        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+
     if (iter != tls_LockInfo.holding.end())
     {
         MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
@@ -65,16 +74,31 @@ _Releases_exclusive_lock_(m) void DeadLockGuard::unlock()
 
 _Acquires_shared_lock_(m) void DeadLockGuard::lock_shared()
 {
+
+    
+    auto iter = tls_LockInfo.holding.begin();
     tls_LockInfo.waitLock = &m;
 
-    auto iter = tls_LockInfo.shared_holding.begin();
-    for (iter; iter != tls_LockInfo.shared_holding.end(); iter++)
+    for (iter; iter != tls_LockInfo.holding.end(); iter++)
     {
         if (*iter == &m)
             break;
     }
-    if (iter != tls_LockInfo.shared_holding.end())
+    auto s_iter = tls_LockInfo.shared_holding.begin();
+    for (s_iter; s_iter != tls_LockInfo.shared_holding.end(); s_iter++)
+    {
+        if (*s_iter == &m)
+            break;
+    }
+    if (s_iter != tls_LockInfo.shared_holding.end())
         MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+
+    if (iter != tls_LockInfo.holding.end())
+    {
+        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+    }
+    
+
 
     m.lock_shared();
     tls_LockInfo.waitLock = nullptr;
@@ -85,16 +109,16 @@ _Acquires_shared_lock_(m) void DeadLockGuard::lock_shared()
 }
 _Releases_shared_lock_(m) void DeadLockGuard::unlock_shared()
 {
-    auto iter = tls_LockInfo.shared_holding.begin();
-    for (iter; iter != tls_LockInfo.shared_holding.end(); iter++)
+    auto s_iter = tls_LockInfo.shared_holding.begin();
+    for (s_iter; s_iter != tls_LockInfo.shared_holding.end(); s_iter++)
     {
-        if (*iter == &m)
+        if (*s_iter == &m)
             break;
     }
-    if (iter == tls_LockInfo.shared_holding.end())
+    if (s_iter == tls_LockInfo.shared_holding.end())
         MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
 
-    tls_LockInfo.shared_holding.erase(iter);
+    tls_LockInfo.shared_holding.erase(s_iter);
     tls_LockInfo._shared_size--;
     m.unlock_shared();
 }
