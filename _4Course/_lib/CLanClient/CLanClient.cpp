@@ -141,8 +141,8 @@ void CLanClient::WorkerThread()
             SendComplete(*session, transferred);
             break;
         case Job_Type::ReleasePost:
-            ReleaseComplete(key);
-            OnLeaveServer(key);
+            ReleaseComplete(session->m_SeqID.SeqNumberAndIdx);
+            OnLeaveServer(session->m_SeqID.SeqNumberAndIdx);
             continue;
         default:
             // CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stOverlapped *>(overlapped)->_mode);
@@ -225,7 +225,7 @@ bool CLanClient::Connect(const wchar_t *ServerAddress, short Serverport,const wc
         SessionID += g_ID++;
 
         sessions_vec[top].m_SeqID.SeqNumberAndIdx = SessionID;
-        sessions_vec[top].m_sock = _sockVec[top];
+        sessions_vec[top].m_sock = _sockVec[i];
         OnEnterJoinServer(SessionID);
 
         CreateIoCompletionPort((HANDLE)sessions_vec[top].m_sock, m_hIOCP, (ULONG_PTR)&sessions_vec[top], 0);
@@ -595,13 +595,15 @@ void CLanClient::ReleaseComplete(ull SessionID)
     }
 }
 
+
+
 void CLanClient::ReleaseSession(ull SessionID)
 {
 
-    clsSession &session = sessions_vec[SessionID >> 47];
-    ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
+    clsSession* session = &sessions_vec[SessionID >> 47];
+    ZeroMemory(&session->m_releaseOverlapped, sizeof(OVERLAPPED));
 
-    PostQueuedCompletionStatus(m_hIOCP, 0, SessionID, &session.m_releaseOverlapped);
+    PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)session, &session->m_releaseOverlapped);
 }
 
 void CLanClient::WSASendError(const DWORD LastError, const ull SessionID)
