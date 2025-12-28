@@ -1,9 +1,10 @@
-#pragma once
-#include <Windows.h>
+ï»¿#pragma once
 #include <memory>
-#define WIN32_LEAN_AND_MEAN // °ÅÀÇ »ç¿ëµÇÁö ¾Ê´Â ³»¿ëÀ» Windows Çì´õ¿¡¼­ Á¦¿ÜÇÕ´Ï´Ù.
+#include <Windows.h>   
+#define WIN32_LEAN_AND_MEAN             // ê±°ì˜ ì‚¬ìš©ë˜ì§€ ì•ŠëŠ” ë‚´ìš©ì„ Windows í—¤ë”ì—ì„œ ì œì™¸í•©ë‹ˆë‹¤.
 
 using ringBufferSize = int;
+
 
 class CRingBuffer
 {
@@ -22,19 +23,21 @@ class CRingBuffer
     ringBufferSize Enqueue(const void *pSrc, ringBufferSize iSize);
     ringBufferSize Dequeue(void *chpDest, ringBufferSize iSize);
 
+
     ringBufferSize Peek(void *chpDest, ringBufferSize iSize);
     ringBufferSize Peek(void *pDest, ringBufferSize iSize, char *f, char *r);
 
     void ClearBuffer();
 
     ringBufferSize DirectEnqueueSize();
-    ringBufferSize DirectEnqueueSize(const char *f, const char *r);
+    ringBufferSize DirectEnqueueSize(const char* f, const char* r);
 
     ringBufferSize DirectDequeueSize();
     ringBufferSize DirectDequeueSize(const char *f, const char *r);
 
     void MoveRear(ringBufferSize iSize);
     void MoveFront(ringBufferSize iSize);
+
 
   public:
     char *_begin;

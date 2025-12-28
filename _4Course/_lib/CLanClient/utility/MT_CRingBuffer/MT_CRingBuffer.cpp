@@ -1,11 +1,11 @@
-#include "CRingBuffer.h"
+ï»¿#include "MT_CRingBuffer.h"
 
 CRingBuffer::CRingBuffer()
     : CRingBuffer(s_BufferSize) {}
 
 CRingBuffer::CRingBuffer(ringBufferSize iBufferSize)
 {
-    _begin = (char *)malloc(iBufferSize);
+    _begin = (char*)malloc(iBufferSize);
     if (_begin == nullptr)
     {
         __debugbreak();
@@ -72,8 +72,8 @@ ringBufferSize CRingBuffer::Enqueue(const void *pSrc, ringBufferSize iSize)
 
     if (freeSize < local_size)
     {
-        // TODO : ¸µ¹öÆÛ°¡ °¡µæÂ÷¹ö¸²ÀÇ °æ¿ì
-        // HEX_FILE_LOG(L"RingbufferFulled_Error.txt", _begin, s_BufferSize);
+        // TODO : ë§ë²„í¼ê°€ ê°€ë“ì°¨ë²„ë¦¼ì˜ ê²½ìš°
+        //HEX_FILE_LOG(L"RingbufferFulled_Error.txt", _begin, s_BufferSize);
 
         return false;
     }
@@ -199,17 +199,17 @@ void CRingBuffer::MoveRear(ringBufferSize iSize)
     }
     _rearPtr = pChk;
 
-    // InterlockedExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk);
-    //  do
+    //InterlockedExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk);
+    // do
     //{
-    //      oldRear = _rearPtr;
-    //      pChk = oldRear + iSize;
-    //      distance = reinterpret_cast<char *>(pChk - _end);
-    //      if (_end < pChk)
-    //      {
-    //          pChk = _begin + long long(distance);
-    //      }
-    //  } while (InterlockedCompareExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk, (unsigned long long)oldRear) != (unsigned long long)oldRear);
+    //     oldRear = _rearPtr;
+    //     pChk = oldRear + iSize;
+    //     distance = reinterpret_cast<char *>(pChk - _end);
+    //     if (_end < pChk)
+    //     {
+    //         pChk = _begin + long long(distance);
+    //     }
+    // } while (InterlockedCompareExchange((unsigned long long *)&_rearPtr, (unsigned long long)pChk, (unsigned long long)oldRear) != (unsigned long long)oldRear);
     //// MoveRear(iSize, _rearPtr);
 }
 

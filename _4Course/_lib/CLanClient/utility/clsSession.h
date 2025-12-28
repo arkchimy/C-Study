@@ -17,7 +17,6 @@ enum class Job_Type : BYTE
     Recv,
     Send,
     ReleasePost,
-    Post,
     MAX,
 };
 // _mode 판단을 stOverlapped 기준으로 하므로 첫 멤버변수 _mode 로 할것. 
@@ -32,19 +31,9 @@ struct stSendOverlapped : public OVERLAPPED
     stSendOverlapped(Job_Type mode) : _mode(mode) {}
     Job_Type _mode = Job_Type::MAX;
     DWORD msgCnt = 0;
-    struct CMessage *msgs[500]{
-        0,
-    };
+    struct CMessage *msgs[500]{0,};
 
 };
-struct stDBOverlapped : public OVERLAPPED
-{
-    Job_Type _mode = Job_Type::Post;
-
-    ull SessionID;
-    CMessage *msg;
-};
-
 typedef struct stSessionId
 {
     bool operator==(const stSessionId other)
@@ -76,7 +65,7 @@ class clsSession
     SOCKET m_sock = 0;
     stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
     stSendOverlapped m_sendOverlapped = stSendOverlapped(Job_Type::Send);
-    stSendOverlapped m_releaseOverlapped = stSendOverlapped(Job_Type::ReleasePost);
+    stOverlapped m_releaseOverlapped = stOverlapped(Job_Type::Send);
 
     CTlsLockFreeQueue<struct CMessage *> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
@@ -85,4 +74,5 @@ class clsSession
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0; // SendFlag
+
 };
