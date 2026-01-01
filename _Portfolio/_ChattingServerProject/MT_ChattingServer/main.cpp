@@ -7,8 +7,7 @@
 int main()
 {
     CDump::SetHandlerDump();
-
-    st_WSAData wsa;
+    stWSAData wsa;
 
     wchar_t bindAddr[16];
     wchar_t RedisIpAddress[16];

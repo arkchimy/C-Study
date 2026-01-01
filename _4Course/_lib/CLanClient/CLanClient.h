@@ -74,7 +74,7 @@ class CLanClient
     ////////////////
 
     clsSession sessions_vec[SessionMax];
-    std::stack<ull> _IdxStack;
+    CLockFreeStack<ull> _IdxStack;
     ull g_ID = 0; //  [ IDX :17  SEQ : 47 ]
 
     // Start에서 초기화

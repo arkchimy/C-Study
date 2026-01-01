@@ -15,7 +15,7 @@ BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
     {
         return FALSE;
     }
-    pSockAddr = (SOCKADDR_IN *)pAddrInfo->ai_addrlen;
+    pSockAddr = (SOCKADDR_IN *)pAddrInfo->ai_addr;
     *pAddr = pSockAddr->sin_addr;
     FreeAddrInfo(pAddrInfo);
     return TRUE;
@@ -59,7 +59,7 @@ BOOL GetLogicalProcess(DWORD &out)
     out = temp;
     return true;
 }
-SRWLOCK srw_Log;
+//SRWLOCK srw_Log;
 
 unsigned AcceptThread(void *arg)
 {
@@ -98,7 +98,7 @@ unsigned AcceptThread(void *arg)
     listen_retval = listen(listen_sock, SOMAXCONN_HINT(65535));
     flag = 0;
 
-    InitializeSRWLock(&srw_Log);
+    //InitializeSRWLock(&srw_Log);
 
     if (listen_retval == 0)
         printf("Listen Sucess\n");

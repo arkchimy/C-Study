@@ -8,56 +8,21 @@
 #include <unordered_map>
 #include <thread>
 #include <shared_mutex>
+#include "Contents/Sector/SectorManager.h"
+#include "Contents/Player/stPlayer.h"
+//
+//#define dfRANGE_MOVE_TOP 0
+//#define dfRANGE_MOVE_LEFT 0
+//#define dfRANGE_MOVE_RIGHT 6400
+//#define dfRANGE_MOVE_BOTTOM 6400
+//// #define dfRANGE_MOVE_RIGHT 640
+//// #define dfRANGE_MOVE_BOTTOM 640
+//#define dfSECTOR_Size 128
+//
 
-#define dfRANGE_MOVE_TOP 0
-#define dfRANGE_MOVE_LEFT 0
-#define dfRANGE_MOVE_RIGHT 6400
-#define dfRANGE_MOVE_BOTTOM 6400
-// #define dfRANGE_MOVE_RIGHT 640
-// #define dfRANGE_MOVE_BOTTOM 640
-#define dfSECTOR_Size 128
-
-
-enum class en_State : int
-{
-    Session,
-    Player,
-    DisConnect,
-    Max,
-};
-
-struct CPlayer
-{
-    void Initalize()
-    {
-        m_State = en_State::Max;
-        m_sessionID = 0;
-
-        m_Timer = 0;
-        m_AccountNo = 0;
-
-        iSectorX = 0;
-        iSectorY = 0;
-    }
-
-    DWORD m_ContentsQIdx = 0;
-    en_State m_State = en_State::Max;
-    ull m_sessionID = 0;
-
-    DWORD m_Timer = 0;
-    INT64 m_AccountNo = 0;
-
-    WCHAR m_ID[20]{0};
-    WCHAR m_Nickname[20]{0};
-    char m_SessionKey[64]{0};
-
-    int iSectorX = 0;
-    int iSectorY = 0;
-
-    char m_ipAddress[16];
-    USHORT m_port;
-
-};
+#define dfCHAT_SECTOR_BOTTOM 6400
+#define dfCHAT_SECTOR_RIGHT 6400
+#define dfCHAT_SECTOR_SIZE 128
 
 
 // DB연동서버
@@ -167,27 +132,31 @@ class CTestServer : public CLanServer
         inline static std::set<ull>
     */
     // TODO: 특정 인원이상 안늘어나게 조치.
-    CObjectPool_UnSafeMT<CPlayer> player_pool;
+    CObjectPool_UnSafeMT<stPlayer> player_pool;
 
     //SRWLOCK srw_SessionID_Hash; // SessionID_hash 소유권. OnRecv , BalanceThread에서 접근
     std::shared_mutex srw_SessionID_Hash;
 
     // Account   Key , Player접근.
-    std::unordered_map<ull, CPlayer *> AccountNo_hash; // 중복 접속을 제거하는 용도
+    std::unordered_map<ull, stPlayer *> AccountNo_hash; // 중복 접속을 제거하는 용도
 
     // SessionID Key , Player접근.
-    std::unordered_map<ull, CPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
+    std::unordered_map<ull, stPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
 
     // SessionID Key , Player접근.
-    std::unordered_map<ull, CPlayer *> prePlayer_hash; // 중복 접속을 제거하는 용도
+    std::unordered_map<ull, stPlayer *> prePlayer_hash; // 중복 접속을 제거하는 용도
 
     // SessionID 를 삽입
      std::set<ull>
-        g_Sector[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size]
-                [dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
+        g_Sector[dfCHAT_SECTOR_BOTTOM / dfCHAT_SECTOR_SIZE]
+                [dfCHAT_SECTOR_RIGHT / dfCHAT_SECTOR_SIZE]; // [Y][X]
 
-    // Sector마다 Lock이 존재.
-    std::shared_mutex srw_Sectors[dfRANGE_MOVE_BOTTOM / dfSECTOR_Size][dfRANGE_MOVE_BOTTOM / dfSECTOR_Size];
+    stSectorManager m_sectorManager =
+        stSectorManager(dfCHAT_SECTOR_RIGHT, dfCHAT_SECTOR_BOTTOM, dfCHAT_SECTOR_SIZE);
+
+    // Sector마다 Lock이 존재.  [Y][X]
+    std::shared_mutex 
+        srw_Sectors[dfCHAT_SECTOR_BOTTOM / dfCHAT_SECTOR_SIZE][dfCHAT_SECTOR_RIGHT / dfCHAT_SECTOR_SIZE];
 
     /*
       하트비트 처리 방법.
@@ -204,58 +173,3 @@ class CTestServer : public CLanServer
 
 };
 
-struct st_Sector_Pos
-{
-    st_Sector_Pos() = default;
-
-    st_Sector_Pos(int iX, int iY)
-    {
-        _iX = iX / dfSECTOR_Size;
-        _iY = iY / dfSECTOR_Size;
-    }
-    bool operator<(const st_Sector_Pos &other) const
-    {
-        if (this->_iX != other._iX)
-            return this->_iX < other._iX;
-        return this->_iY < other._iY;
-    }
-    bool operator==(const st_Sector_Pos &other) const
-    {
-        return this->_iX == other._iX && this->_iY == other._iY;
-    }
-    int _iX, _iY;
-};
-struct st_Sector_Around
-{
-    st_Sector_Around()
-    {
-        // Around.reserve(6);
-    }
-    std::set<st_Sector_Pos> Around;
-};
-
-#include <algorithm>
-
-#define SectorMax dfRANGE_MOVE_BOTTOM / dfSECTOR_Size
-
-class SectorManager
-{
-  public:
-    static void GetSectorAround(int iX, int iY,
-                                st_Sector_Around *pSectorAround)
-    {
-
-        for (int row = -1; row <= 1; row++)
-        {
-            for (int column = -1; column <= 1; column++)
-            {
-                int rx = std::clamp(iX + row, 0, SectorMax - 1);
-                int ry = std::clamp(iY + column, 0, SectorMax - 1);
-                st_Sector_Pos temp;
-                temp._iX = rx;
-                temp._iY = ry;
-                pSectorAround->Around.insert(temp);
-            }
-        }
-    }
-};

@@ -188,8 +188,8 @@ bool CLanClient::Connect(const wchar_t *ServerAddress, short Serverport,const wc
     }
 
     _sockVec.resize(userCnt);
-    for (int i = 0; i < SessionMax; i++)
-        _IdxStack.push(i);
+    for (ull i = 0; i < SessionMax; i++)
+        _IdxStack.Push(i);
 
     ZeroMemory(&serverAddr, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
@@ -217,9 +217,11 @@ bool CLanClient::Connect(const wchar_t *ServerAddress, short Serverport,const wc
             DWORD lastError = GetLastError();
             __debugbreak();
         }
-        ull top = _IdxStack.top();
-        _IdxStack.pop();
-        ull SessionID = top;
+        ull top;
+        ull SessionID;
+        _IdxStack.Pop(top);
+
+        SessionID = top;
 
         SessionID = SessionID << 47;
         SessionID += g_ID++;
@@ -590,7 +592,7 @@ void CLanClient::ReleaseComplete(ull SessionID)
     }
     else
     {
-        _IdxStack.push(SessionID >> 47);
+        _IdxStack.Push(SessionID >> 47);
         //_interlockeddecrement64(&m_SessionCount);
     }
 }

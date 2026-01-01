@@ -13,6 +13,21 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Contents">
+      <UniqueIdentifier>{b23e9a7e-c8f0-47cb-90c9-ce393b2eecf2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Contents\Sector">
+      <UniqueIdentifier>{46459bfa-2e90-4703-adc7-b3a5c7ddf72e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Contents\Player">
+      <UniqueIdentifier>{6be3ee43-11b6-490b-918b-8577dc7ec4ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Contents\Types">
+      <UniqueIdentifier>{ffdaa2b0-e73d-4f38-9b36-b6bda22d8631}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Win32">
+      <UniqueIdentifier>{91d348ba-37fd-4b7f-a72f-70acc75e16ff}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -21,10 +36,28 @@
     <ClCompile Include="CMTChattingServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Contents\Sector\SectorManager.cpp">
+      <Filter>Contents\Sector</Filter>
+    </ClCompile>
+    <ClCompile Include="Win32\Atomic.cpp">
+      <Filter>Win32</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CMTChattingServer.h">
       <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Contents\Sector\SectorManager.h">
+      <Filter>Contents\Sector</Filter>
+    </ClInclude>
+    <ClInclude Include="Contents\Sector\SectorTypes.h">
+      <Filter>Contents\Sector</Filter>
+    </ClInclude>
+    <ClInclude Include="Contents\Player\stPlayer.h">
+      <Filter>Contents\Player</Filter>
+    </ClInclude>
+    <ClInclude Include="Win32\Atomic.h">
+      <Filter>Win32</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

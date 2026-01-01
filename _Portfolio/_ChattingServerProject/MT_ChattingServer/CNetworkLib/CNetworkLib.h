@@ -23,10 +23,12 @@
 
 using ull = unsigned long long;
 
-class st_WSAData
+
+class stWSAData
 {
+  // main에서 선언
   public:
-    st_WSAData()
+    stWSAData()
     {
         WSAData wsa;
         DWORD wsaStartRetval;
@@ -37,25 +39,12 @@ class st_WSAData
             __debugbreak();
         }
     }
-    ~st_WSAData()
+    ~stWSAData()
     {
         WSACleanup();
     }
 };
 
-struct stSRWLock
-{
-    stSRWLock(SRWLOCK *srw)
-        : m_srw(srw)
-    {
-        AcquireSRWLockExclusive(m_srw);
-    }
-    ~stSRWLock()
-    {
-        ReleaseSRWLockExclusive(m_srw);
-    }
-    SRWLOCK *m_srw;
-};
 
 class CLanServer : public Stub, public Proxy
 {
