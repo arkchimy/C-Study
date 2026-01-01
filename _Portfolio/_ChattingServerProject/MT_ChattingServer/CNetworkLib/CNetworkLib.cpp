@@ -271,7 +271,7 @@ CLanServer::~CLanServer()
 
 BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
 {
-    linger linger;
+    linger linger{1,0};
     int buflen;
     DWORD lProcessCnt;
     DWORD bind_retval;
@@ -287,8 +287,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     for (ull idx = 0; idx < MaxSessions; idx++)
         m_SessionIdxStack.Push(idx);
 
-    linger.l_onoff = 1;
-    linger.l_linger = 0;
 
     ZeroMemory(&serverAddr, sizeof(serverAddr));
 
@@ -409,13 +407,13 @@ void CLanServer::CancelIO_Routine(const ull SessionID)
     retval = CancelIoEx((HANDLE)session.m_sock, &session.m_recvOverlapped);
 }
 
-LONG64 CLanServer::GetSessionCount()
+LONG64 CLanServer::GetSessionCount() const
 {
     // AcceptThread에서 전담한다면, interlock이 필요없다.
     return m_SessionCount;
 }
 
-LONG64 CLanServer::Get_IdxStack()
+LONG64 CLanServer::Get_IdxStack() const
 {
     return m_SessionIdxStack.m_size;
 }
@@ -493,7 +491,7 @@ void CLanServer::DecrementIoCountAndMaybeDeleteSession(clsSession &session)
     }
 }
 
-CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header)
+CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header) const
 {
     // TODO : Header를 읽고, 생성하고
 
@@ -732,10 +730,12 @@ void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
 
     SessionUnLock(SessionID);
 }
-void CLanServer::BroadCast(ull SessionID, CMessage *msg , std::vector<ull>* pIDVector, WORD wVecLen)
+void CLanServer::BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, size_t wVecLen)
 {
+    ull local_IoCount;
+
     InterlockedExchange64(&msg->iUseCnt, wVecLen);
-    for (WORD i = 0; i < wVecLen; i++)
+    for (size_t i = 0; i < wVecLen; i++)
     {
         ull currentSessionID = (*pIDVector)[i];
         if (SessionLock(currentSessionID) == false)
@@ -746,8 +746,6 @@ void CLanServer::BroadCast(ull SessionID, CMessage *msg , std::vector<ull>* pIDV
         clsSession &session = sessions_vec[currentSessionID >> 47];
 
         // 여기까지 왔다면, 같은 Session으로 판단하자.
-
-        ull local_IoCount;
         {
             Profiler profile(L"LFQ_Push");
             session.m_sendBuffer.Push(msg);
@@ -802,17 +800,17 @@ void CLanServer::RecvPacket(clsSession &session)
     if (freeSize <= directEnQsize)
     {
         localRecvWSABuf[0].buf = r;
-        localRecvWSABuf[0].len = directEnQsize;
+        localRecvWSABuf[0].len = (ULONG)directEnQsize;
 
         bufCnt = 1;
     }
     else
     {
         localRecvWSABuf[0].buf = r;
-        localRecvWSABuf[0].len = directEnQsize;
+        localRecvWSABuf[0].len = (ULONG)directEnQsize;
 
         localRecvWSABuf[1].buf = session.m_recvBuffer._begin;
-        localRecvWSABuf[1].len = freeSize - directEnQsize;
+        localRecvWSABuf[1].len = (ULONG)(freeSize - directEnQsize);
 
         bufCnt = 2;
     }

@@ -6,12 +6,16 @@
 
 
 
-#define BITMASK 0x7FFFFFFFFFFF
-#define ALLOC_Node 0xcccccccc
-#define RELEASE_Node 0xeeeeeeee
+//#define BITMASK 0x7FFFFFFFFFFF
+//#define ALLOC_Node 0xcccccccc
+//#define RELEASE_Node 0xeeeeeeee
 
 using ull = unsigned long long;
 using ll = long long;
+
+constexpr ull BITMASK = 0x7FFFFFFFFFFF;
+constexpr ull ALLOC_Node = 0xcccccccc;
+constexpr ull RELEASE_Node = 0xeeeeeeee;
 
 struct stPoolInfo
 {

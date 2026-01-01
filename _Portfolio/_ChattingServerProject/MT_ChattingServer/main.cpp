@@ -20,7 +20,7 @@ int main()
     int NoDelay;
     int maxSessions;
 
-    LINGER linger;
+    LINGER linger{1,0};
     int iRingBufferSize;
     int ContentsRingBufferSize;
 

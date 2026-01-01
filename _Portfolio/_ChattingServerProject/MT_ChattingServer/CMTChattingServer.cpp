@@ -1239,8 +1239,6 @@ void CTestServer::Update()
 void CTestServer::BalanceUpdate()
 {
     CMessage *msg;
-
-    ringBufferSize DeQSisze;
     ull l_sessionID;
 
     WORD wType;

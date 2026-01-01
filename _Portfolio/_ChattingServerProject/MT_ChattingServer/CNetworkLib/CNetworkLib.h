@@ -60,7 +60,7 @@ class CLanServer : public Stub, public Proxy
     void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
 
     void DecrementIoCountAndMaybeDeleteSession(clsSession &session);
-    CMessage *CreateMessage(class clsSession &session, struct stHeader &header);
+    CMessage *CreateMessage(class clsSession &session, struct stHeader &header) const ;
 
     // void RecvComplete(class clsSession *const session, DWORD transferred);
     void RecvComplete(class clsSession &session, DWORD transferred);
@@ -72,7 +72,7 @@ class CLanServer : public Stub, public Proxy
     void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
                     std::vector<ull> *pIDVector = nullptr, size_t wVecLen = 0);
     void Unicast(ull SessionID, CMessage *msg, LONG64 Account = 0);
-    void BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, WORD wVecLen);
+    void BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, size_t wVecLen);
 
     void RecvPacket(class clsSession &session);
 
@@ -80,12 +80,12 @@ class CLanServer : public Stub, public Proxy
     virtual void OnRecv(ull SessionID, struct CMessage *msg, bool bBalanceQ = false) = 0;
     virtual void OnRelease(ull SessionID) = 0;
 
-    LONG64 GetSessionCount();
+    LONG64 GetSessionCount() const ; 
     virtual LONG64 GetPlayerCount() { return 0; } // Contents에서 구현하기.
-    LONG64 Get_IdxStack();
+    LONG64 Get_IdxStack() const ;
 
-    ull getTotalAccept() { return m_TotalAccept; }
-    ull getNetworkMsgCount() { return m_NetworkMsgCount; }
+    ull getTotalAccept() const { return m_TotalAccept; }
+    ull getNetworkMsgCount() const { return m_NetworkMsgCount; }
     int getAcceptTPS();
     int getRecvMessageTPS();
     int getSendMessageTPS();

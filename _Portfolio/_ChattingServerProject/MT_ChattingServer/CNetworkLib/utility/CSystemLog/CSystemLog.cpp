@@ -5,7 +5,9 @@
 
 #include <strsafe.h>
 #include <thread>
-#define DebugVectorSize 500000
+
+constexpr size_t DebugVectorSize = 500000;
+
 LONG64 m_seqNumber = 0;
 SRWLOCK g_srw_DebugQlock;
 // Debug용도

@@ -25,7 +25,7 @@ constexpr int Chat_Sector_Right = 6400;
 constexpr int Chat_Sector_Size = 128;
 
 // DB연동서버
-enum
+enum 
 {
     IP_LEN = 16,
     DBName_LEN = 16,
@@ -81,9 +81,9 @@ class CTestServer : public CLanServer
     LONG64 AccountNo_hash_size = 0;
     LONG64 SessionID_hash_size = 0;
 
-    LONG64 GetprePlayer_hash() { return prePlayer_hash_size; }
-    LONG64 GetAccountNo_hash() { return AccountNo_hash_size; }
-    LONG64 GetSessionID_hash() { return SessionID_hash_size; }
+    LONG64 GetprePlayer_hash() const { return prePlayer_hash_size; }
+    LONG64 GetAccountNo_hash() const { return AccountNo_hash_size; }
+    LONG64 GetSessionID_hash() const { return SessionID_hash_size; } 
 
     ///////////////////////////////////////////////////////////////////////
     ////////////////////////// ContentsThread //////////////////////////
