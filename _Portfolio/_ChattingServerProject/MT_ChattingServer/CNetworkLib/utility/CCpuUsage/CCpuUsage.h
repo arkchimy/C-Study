@@ -26,13 +26,13 @@ class CCpuUsage
 
     void UpdateCpuTime(void);
 
-    float ProcessorTotal(void) { return _fProcessorTotal; }
-    float ProcessorUser(void) { return _fProcessorUser; }
-    float ProcessorKernel(void) { return _fProcessorKernel; }
+    float ProcessorTotal(void) const  { return _fProcessorTotal; }
+    float ProcessorUser(void) const { return _fProcessorUser; }
+    float ProcessorKernel(void) const { return _fProcessorKernel; }
 
-    float ProcessTotal(void) { return _fProcessTotal; }
-    float ProcessUser(void) { return _fProcessUser; }
-    float ProcessKernel(void) { return _fProcessKernel; }
+    float ProcessTotal(void) const { return _fProcessTotal; }
+    float ProcessUser(void) const { return _fProcessUser; }
+    float ProcessKernel(void) const { return _fProcessKernel; }
 
   private:
     HANDLE _hProcess;
