@@ -4,12 +4,6 @@
 #include <iostream>
 #include <vector>
 
-
-
-//#define BITMASK 0x7FFFFFFFFFFF
-//#define ALLOC_Node 0xcccccccc
-//#define RELEASE_Node 0xeeeeeeee
-
 using ull = unsigned long long;
 using ll = long long;
 
