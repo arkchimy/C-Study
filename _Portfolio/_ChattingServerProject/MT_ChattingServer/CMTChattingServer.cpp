@@ -37,8 +37,7 @@ thread_local ull tls_ContentsQIdx; // ContentsThread 에서 사용하는 Q에  접근하기
 
 
 extern SRWLOCK srw_Log;
-extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
-extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
+
 
 void MsgTypePrint(WORD type, LONG64 val);
 
@@ -81,7 +80,7 @@ unsigned MonitorThread(void *arg)
 
     int workthreadCnt = server->m_WorkThreadCnt;
     bool ZeroCopy = server->bZeroCopy;
-    int MaxSessions = server->sessions_vec.size();
+    size_t MaxSessions = server->sessions_vec.size();
     int maxPlayers = server->m_maxPlayers;
     int bNoDelay = server->bNoDelay;
 
@@ -161,7 +160,7 @@ unsigned MonitorThread(void *arg)
 
             printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", workthreadCnt, "SessionNum", server->GetSessionCount());
             printf("%-25s : %10d  %-25s : %10d \n", "ZeroCopy", ZeroCopy, "Nodelay", bNoDelay);
-            printf("%-25s : %10d  %-25s : %10d\n", "MaxSessions", MaxSessions, "MaxPlayers", maxPlayers);
+            printf("%-25s : %10zu  %-25s : %10d\n", "MaxSessions", MaxSessions, "MaxPlayers", maxPlayers);
 
 
             printf(" \n========================================= Server Runtime Status ====================================== \n");
@@ -203,7 +202,7 @@ unsigned MonitorThread(void *arg)
                 // Contents 정보 Print
                 for (int idx = 0; idx < server->balanceVec.size(); idx++)
                 {
-                    printf("%15s %10s %05d  %10s %05d\n",
+                    printf("%15s %10s %05d  %10s %05lld\n",
                            "Contetent",
                            "Session :", server->balanceVec[idx].second,
                            "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].m_size);
@@ -233,7 +232,7 @@ unsigned MonitorThread(void *arg)
                 wprintf(L"====================================================================================================\n");
 
                 // 갱신 데이터 얻음
-                PDH_FMT_COUNTERVALUE counterVal;
+                //PDH_FMT_COUNTERVALUE counterVal;
                 PdhGetFormattedCounterValue(Process_PrivateByte, PDH_FMT_LARGE, NULL, &Process_PrivateByteVal);
                 wprintf(L"Process_PrivateByte : %lld Byte\n", Process_PrivateByteVal.largeValue);
 
@@ -392,7 +391,7 @@ unsigned MonitorThread(void *arg)
         for (int idx = 0; idx < server->balanceVec.size(); idx++)
         {
             sum += server->balanceVec[idx].second;
-            printf("%15s %10s %05d  %10s %05d\n",
+            printf("%15s %10s %05d  %10s %05lld\n",
                    "Contetent",
                    "Session :", server->balanceVec[idx].second,
                    "UpdateMessage_Queue", server->m_CotentsQ_vec[idx].m_size);
@@ -421,7 +420,6 @@ void BalanceThread(void *arg)
 
 
     ringBufferSize ContentsUseSize;
-    char *f, *r;
 
     {
         CotentsQ = &server->m_BalanceQ;
@@ -513,7 +511,6 @@ void ContentsThread(void *arg)
                                        DS);
     }
     ringBufferSize ContentsUseSize;
-    char *f, *r;
 
     while (1)
     {
@@ -1068,7 +1065,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
 }
 
-CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
+CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0), hBalanceThread(0)
 {
     HRESULT hr;
@@ -1098,7 +1095,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
         m_CotentsQ_vec.reserve(ContentsThreadCnt);
         hContentsThread_vec.reserve(ContentsThreadCnt);
 
-        for (DWORD i = 0; i < ContentsThreadCnt; i++)
+        for (int i = 0; i < ContentsThreadCnt; i++)
         {
             balanceVec.emplace_back(i, 0);
             m_CotentsQ_vec.emplace_back();
@@ -1110,7 +1107,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
     // ContentsThread의 생성
     hContentsThread_vec.resize(m_ContentsThreadCnt);
 
-    for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
+    for (int i = 0; i < m_ContentsThreadCnt; i++)
     {
         std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
 
@@ -1125,11 +1122,12 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording)
 
 }
 
+
 CTestServer::~CTestServer()
 {
     pBalanceThread.join(); // Balance
 
-    for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
+    for (int i = 0; i < m_ContentsThreadCnt; i++)
     {
         hContentsThread_vec[i].join();
     }
@@ -1138,8 +1136,6 @@ CTestServer::~CTestServer()
 void CTestServer::Update()
 {
     CMessage *msg;
-
-    ringBufferSize  DeQSisze;
     ull l_sessionID;
 
     WORD wType;
@@ -1372,8 +1368,6 @@ void CTestServer::HeartBeat()
 
     //// LoginPacket을 받아서 승격된 하트비트 부분
     {
-
-        DWORD disTime;
         stPlayer *player;
 
         // AccountNo_hash 는 LoginPacket을 받아서 승격된 Player
@@ -1506,7 +1500,7 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
         // TODO : 실패의 경우의 수
         OnRecv(SessionID, msg,true);
 
-        Win32::AtomicIncreament<LONG64>(m_NetworkMsgCount);
+        Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
         //_InterlockedIncrement64(&m_NetworkMsgCount);
     }
 

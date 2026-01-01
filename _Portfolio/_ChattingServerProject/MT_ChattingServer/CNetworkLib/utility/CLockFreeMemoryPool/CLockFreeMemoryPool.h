@@ -63,7 +63,7 @@ struct stNode
         this->seqAddr.seqNumber1 = 0;
         this->seqAddr.seqNumber2 = id;
     }
-    T data;
+    T data{};
     stSeqAddr seqAddr;
     stNode *next = nullptr;
 };

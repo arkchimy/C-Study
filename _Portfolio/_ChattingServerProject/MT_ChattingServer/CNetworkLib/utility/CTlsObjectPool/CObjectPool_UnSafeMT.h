@@ -39,7 +39,7 @@ class CObjectPool_UnSafeMT
     struct stNode
     {
         stNode() :next(nullptr) {}
-        T data;
+        T data{};
         stNode *next = nullptr;
     };
 

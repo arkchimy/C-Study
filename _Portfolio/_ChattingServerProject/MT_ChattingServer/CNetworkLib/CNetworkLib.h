@@ -70,7 +70,7 @@ class CLanServer : public Stub, public Proxy
     void SessionUnLock(ull SessionID); // 반환형 쓸때가 없음.
 
     void SendPacket(ull SessionID, struct CMessage *msg, BYTE SendType,
-                    std::vector<ull> *pIDVector = nullptr, WORD wVecLen = 0);
+                    std::vector<ull> *pIDVector = nullptr, size_t wVecLen = 0);
     void Unicast(ull SessionID, CMessage *msg, LONG64 Account = 0);
     void BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVector, WORD wVecLen);
 

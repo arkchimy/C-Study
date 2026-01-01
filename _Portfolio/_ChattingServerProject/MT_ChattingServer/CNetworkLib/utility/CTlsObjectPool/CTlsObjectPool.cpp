@@ -2,9 +2,10 @@
 //
 
 #include "CTlsObjectPool.h"
-#include  "../SerializeBuffer_exception/SerializeBuffer_exception.h"
+
 
 int tlsPool_init_Capacity;
+
 
 
 template <>
@@ -203,3 +204,6 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
     }
 
 }
+
+// 명시적 인스턴스화
+template struct stTlsObjectPool<CMessage>;

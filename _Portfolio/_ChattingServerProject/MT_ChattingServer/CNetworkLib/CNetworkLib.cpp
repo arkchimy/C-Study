@@ -4,9 +4,6 @@
 
 #include <thread>
 
-extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
-extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
-
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
     ADDRINFOW *pAddrInfo;
@@ -427,7 +424,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
 {
     stHeader header;
     ringBufferSize useSize;
-    float qPersentage;
+
     ull SessionID;
     bool bChkSum = false;
     {
@@ -685,7 +682,7 @@ void CLanServer::SessionUnLock(ull SessionID)
 }
 
 void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
-                            std::vector<ull>* pIDVector , WORD wVecLen)
+                            std::vector<ull> *pIDVector, size_t wVecLen)
 {
     //InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
     switch (SendType)

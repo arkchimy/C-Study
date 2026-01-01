@@ -11,9 +11,9 @@ SRWLOCK g_srw_DebugQlock;
 // Debug용도
 struct stDebugInfo
 {
-    const WCHAR *szType;
-    en_LOG_LEVEL LogLevel;
-    const WCHAR *szStringFormat;
+    const WCHAR *szType = nullptr;
+    en_LOG_LEVEL LogLevel = en_LOG_LEVEL::MAX;
+    const WCHAR *szStringFormat = nullptr;
     std::wstring LogWstring;
 };
 
@@ -27,7 +27,6 @@ unsigned LogThread(void *arg)
 
    CRingBuffer *ptrDebugQ = (CRingBuffer *)hArg[0];
 
-    FILE *debugFile;
    m_TargetDebugVector.resize(DebugVectorSize);
 
     static int idx = 0;
@@ -42,7 +41,7 @@ unsigned LogThread(void *arg)
             std::wstring str;
             wchar_t buffer[1000];
             ringBufferSize useSize = ptrDebugQ->GetUseSize();
-            if (useSize < header.len + sizeof(DeBugHeader))
+            if (useSize < LONG64(header.len + sizeof(DeBugHeader)))
                 break;
 
             ptrDebugQ->Dequeue(&header, sizeof(DeBugHeader));
@@ -52,20 +51,6 @@ unsigned LogThread(void *arg)
             idx++;
 
         }
-        //while (ptrDebugQ->empty() == false)
-        //{
-        //    std::wstring str;
-        //    AcquireSRWLockExclusive(&g_srw_DebugQlock);
-        //    if (ptrDebugQ->empty() == false)
-        //    {
-        //        str = ptrDebugQ->front();
-        //        ptrDebugQ->pop();
-        //    }
-
-        //    ReleaseSRWLockExclusive(&g_srw_DebugQlock);
-
-        //    fwrite(str.c_str(), 2, wcslen(str.c_str()), debugFile);
-        //}
 
     }
 
@@ -80,7 +65,6 @@ reWfopen:
         goto reWfopen;
     }
 
-    DeBugHeader header;
     for (int i = 0; i < DebugVectorSize; i++)
     {
         fwrite(m_TargetDebugVector[i].LogWstring.c_str(), 2, wcslen(m_TargetDebugVector[i].LogWstring.c_str()), debugFile);
@@ -201,7 +185,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
         StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogWstring);
 
-        DWORD idx = wcslen(LogHeaderBuffer);
+        size_t idx = wcslen(LogHeaderBuffer);
         LogHeaderBuffer[idx] = L'\n';
         LogHeaderBuffer[idx + 1] = 0;
 
@@ -216,7 +200,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
     GetLocalTime(&stNowTime);
 
-    if (GetLogFileName(szType, FILENAME_MAX, stNowTime, LogFileName) == false)
+    if (GetLogFileName(szType, (size_t)FILENAME_MAX, stNowTime, LogFileName) == false)
     {
         __debugbreak();
         return;
@@ -240,7 +224,7 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
     }
     StringCchCatW(LogHeaderBuffer, sizeof(LogHeaderBuffer) / sizeof(wchar_t), LogWstring);
 
-    DWORD idx = wcslen(LogHeaderBuffer);
+    size_t idx = wcslen(LogHeaderBuffer);
     LogHeaderBuffer[idx] = L'\n';
     LogHeaderBuffer[idx + 1] = 0;
 

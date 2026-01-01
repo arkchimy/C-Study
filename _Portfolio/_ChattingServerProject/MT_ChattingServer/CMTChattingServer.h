@@ -20,10 +20,9 @@
 //#define dfSECTOR_Size 128
 //
 
-#define dfCHAT_SECTOR_BOTTOM 6400
-#define dfCHAT_SECTOR_RIGHT 6400
-#define dfCHAT_SECTOR_SIZE 128
-
+constexpr int Chat_Sector_Bottom = 6400;
+constexpr int Chat_Sector_Right = 6400;
+constexpr int Chat_Sector_Size = 128;
 
 // DB연동서버
 enum
@@ -50,7 +49,7 @@ class CTestServer : public CLanServer
     void DeletePlayer(CMessage *msg);
 
   public:
-    CTestServer(DWORD ContentsThreadCnt = 1, int iEncording = false);
+    CTestServer(int ContentsThreadCnt = 1, int iEncording = false);
     virtual ~CTestServer();
 
     void Update();
@@ -91,7 +90,7 @@ class CTestServer : public CLanServer
     // 
     //ContentsThread 만큼 reSize함.
     std::vector<std::thread> hContentsThread_vec; // HANDLE of ContentThread 
-    DWORD m_ContentsThreadCnt;  // 생성자를 통해 받은 ContentsQ 개수 .
+    int m_ContentsThreadCnt;  // 생성자를 통해 받은 ContentsQ 개수 .
     
     ull m_ContentsThreadIdX = -1;  // ContentsThread가 생성시에 Interlock으로 1씩 증가.
 
@@ -148,15 +147,15 @@ class CTestServer : public CLanServer
 
     // SessionID 를 삽입
      std::set<ull>
-        g_Sector[dfCHAT_SECTOR_BOTTOM / dfCHAT_SECTOR_SIZE]
-                [dfCHAT_SECTOR_RIGHT / dfCHAT_SECTOR_SIZE]; // [Y][X]
+        g_Sector[Chat_Sector_Bottom / Chat_Sector_Size]
+                [Chat_Sector_Right / Chat_Sector_Size]; // [Y][X]
 
     stSectorManager m_sectorManager =
-        stSectorManager(dfCHAT_SECTOR_RIGHT, dfCHAT_SECTOR_BOTTOM, dfCHAT_SECTOR_SIZE);
+        stSectorManager(Chat_Sector_Right, Chat_Sector_Bottom, Chat_Sector_Size);
 
     // Sector마다 Lock이 존재.  [Y][X]
     std::shared_mutex 
-        srw_Sectors[dfCHAT_SECTOR_BOTTOM / dfCHAT_SECTOR_SIZE][dfCHAT_SECTOR_RIGHT / dfCHAT_SECTOR_SIZE];
+        srw_Sectors[Chat_Sector_Bottom / Chat_Sector_Size][Chat_Sector_Right / Chat_Sector_Size];
 
     /*
       하트비트 처리 방법.

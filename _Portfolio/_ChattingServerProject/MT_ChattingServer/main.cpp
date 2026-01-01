@@ -24,7 +24,6 @@ int main()
     int iRingBufferSize;
     int ContentsRingBufferSize;
 
-    HRESULT hr;
     DWORD waitThread_Retval; // Waitfor 종료절차  반환값. 현재는 infinite
 
     {
