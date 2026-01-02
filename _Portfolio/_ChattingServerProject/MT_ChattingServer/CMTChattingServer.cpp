@@ -1017,7 +1017,7 @@ CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
     }
 
 
-    pBalanceThread = std::thread(&BalanceThread, this);
+    pBalanceThread = std::thread(&CTestServer::BalanceThread, this);
     hr = SetThreadDescription(pBalanceThread.native_handle(), L"\tBalanceThread");
     RT_ASSERT(!FAILED(hr));
 
@@ -1201,15 +1201,17 @@ void CTestServer::BalanceThread()
 
         ContentsUseSize = m_BalanceQ.m_size;
 
-        prePlayer_hash_size = prePlayer_hash.size();
-        AccountNo_hash_size = AccountNo_hash.size();
-        SessionID_hash_size = SessionID_hash.size();
+        //모니터링 변수 초기화.
+        {
+            prePlayer_hash_size = prePlayer_hash.size();
+            AccountNo_hash_size = AccountNo_hash.size();
+            SessionID_hash_size = SessionID_hash.size();
+        }
 
         if (hSignalIdx - WAIT_OBJECT_0 == 1 && prePlayer_hash_size == 0 && AccountNo_hash_size == 0 && SessionID_hash_size == 0 && ContentsUseSize == 0)
         {
             // 종료 메세지. 워커쓰레드 수 만큼
-            for (int i = 0; i < m_WorkThreadCnt; i++)
-                PostQueuedCompletionStatus(m_hIOCP, 0, 0, nullptr);
+            SignalOnForStop();
             break;
         }
         else if (hSignalIdx - WAIT_OBJECT_0 == 1)
@@ -1394,6 +1396,8 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 
     return retval;
 }
+
+
 
 void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
 {

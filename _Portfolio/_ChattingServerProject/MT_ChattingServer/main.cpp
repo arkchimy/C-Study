@@ -73,10 +73,12 @@ int main()
             {
                 CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
                 CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
-                ChattingServer->Stop();
-                ChattingServer->bMonitorThreadOn = false;
 
+                ChattingServer->bMonitorThreadOn = false;
                 SetEvent(ChattingServer->m_ServerOffEvent);
+
+                ChattingServer->Stop();
+
                 break;
             }
             if (_kbhit())

@@ -106,14 +106,13 @@ unsigned AcceptThread(void *arg)
     if (listen_retval == 0)
         printf("Listen Sucess\n");
     else
-        CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Listen_Falied %d", GetLastError());
-    while (server->bOn)
+        CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Listen_Falied %d", WSAGetLastError());
+    while (1)
     {
         client_sock = accept(listen_sock, (sockaddr *)&addr, &addrlen);
         if (client_sock == INVALID_SOCKET)
         {
-            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode
-                , L"accept Reseult INVALID_SOCKET  GetLastError : %05d", GetLastError());
+            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET  GetLastError : %05d", WSAGetLastError());
             break;
         }
      
@@ -213,8 +212,8 @@ unsigned WorkerThread(void *arg)
     clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
 
     ull local_IoCount;
-
-    while (server->bOn)
+    BOOL bGQCS;
+    while (1)
     {
         // 지역변수 초기화
         {
@@ -223,17 +222,22 @@ unsigned WorkerThread(void *arg)
             overlapped = nullptr;
             session = nullptr;
         }
-        GetQueuedCompletionStatus(hiocp, &transferred, &key, &overlapped, INFINITE);
+        bGQCS = GetQueuedCompletionStatus(hiocp, &transferred, &key, &overlapped, INFINITE);
 
         if (transferred == 0 && overlapped == nullptr && key == 0)
             break;
 
         // overalpped가 nullptr인 메세지를 PQCS 하지 않도록 하기.
         // 만일 진짜 실패면 지역변수를 초기화 하였기에 IocpWorkerThread가 종료.
-        if (overlapped == nullptr)
+        if (overlapped == nullptr && bGQCS)
         {
             CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
-            continue;
+            __debugbreak();// PQCS로 overlapped에 nullptr을 넣음.
+        }
+        else if (overlapped == nullptr)
+        {
+            CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GQCS Failed overlapped is nullptr : %05d", GetLastError());
+            break;
         }
         session = reinterpret_cast<clsSession *>(key);
         // TODO : JumpTable 생성 되는 지?
@@ -270,13 +274,18 @@ unsigned WorkerThread(void *arg)
             server->ReleaseSession(seqID);
         }
     }
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThreadID Terminated %d", 0);
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThreadID Terminated ");
     return 0;
 }
 
 CLanServer::CLanServer(bool EnCoding)
     : bEnCording(EnCoding)
 {
+    hReadyForStopEvent = CreateEvent(nullptr,true, false, nullptr);
+    if (hReadyForStopEvent == nullptr)
+        __debugbreak();
+
+
     if (bEnCording)
         headerSize = sizeof(stHeader);
     else
@@ -379,13 +388,25 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
 void CLanServer::Stop()
 {
+
     closesocket(m_listen_sock);
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock", GetLastError());
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock");
     for (clsSession &session : sessions_vec)
     {
         Disconnect(session.m_SeqID.SeqNumberAndIdx);
     }
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WaitForSingleObject : hReadyForStopEvent");
+    //SignalOnForStop 호출을 대기
+    WaitForSingleObject(hReadyForStopEvent, INFINITE);
 
+    for (int i = 0; i < m_WorkThreadCnt; i++)
+        PostQueuedCompletionStatus(m_hIOCP, 0, 0, nullptr);
+
+}
+
+void CLanServer::SignalOnForStop()
+{
+    SetEvent(hReadyForStopEvent);
 }
 
 bool CLanServer::Disconnect(const ull SessionID)

@@ -52,13 +52,14 @@ class CTestServer : public CLanServer
     CTestServer(int ContentsThreadCnt = 1, int iEncording = false);
     virtual ~CTestServer();
 
+
+
     void Update();
     void BalanceThread();
     void BalanceUpdate();
     void HeartBeat();
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
-
     virtual void OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
 
     virtual bool OnAccept(ull SessionID,SOCKADDR_IN& addr) override;
