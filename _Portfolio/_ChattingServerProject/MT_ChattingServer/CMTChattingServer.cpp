@@ -519,11 +519,11 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
                                        L"현재들어온ID:", SessionID,
                                        L"현재들어온ID:", AccountNo_hash[AccountNo]->m_sessionID);
 
-        stTlsObjectPool<CMessage>::Release(msg);
-        Disconnect(SessionID);
+        //stTlsObjectPool<CMessage>::Release(msg);
+        //Disconnect(SessionID);
         // 이 경우때문에 결국 Player에 SessionID가 필요함.
         Disconnect(AccountNo_hash[AccountNo]->m_sessionID);
-        return;
+        //return;
     }
     std::vector<std::pair<DWORD, int>>::iterator iter = std::min_element(balanceVec.begin(), balanceVec.end(),
                                   [](const std::pair<DWORD, int> &a, const std::pair<DWORD, int> &b)
@@ -937,8 +937,9 @@ void CTestServer::DeletePlayer(CMessage *msg)
                                                SessionID);
    
             }
-
-            AccountNo_hash.erase(player->m_AccountNo);  
+            auto it = AccountNo_hash.find(player->m_AccountNo);
+            if (it != AccountNo_hash.end() && it->second == player)
+                AccountNo_hash.erase(it);
             m_TotalPlayers--;
 
             if (player->iSectorX >= m_sectorManager._MaxX || player->iSectorY >= m_sectorManager._MaxY)
