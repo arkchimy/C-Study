@@ -24,7 +24,7 @@
 using ull = unsigned long long;
 
 
-class stWSAData
+struct stWSAData
 {
   // main에서 선언
   public:
@@ -45,7 +45,17 @@ class stWSAData
     }
 };
 
-
+struct stAcceptArgs
+{
+    HANDLE hiocp;
+    SOCKET listenSock;
+    class CLanServer *server;
+};
+struct stWorkerArgs
+{
+    HANDLE hiocp;
+    class CLanServer *server;
+};
 class CLanServer : public Stub, public Proxy
 {
   public:
@@ -54,7 +64,7 @@ class CLanServer : public Stub, public Proxy
 
     // 오픈 IP / 포트 / 제로카피 여부 /워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
-    void Stop();
+    virtual void Stop();
 
     bool Disconnect(const ull SessionID);
     void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
@@ -118,8 +128,8 @@ class CLanServer : public Stub, public Proxy
     DWORD m_tlsIdxForTPS = 0; // Start에서 초기화
     LONG64 *arrTPS = nullptr; //  idx 0 : AcceptTps , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
 
-    HANDLE WorkerArg[2]{0}; // WorkerThread __beginthreadex 매개변수
-    HANDLE AcceptArg[3]{0}; // AcceptThread __beginthreadex 매개변수
+    stWorkerArgs WorkerArg; // WorkerThread __beginthreadex 매개변수
+    stAcceptArgs AcceptArg; // AcceptThread __beginthreadex 매개변수
 
     ull m_TotalAccept = 0;
     LONG64 m_AllocMsgCount = 0;

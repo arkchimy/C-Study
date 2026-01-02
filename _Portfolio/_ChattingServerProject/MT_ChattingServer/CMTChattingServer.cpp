@@ -410,72 +410,6 @@ unsigned MonitorThread(void *arg)
 //arg[0] pServer
 //arg[1] pContentsQ
 
-void BalanceThread(void *arg)
-{
-    DWORD hSignalIdx;
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-
-    CLockFreeQueue<CMessage*> *CotentsQ;
-    HANDLE local_ContentsEvent;
-
-
-    ringBufferSize ContentsUseSize;
-
-    {
-        CotentsQ = &server->m_BalanceQ;
-        local_ContentsEvent = server->hBalanceEvent;
-    }
-
-    HANDLE hWaitHandle[2] = {local_ContentsEvent, server->m_ServerOffEvent};
-
-    {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                       L"%-20s ",
-                                       L"BalanceThread");
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                       L"%-20s ",
-                                       L"BalanceThread");
-    }
-
-
-    cpp_redis::client a;
-    client = &a;
-
-    client->connect(server->RedisIpAddress, 6379);
-
-    while (1)
-    {
-        hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
-        {
-            Profiler BalanceUpdateprofile(L"BalanceUpdate");
-            server->BalanceUpdate();
-        }
-
-        ContentsUseSize = CotentsQ->m_size;
-
-        server->prePlayer_hash_size = server->prePlayer_hash.size();
-        server->AccountNo_hash_size = server->AccountNo_hash.size();
-        server->SessionID_hash_size = server->SessionID_hash.size();
-
-        if (hSignalIdx - WAIT_OBJECT_0 == 1 && server->prePlayer_hash_size == 0 && server->AccountNo_hash_size == 0 && server->SessionID_hash_size == 0 && ContentsUseSize == 0)
-        {
-            CloseHandle(server->m_hIOCP);
-            break;
-        }
-        else if (hSignalIdx - WAIT_OBJECT_0 == 1)
-        {
-            CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode,
-                                           L"BalanceThread wait Player Exit %lld  %lld %lld",
-                                           server->prePlayer_hash_size,
-                                           server->AccountNo_hash_size,
-                                           server->SessionID_hash_size);
-        }
-    }
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"BalanceThread Terminated %d", 0);
-    //return 0;
-}
-
-
 void ContentsThread(void *arg)
 {
     DWORD hSignalIdx;
@@ -1234,6 +1168,62 @@ void CTestServer::Update()
         InterlockedIncrement64(&m_UpdateTPS);
     }
 
+}
+
+void CTestServer::BalanceThread()
+{
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"BalanceThread");
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"BalanceThread");
+    }
+
+    DWORD hSignalIdx;
+    ringBufferSize ContentsUseSize;
+    // m_ServerOffEvent 는 ESCAPE 누를 시 호출 
+    HANDLE hWaitHandle[2] = {hBalanceEvent, m_ServerOffEvent};
+
+    cpp_redis::client a;
+    client = &a;
+
+    client->connect(RedisIpAddress, 6379);
+
+    while (1)
+    {
+        hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
+        {
+            Profiler BalanceUpdateprofile(L"BalanceUpdate");
+            BalanceUpdate();
+        }
+
+        ContentsUseSize = m_BalanceQ.m_size;
+
+        prePlayer_hash_size = prePlayer_hash.size();
+        AccountNo_hash_size = AccountNo_hash.size();
+        SessionID_hash_size = SessionID_hash.size();
+
+        if (hSignalIdx - WAIT_OBJECT_0 == 1 && prePlayer_hash_size == 0 && AccountNo_hash_size == 0 && SessionID_hash_size == 0 && ContentsUseSize == 0)
+        {
+            // 종료 메세지. 워커쓰레드 수 만큼
+            for (int i = 0; i < m_WorkThreadCnt; i++)
+                PostQueuedCompletionStatus(m_hIOCP, 0, 0, nullptr);
+            break;
+        }
+        else if (hSignalIdx - WAIT_OBJECT_0 == 1)
+        {
+            // 아직 유저가 전부 나가지않음.
+            CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode,
+                                           L"BalanceThread wait Player Exit %lld  %lld %lld",
+                                           prePlayer_hash_size,
+                                           AccountNo_hash_size,
+                                           SessionID_hash_size);
+        }
+    }
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"BalanceThread Terminated %d", 0);
+    // return 0;
 }
 
 void CTestServer::BalanceUpdate()

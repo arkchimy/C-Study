@@ -60,28 +60,7 @@ BOOL GetLogicalProcess(DWORD &out)
 
 unsigned AcceptThread(void *arg)
 {
-    SOCKET client_sock;
-    SOCKADDR_IN addr;
 
-    size_t *arrArg = (size_t *)arg;
-    HANDLE hIOCP = (HANDLE)*arrArg;
-    SOCKET listen_sock = SOCKET(arrArg[1]);
-
-    DWORD listen_retval;
-    DWORD flag;
-
-    ull session_id = 0;
-    ull idx;
-
-    CLanServer *server;
-
-    int addrlen;
-    stSessionId stsessionID;
-
-    /* arg 에 대해서
-     * arg[0] 에는 클라이언트에게 연결시킬 hIOCP의 HANDLE을 넣기.
-     * arg[1] 에는 listen_sock의 주소를 넣기
-     */
     CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                    L"%-20s ",
                                    L"This is AcceptThread");
@@ -89,8 +68,35 @@ unsigned AcceptThread(void *arg)
                                    L"%-20s ",
                                    L"This is AcceptThread");
 
+
+    SOCKET client_sock;
+    SOCKADDR_IN addr;
+
+    DWORD listen_retval;
+    DWORD flag;
+
+    ull session_id = 0;
+    ull idx;
+
+    int addrlen;
+    stSessionId stsessionID;
+
+    
+    HANDLE hIOCP;
+    SOCKET listen_sock;
+    CLanServer *server;
+
+    // 매개변수를 이용한 초기화
+    stAcceptArgs *AcceptArg = reinterpret_cast<stAcceptArgs *>(arg);
+    {
+        hIOCP = AcceptArg->hiocp;
+        listen_sock = AcceptArg->listenSock;
+        server = AcceptArg->server;
+    }
+
+
     addrlen = sizeof(addr);
-    server = reinterpret_cast<CLanServer *>(arrArg[2]);
+
 
     listen_retval = listen(listen_sock, SOMAXCONN_HINT(65535));
     flag = 0;
@@ -101,17 +107,16 @@ unsigned AcceptThread(void *arg)
         printf("Listen Sucess\n");
     else
         CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Listen_Falied %d", GetLastError());
-    while (1)
+    while (server->bOn)
     {
         client_sock = accept(listen_sock, (sockaddr *)&addr, &addrlen);
         if (client_sock == INVALID_SOCKET)
         {
-            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET");
+            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode
+                , L"accept Reseult INVALID_SOCKET  GetLastError : %05d", GetLastError());
             break;
         }
      
-
-        
 
         server->arrTPS[0]++; // Accept TPS 측정
         server->m_TotalAccept++;
@@ -145,9 +150,17 @@ unsigned AcceptThread(void *arg)
 
 
         _interlockedincrement64(&server->m_SessionCount);
-
-        CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)&session, 0);
-
+        // CreateIoCompletionPort 함수가 실패하면 반환 값은 NULL입니다.
+        {
+            HANDLE createResult = CreateIoCompletionPort((HANDLE)client_sock, hIOCP, (ull)&session, 0);
+            if (createResult == NULL)
+            {
+                CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode,
+                    L"CreateIoCompletionPort Reseult NULL GetLastError : %05d",GetLastError());
+                closesocket(client_sock);
+                continue;
+            }
+        }
         // AllocMsg의 처리가 너무 많이 발생한다면 False를 반환.
         if (server->OnAccept(session.m_SeqID.SeqNumberAndIdx,addr) == false)
         {
@@ -165,23 +178,29 @@ unsigned AcceptThread(void *arg)
 
 unsigned WorkerThread(void *arg)
 {
-    /*
-     * arg[0] 에는 hIOCP의 가짜핸들을
-     * arg[1] 에는 Server의 인스턴스
-     */
 
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is WorkerThread");
-    CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                   L"%-20s ",
-                                   L"This is WorkerThread");
-    size_t *arrArg = reinterpret_cast<size_t *>(arg);
-    HANDLE hIOCP = (HANDLE)*arrArg;
-    CLanServer *server = reinterpret_cast<CLanServer *>(arrArg[1]);
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"This is WorkerThread");
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       L"This is WorkerThread");
+    }
+
+
+
+    // 매개변수를 통한 초기화
+    HANDLE hiocp;
+    CLanServer *server;
+    stWorkerArgs *WorkerArg = reinterpret_cast<stWorkerArgs *>(arg);
+    {
+        hiocp = WorkerArg->hiocp;
+        server = WorkerArg->server;
+    }
 
     static LONG64 s_arrTPS_idx = 0;
-    LONG64 *arrTPS_idx = reinterpret_cast<LONG64 *>(TlsGetValue(server->m_tlsIdxForTPS));
+    LPVOID arrTPS_idx = TlsGetValue(server->m_tlsIdxForTPS);
     // arrTPS 의 index 값을 셋팅함.
     if (arrTPS_idx == nullptr)
     {
@@ -204,11 +223,13 @@ unsigned WorkerThread(void *arg)
             overlapped = nullptr;
             session = nullptr;
         }
-
-        GetQueuedCompletionStatus(hIOCP, &transferred, &key, &overlapped, INFINITE);
+        GetQueuedCompletionStatus(hiocp, &transferred, &key, &overlapped, INFINITE);
 
         if (transferred == 0 && overlapped == nullptr && key == 0)
             break;
+
+        // overalpped가 nullptr인 메세지를 PQCS 하지 않도록 하기.
+        // 만일 진짜 실패면 지역변수를 초기화 하였기에 IocpWorkerThread가 종료.
         if (overlapped == nullptr)
         {
             CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
@@ -220,8 +241,12 @@ unsigned WorkerThread(void *arg)
         {
         case Job_Type::Recv:
             //// FIN 의 경우에
-            // if (transferred == 0)
-            //     break;
+            if (transferred == 0)
+            {
+                // CancleIO 유도
+                session->m_blive = false;
+            }
+
             server->RecvComplete(*session, transferred);
             break;
         case Job_Type::Send:
@@ -323,12 +348,13 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     m_WorkThreadCnt = WorkerCreateCnt;
 
     {
-        WorkerArg[0] = m_hIOCP;
-        WorkerArg[1] = this;
+        WorkerArg.hiocp = m_hIOCP;
+        WorkerArg.server = this;
 
-        AcceptArg[0] = m_hIOCP;
-        AcceptArg[1] = (HANDLE)m_listen_sock;
-        AcceptArg[2] = this;
+        AcceptArg.hiocp = m_hIOCP;
+        AcceptArg.listenSock = m_listen_sock;
+        AcceptArg.server = this;
+
     }
 
     bOn = true;
@@ -359,6 +385,7 @@ void CLanServer::Stop()
     {
         Disconnect(session.m_SeqID.SeqNumberAndIdx);
     }
+
 }
 
 bool CLanServer::Disconnect(const ull SessionID)

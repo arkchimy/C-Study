@@ -53,6 +53,7 @@ class CTestServer : public CLanServer
     virtual ~CTestServer();
 
     void Update();
+    void BalanceThread();
     void BalanceUpdate();
     void HeartBeat();
 
