@@ -11,9 +11,6 @@
 #pragma comment(lib, "tacopie.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-extern template PVOID stTlsObjectPool<CMessage>::Alloc();       // 암시적 인스턴스화 금지
-extern template void stTlsObjectPool<CMessage>::Release(PVOID); // 암시적 인스턴스화 금지
-
 
 // Chatting Server와의 연결
 // Redis와의 연결
@@ -43,7 +40,7 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
     //일단은 성공만 반환 나중에 db에서 가져와서 확인.
 
     //SELECT 컬럼명 FROM 테이블명 WHERE 조건
-    CDB::ResultSet result = std::move(db.Query("select sessionkey from sessionkey where accountno = %lld", AccountNo));
+    CDB::ResultSet result = db.Query("select sessionkey from sessionkey where accountno = %lld", AccountNo);
     if (result.Sucess() == false)
     {
         printf("\tQuery Error %s \n", result.Error().c_str());
@@ -208,14 +205,19 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 
         if (SessionID_hash.find(SessionID) == SessionID_hash.end())
             return;
-        if (Account_hash.find(AccountNo) != Account_hash.end())
+        auto iter = Account_hash.find(AccountNo);
+        if (iter != Account_hash.end())
         {
             CSystemLog::GetInstance()->Log(L"Contents_DisConnect", en_LOG_LEVEL::SYSTEM_Mode,
                                            L"%-10s %10s %05lld ",
                                            L"REQ_LOGIN", L"AccountNo Already exists ",
                                            SessionID);
+            Disconnect(iter->second->m_sessionID);
+
+        
+            /*  
             Disconnect(SessionID);
-            return;
+            return;*/
         }
         player = SessionID_hash[SessionID];
         //Account_Hash 추가
@@ -251,6 +253,8 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThreadCount)
     : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt)
 {
+    mysql_library_init(0, nullptr, nullptr);
+
     int DBThreadCnt;
     {
         WCHAR DBIPAddress[16];
@@ -284,12 +288,13 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
         wcstombs_s(&i, schema, schema_LEN, DBName, schema_LEN );
   
     }
+
     // DBConcurrent Thread 세팅
     m_hDBIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, m_lProcessCnt - reduceThreadCount);
 
     HRESULT hr;
-    player_pool.Initalize(m_maxPlayers);
-    player_pool.Limite_Lock(); // Pool이 더 이상 늘어나지않음.
+    //player_pool.Initalize(m_maxPlayers);
+    //player_pool.Limite_Lock(); // Pool이 더 이상 늘어나지않음.
 
     // BalanceThread를 위한 정보 초기화.
     {
@@ -324,7 +329,7 @@ CTestServer::~CTestServer()
 {
 
     hHeartBeatThread.join();
-    for (DWORD i = 0; i < m_ContentsThreadCnt; i++)
+    for (DWORD i = 0; i < hDBThread_vec.size(); i++)
     {
         hDBThread_vec[i].join();
     }
@@ -348,12 +353,12 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
-float CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
+void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
 {
     WORD type;
     *msg >> type;
     PacketProc(SessionID,msg,type);
-    return 0.0f;
+
 }
 
 bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
@@ -416,27 +421,6 @@ void CTestServer::OnRelease(ull SessionID)
     player_pool.Release(player);
 
 }
-
-
-
-//void CTestServer::DeletePlayer(CMessage *msg)
-//{    
-//    ull SessionID;
-//    CPlayer *player;
-//
-//    *msg >> SessionID;
-//
-//    std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
-//
-//    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
-//        __debugbreak();
-//    player = SessionID_hash[SessionID];
-//
-//    SessionID_hash.erase(SessionID);
-//
-//    player_pool.Release(player);
-//    stTlsObjectPool<CMessage>::Release(msg);
-//}
 
 void CTestServer::Update()
 {

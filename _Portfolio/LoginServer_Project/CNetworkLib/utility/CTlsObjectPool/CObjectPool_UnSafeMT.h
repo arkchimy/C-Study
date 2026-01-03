@@ -39,7 +39,7 @@ class CObjectPool_UnSafeMT
     struct stNode
     {
         stNode() :next(nullptr) {}
-        T data;
+        T data{};
         stNode *next = nullptr;
     };
 
@@ -73,7 +73,7 @@ class CObjectPool_UnSafeMT
         for (DWORD i = 0; i < iSize; i++)
         {
             Release(new stNode());
-            _InterlockedIncrement(&iNodeCnt);
+            iNodeCnt++;
         }
     }
     void Limite_Lock()
@@ -98,7 +98,7 @@ class CObjectPool_UnSafeMT
                 return nullptr;
 
             oldTop = new stNode();
-            _InterlockedIncrement(&iNodeCnt);
+            iNodeCnt++;
 #ifdef POOLTEST
 
 #endif
@@ -135,5 +135,5 @@ class CObjectPool_UnSafeMT
     bool m_blimite = false;
     ll seqNumber = -1;
     ll m_size = 0;
-    long iNodeCnt = 0;
+    int iNodeCnt = 0;
 };

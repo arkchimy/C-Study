@@ -511,7 +511,8 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         // 일단은 안만듬
         //Proxy::RES_LOGIN(SessionID, msg, false, AccountNo);
 
-        // 중복 로그인 이면 둘 다 끊기 => 기존에 있던 User만 끊기. RST유실 혹은 지연 삭제
+        // 중복 로그인 이면 기존에 있던 User만 끊기. 
+        // =>  RST유실 혹은 지연 삭제로 인함.
 
         CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
                                        L"%-20s %05lld %12s %05lld %12s %05llu ",

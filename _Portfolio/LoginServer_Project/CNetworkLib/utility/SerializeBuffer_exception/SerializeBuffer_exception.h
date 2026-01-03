@@ -118,7 +118,6 @@ struct CMessage
         size_t len = sizeof(T);
         if (_frontPtr + len > _rearPtr)
         {
-            HexLog(en_Tag::_ERROR);
             throw MessageException(MessageException::HasNotData, "false Packet \n");
         }
 
@@ -133,7 +132,6 @@ struct CMessage
         size_t len = _rearPtr - _frontPtr;
         if (_frontPtr > _rearPtr)
         {
-            HexLog(en_Tag::_ERROR);
             throw MessageException(MessageException::HasNotData, "false Packet \n");
         }
 

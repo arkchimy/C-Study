@@ -2,9 +2,10 @@
 //
 
 #include "CTlsObjectPool.h"
-#include  "../SerializeBuffer_exception/SerializeBuffer_exception.h"
+
 
 int tlsPool_init_Capacity;
+
 
 
 template <>
@@ -129,7 +130,7 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
     PVOID node = pool->allocPool->Alloc();
 
     CMessage *msg = reinterpret_cast<CMessage *>(node);
-    msg->~CMessage();
+    msg->InitMessage();
     if (msg->_frontPtr == nullptr)
         __debugbreak();
     CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%10s %10s : %08p %10s %08p %10s %llu",
@@ -203,3 +204,6 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
     }
 
 }
+
+// 명시적 인스턴스화
+template struct stTlsObjectPool<CMessage>;

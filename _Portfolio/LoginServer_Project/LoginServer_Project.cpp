@@ -13,7 +13,7 @@ int main()
 
     CDump::SetHandlerDump();
 
-    st_WSAData wsa;
+    stWSAData wsa;
 
     wchar_t bindAddr[16];
     short bindPort;
@@ -76,7 +76,7 @@ int main()
         CRingBuffer::s_BufferSize = iRingBufferSize;
     }
     wchar_t buffer[100];
-    CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
+
 
     StringCchPrintfW(buffer, 100, L"Profiler_%hs.txt", __DATE__);
 
@@ -84,6 +84,8 @@ int main()
         CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         // 생성자에서 넘겨주는 것이 DB컨커런트
         CTestServer *LoginServer = new CTestServer(DBWorkerThreadCnt, iEnCording, DBContentsThreadCnt);
+        CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
+
         memcpy(LoginServer->ChatServerIP, ChatServerbindAddr, 32);
         memcpy(LoginServer->Dummy1_ChatServerIP, Dummy1_ChatServerbindAddr, 32);
         memcpy(LoginServer->Dummy2_ChatServerIP, Dummy2_ChatServerbindAddr, 32);

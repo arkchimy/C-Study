@@ -4,7 +4,7 @@
 
 
 #include "../Parser/Parser.h"
-//#include "../CLockFreeQueue/CLockFreeQueue.h"
+#include  "../SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "../CLockFreeStack/CLockFreeStack.h"
 #include "../CSystemLog/CSystemLog.h"
 
@@ -259,3 +259,10 @@ struct stTlsObjectPool
     ObjectPoolType<T> *allocPool = nullptr;
     ObjectPoolType<T> *releasePool = nullptr;
 };
+template <>
+PVOID stTlsObjectPool<CMessage>::Alloc();
+
+template <>
+void stTlsObjectPool<CMessage>::Release(PVOID node);
+
+extern template struct stTlsObjectPool<CMessage>;

@@ -48,7 +48,7 @@ class CSystemLog
     HANDLE m_LogThreadEvent;
 
 
-    HANDLE m_LogThread;
+    HANDLE m_LogThread = INVALID_HANDLE_VALUE;
 
     en_LOG_LEVEL m_Log_Level = en_LOG_LEVEL::ERROR_Mode;
 };

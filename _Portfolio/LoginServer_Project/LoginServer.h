@@ -63,7 +63,7 @@ class CTestServer :public CLanServer
     virtual ~CTestServer();
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
-    virtual float OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
+    virtual void OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
 
      virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) override;
     virtual void OnRelease(ull SessionID) override;
@@ -130,7 +130,7 @@ class CTestServer :public CLanServer
 
     char DBuser[ID_LEN];
     char password[Password_LEN];
-
+    int m_lProcessCnt;
 };
 //// Debuging Á¤º¸
 //////////////////////////////////////////////////////////////////////////
