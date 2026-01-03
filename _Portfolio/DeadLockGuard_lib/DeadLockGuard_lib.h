@@ -13,26 +13,26 @@
 #include <unordered_set>
 struct stTlsLockInfo;
 
-class MyMutexManager
+class clsDeadLockMananger
 {
   private:
-    MyMutexManager()
+    clsDeadLockMananger()
         : hMutexLogEvent(nullptr)
     {
         // 만일 재귀 lock이 걸린다면 생성자에서 생성한 이벤트로 Signal이 온다.
         // 여기서 생성한 Thread는 해당 signal을 기다리고있으므로 해당 쓰레드에서 Log를 작성.
 
         hMutexLogEvent = CreateEvent(nullptr, false, false, nullptr);
-        hManagerThread = std::thread(&MyMutexManager::MyMutexManagerThread, this);
+        hManagerThread = std::thread(&clsDeadLockMananger::clsDeadLockManangerThread, this);
         // Join 안함.
     };
-    void MyMutexManagerThread()
+    void clsDeadLockManangerThread()
     {
 
         if (hMutexLogEvent == nullptr)
             __debugbreak();
 
-        SetThreadDescription(hManagerThread.native_handle(), L"MyMutexManagerThread");
+        SetThreadDescription(hManagerThread.native_handle(), L"clsDeadLockManangerThread");
 
         WaitForSingleObject(hMutexLogEvent, INFINITE);
 
@@ -43,20 +43,20 @@ class MyMutexManager
     }
 
   public:
-    static MyMutexManager *GetInstance()
+    static clsDeadLockMananger *GetInstance()
     {
         // 함수가 실패하면 반환 값은 NULL.
         static HANDLE hInitEvent = CreateEvent(nullptr, true, false, nullptr);
         if (hInitEvent == nullptr)
             __debugbreak();
 
-        static MyMutexManager *instance = nullptr;
+        static clsDeadLockMananger *instance = nullptr;
         static long Once = false;
         // 단 한번만
 
         if (InterlockedCompareExchange(&Once, true, false) == false)
         {
-            instance = new MyMutexManager();
+            instance = new clsDeadLockMananger();
             if (instance == nullptr)
                 __debugbreak();
             SetEvent(hInitEvent);

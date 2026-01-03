@@ -17,7 +17,7 @@ void func()
 
     {
         thread_local stTlsLockInfo tls_LockInfo;
-        MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); // 등록을 해야함.
+        clsDeadLockMananger::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); // 등록을 해야함.
 
         std::lock_guard<SharedMutex> m_lock(m);
         std::shared_lock<SharedMutex> lock(m);
@@ -44,11 +44,11 @@ _Acquires_exclusive_lock_(m) void DeadLockGuard::lock()
             break;
     }
     if (s_iter != tls_LockInfo.shared_holding.end())
-        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+        clsDeadLockMananger::GetInstance()->RequestCreateLogFile_And_Debugbreak();
 
     if (iter != tls_LockInfo.holding.end())
     {
-        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+        clsDeadLockMananger::GetInstance()->RequestCreateLogFile_And_Debugbreak();
     }
 
     m.lock();
@@ -65,7 +65,7 @@ _Releases_exclusive_lock_(m) void DeadLockGuard::unlock()
             break;
     }
     if (iter == tls_LockInfo.holding.end())
-        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+        clsDeadLockMananger::GetInstance()->RequestCreateLogFile_And_Debugbreak();
 
     tls_LockInfo.holding.erase(iter);
     tls_LockInfo._size--;
@@ -91,11 +91,11 @@ _Acquires_shared_lock_(m) void DeadLockGuard::lock_shared()
             break;
     }
     if (s_iter != tls_LockInfo.shared_holding.end())
-        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+        clsDeadLockMananger::GetInstance()->RequestCreateLogFile_And_Debugbreak();
 
     if (iter != tls_LockInfo.holding.end())
     {
-        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+        clsDeadLockMananger::GetInstance()->RequestCreateLogFile_And_Debugbreak();
     }
     
 
@@ -116,14 +116,14 @@ _Releases_shared_lock_(m) void DeadLockGuard::unlock_shared()
             break;
     }
     if (s_iter == tls_LockInfo.shared_holding.end())
-        MyMutexManager::GetInstance()->RequestCreateLogFile_And_Debugbreak();
+        clsDeadLockMananger::GetInstance()->RequestCreateLogFile_And_Debugbreak();
 
     tls_LockInfo.shared_holding.erase(s_iter);
     tls_LockInfo._shared_size--;
     m.unlock_shared();
 }
 
-void MyMutexManager::LogTlsInfo(const wchar_t *filename)
+void clsDeadLockMananger::LogTlsInfo(const wchar_t *filename)
 {
     // Log를 위한 Lock
     std::lock_guard<std::mutex> m_lock(Log_m);
@@ -153,7 +153,7 @@ void MyMutexManager::LogTlsInfo(const wchar_t *filename)
     }
 }
 
-void MyMutexManager::RequestCreateLogFile_And_Debugbreak()
+void clsDeadLockMananger::RequestCreateLogFile_And_Debugbreak()
 {
     SetEvent(hMutexLogEvent);
     Sleep(INFINITE);

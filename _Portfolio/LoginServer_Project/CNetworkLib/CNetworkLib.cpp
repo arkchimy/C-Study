@@ -179,7 +179,7 @@ unsigned AcceptThread(void *arg)
 
 unsigned WorkerThread(void *arg)
 {
-
+    clsDeadLockMananger::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-20s ",

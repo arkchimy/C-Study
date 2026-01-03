@@ -138,7 +138,7 @@ void MonitorThread(void *arg)
 
 void HeartBeatThread(void *arg) 
 {
-    MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
+    clsDeadLockMananger::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
 
     DWORD retval;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
@@ -157,7 +157,7 @@ void HeartBeatThread(void *arg)
 
 void DBworkerThread(void *arg)
 {
-    MyMutexManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
+    clsDeadLockMananger::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
 
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
