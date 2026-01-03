@@ -36,8 +36,6 @@ thread_local cpp_redis::client *client;
 thread_local ull tls_ContentsQIdx; // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
 
 
-extern SRWLOCK srw_Log;
-
 
 void MsgTypePrint(WORD type, LONG64 val);
 
@@ -478,7 +476,9 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 
     // 옳바른 연결인지는 Token에 의존.
     // Alloc을 받았다면 prePlayer_hash에 추가되어있을 것이다.
-    if (prePlayer_hash.find(SessionID) == prePlayer_hash.end())
+    auto prePlayeriter = prePlayer_hash.find(SessionID);
+
+    if (prePlayeriter == prePlayer_hash.end())
     {
         // 없다는 것은 내가 만든 절차를 따르지않았음을 의미.
 
@@ -491,7 +491,7 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         Disconnect(SessionID);
         return;
     }
-    player = prePlayer_hash[SessionID];
+    player = prePlayeriter->second;
 
     if (player->m_State != enPlayerState::Session)
     {
@@ -615,9 +615,9 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     }
 
     {
-        std::shared_lock lock(srw_SessionID_Hash);
-
-        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        std::shared_lock<SharedMutex> lock(srw_SessionID_Hash);
+        auto iter = SessionID_hash.find(SessionID);
+        if (iter == SessionID_hash.end())
         {
             // Attack : Login을 안하고 들어옴
             static bool bOn = false;
@@ -634,7 +634,7 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
             stTlsObjectPool<CMessage>::Release(msg);
             return;
         }
-        player = SessionID_hash[SessionID];
+        player = iter->second;
 
         if (player->iSectorX >= m_sectorManager._MaxX || player->iSectorY >= m_sectorManager._MaxY )
         {
@@ -710,8 +710,10 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
 
     {
         // SessionID_HashLock 획득.
-        std::shared_lock SessionID_Hashlock(srw_SessionID_Hash);
-        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        std::shared_lock<SharedMutex> SessionID_Hashlock(srw_SessionID_Hash);
+        auto iter = SessionID_hash.find(SessionID);
+
+        if (iter == SessionID_hash.end())
         {
             // Attack : Login을 안하고 들어옴
             static bool bOn = false;
@@ -731,7 +733,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
             return;
         }
 
-        player = SessionID_hash[SessionID];
+        player = iter->second;
 
         SectorX = player->iSectorX;
         SectorY = player->iSectorY;
@@ -801,8 +803,10 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroa
 {
     stPlayer *player;
 
-    std::shared_lock SessionID_Hashlock(srw_SessionID_Hash);
-    if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+    std::shared_lock<SharedMutex> SessionID_Hashlock(srw_SessionID_Hash);
+    auto iter = SessionID_hash.find(SessionID);
+
+    if (iter == SessionID_hash.end())
     {
 
         stTlsObjectPool<CMessage>::Release(msg);
@@ -816,7 +820,8 @@ void CTestServer::HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroa
         return;
     }
 
-    player = SessionID_hash[SessionID];
+    player = iter->second;
+
     InterlockedExchange(&player->m_Timer, timeGetTime());
 
 
@@ -901,11 +906,12 @@ void CTestServer::DeletePlayer(CMessage *msg)
     stPlayer *player;
     SessionID = msg->ownerID;
 
-    if (prePlayer_hash.find(SessionID) == prePlayer_hash.end())
+    auto prePlayeriter = prePlayer_hash.find(SessionID);
+    if (prePlayeriter == prePlayer_hash.end())
     {
         // Player라면
-  
-        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        auto iter = SessionID_hash.find(SessionID);
+        if (iter == SessionID_hash.end())
         {
             // Attack : 내 만든 메세지일 경우 단 한번만 이 메세지가 오겠지만,
             // 근데 만일 공격 패턴에서 DeletePlayer의 Type을 맞춘다면?
@@ -927,8 +933,8 @@ void CTestServer::DeletePlayer(CMessage *msg)
         }
         else
         {
-            player = SessionID_hash[SessionID];
-            SessionID_hash.erase(SessionID);
+            player = iter->second;
+            SessionID_hash.erase(iter);
 
             if (AccountNo_hash.find(player->m_AccountNo) == AccountNo_hash.end())
             {
@@ -990,7 +996,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
     else
     {
         // Accept 이후  DeletePlayer가 LoginPacket보다 먼저 옴.
-        player = prePlayer_hash[SessionID];
+        player = prePlayeriter->second;
         prePlayer_hash.erase(SessionID);
         m_prePlayerCount--;
 
@@ -1145,7 +1151,8 @@ void CTestServer::Update()
 
         { //  Client Message
             {
-                std::shared_lock SessionID_HashLock(srw_SessionID_Hash);
+
+                std::shared_lock<SharedMutex> SessionID_HashLock(srw_SessionID_Hash);
 
                 if (SessionID_hash.find(l_sessionID) != SessionID_hash.end())
                     player = SessionID_hash[l_sessionID];
@@ -1423,9 +1430,9 @@ void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
     }
     else
     {
-        std::shared_lock SessionID_Hashlock(srw_SessionID_Hash);
-   
-        if (SessionID_hash.find(SessionID) == SessionID_hash.end())
+        std::shared_lock<SharedMutex> SessionID_Hashlock(srw_SessionID_Hash);
+        auto iter = SessionID_hash.find(SessionID);
+        if (iter == SessionID_hash.end())
         {
             TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
             hMsgQueuedEvent = hBalanceEvent;
@@ -1433,7 +1440,7 @@ void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
         }
         else
         {
-            stPlayer *player = SessionID_hash[SessionID];
+            stPlayer *player = iter->second;
 
             TargetQ = &m_CotentsQ_vec[player->m_ContentsQIdx];
             hMsgQueuedEvent = m_ContentsQMap[TargetQ];

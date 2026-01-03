@@ -93,7 +93,7 @@ int main()
                 {
                     Profiler::Reset();
                 }
-                else if (ch == 'L' || ch == ';')
+                else if (ch == 'L' || ch == 'l')
                 {
                     clsDeadLockManager::GetInstance()->CreateLogFile_TlsInfo();
                 }

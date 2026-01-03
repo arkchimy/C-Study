@@ -136,8 +136,7 @@ class CTestServer : public CLanServer
     CObjectPool_UnSafeMT<stPlayer> player_pool;
 
     //SRWLOCK srw_SessionID_Hash; // SessionID_hash 소유권. OnRecv , BalanceThread에서 접근
-    std::shared_mutex srw_SessionID_Hash;
-
+    SharedMutex srw_SessionID_Hash;
     // Account   Key , Player접근.
     std::unordered_map<ull, stPlayer *> AccountNo_hash; // 중복 접속을 제거하는 용도
 
