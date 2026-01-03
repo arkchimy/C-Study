@@ -52,6 +52,9 @@
     <Filter Include="utility\CCpuUsage">
       <UniqueIdentifier>{c4366cbb-1f9e-4653-87db-b8f9ca91f69c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="utility\DeadLockGuard">
+      <UniqueIdentifier>{2eb06613-0e68-476e-b222-ec09f37dbdb6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CNetworkLib.h">
@@ -108,6 +111,9 @@
     <ClInclude Include="utility\CCpuUsage\CCpuUsage.h">
       <Filter>utility\CCpuUsage</Filter>
     </ClInclude>
+    <ClInclude Include="utility\DeadLockGuard\DeadLockGuard_lib.h">
+      <Filter>utility\DeadLockGuard</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CNetworkLib.cpp">
@@ -157,6 +163,9 @@
     </ClCompile>
     <ClCompile Include="utility\CCpuUsage\CCpuUsage.cpp">
       <Filter>utility\CCpuUsage</Filter>
+    </ClCompile>
+    <ClCompile Include="utility\DeadLockGuard\DeadLockGuard_lib.cpp">
+      <Filter>utility\DeadLockGuard</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

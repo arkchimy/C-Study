@@ -4,6 +4,7 @@
 
 #include <thread>
 
+thread_local stTlsLockInfo tls_LockInfo;
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
     ADDRINFOW *pAddrInfo;
@@ -177,6 +178,7 @@ unsigned AcceptThread(void *arg)
 
 unsigned WorkerThread(void *arg)
 {
+    clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
 
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,

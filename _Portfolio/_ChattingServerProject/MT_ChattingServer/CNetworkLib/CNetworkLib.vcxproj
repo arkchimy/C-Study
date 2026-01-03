@@ -156,6 +156,7 @@
     <ClInclude Include="utility\CTlsLockFreeQueue\CTlsLockFreeQueue.h" />
     <ClInclude Include="utility\CTlsObjectPool\CObjectPool_UnSafeMT.h" />
     <ClInclude Include="utility\CTlsObjectPool\CTlsObjectPool.h" />
+    <ClInclude Include="utility\DeadLockGuard\DeadLockGuard_lib.h" />
     <ClInclude Include="utility\MT_CRingBuffer\MT_CRingBuffer.h" />
     <ClInclude Include="utility\Parser\Parser.h" />
     <ClInclude Include="utility\Profiler_MultiThread\Profiler_MultiThread.h" />
@@ -234,6 +235,12 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="utility\DeadLockGuard\DeadLockGuard_lib.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="utility\MT_CRingBuffer\MT_CRingBuffer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>

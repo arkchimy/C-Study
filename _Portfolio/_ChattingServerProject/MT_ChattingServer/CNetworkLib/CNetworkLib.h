@@ -19,10 +19,13 @@
 #include "utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "utility/Parser/Parser.h"
 #include "utility/CTlsObjectPool/CTlsObjectPool.h"
+
 #include "utility/Profiler_MultiThread/Profiler_MultiThread.h"
+#include "utility/DeadLockGuard/DeadLockGuard_lib.h"
+
 
 using ull = unsigned long long;
-
+extern thread_local stTlsLockInfo tls_LockInfo;
 
 struct stWSAData
 {

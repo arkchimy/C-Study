@@ -7,7 +7,7 @@
 #include <queue>
 
 #include "../MT_CRingBuffer/MT_CRingBuffer.h"
-
+#include "../DeadLockGuard/DeadLockGuard_lib.h"
 enum class en_LOG_LEVEL : DWORD
 {
     SYSTEM_Mode = 0,
@@ -40,7 +40,8 @@ class CSystemLog
     BOOL GetLogFileName(const wchar_t *const filename, size_t strlen, SYSTEMTIME &stNowTime, __out wchar_t *const out);
 
   public:
-    SRWLOCK srw_Errorlock;
+    
+    SharedMutex srw_Errorlock;
 
     //LogThread에게 전해주는 용도
     HANDLE hArgArr[2];

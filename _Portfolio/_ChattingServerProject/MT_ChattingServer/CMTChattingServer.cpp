@@ -412,6 +412,8 @@ unsigned MonitorThread(void *arg)
 
 void ContentsThread(void *arg)
 {
+    clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
+
     DWORD hSignalIdx;
     CTestServer *server = reinterpret_cast<CTestServer *>(arg);
 
@@ -685,14 +687,14 @@ void CTestServer::REQ_SECTOR_MOVE(ull SessionID, CMessage *msg, INT64 AccountNo,
     }
 
     {
-        std::unique_lock lock(srw_Sectors[beforeY][beforeX]);
+        std::lock_guard<SharedMutex> lock(srw_Sectors[beforeY][beforeX]);
         g_Sector[beforeY][beforeX].erase(SessionID);
     }
 
 
 
     {
-        std::unique_lock lock(srw_Sectors[SectorY][SectorX]);
+        std::lock_guard<SharedMutex> lock(srw_Sectors[SectorY][SectorX]);
         g_Sector[SectorY][SectorX].insert(SessionID);
     }
 
@@ -756,7 +758,7 @@ void CTestServer::REQ_MESSAGE(ull SessionID, CMessage *msg, INT64 AccountNo, WOR
 
         size_t vectorReserverSize = 0;
 
-        std::vector<std::shared_lock<std::shared_mutex>> SectorAround_locks;
+        std::vector<std::shared_lock<SharedMutex>> SectorAround_locks;
         SectorAround_locks.reserve(AroundSectors.Around.size());
 
         for (const st_Sector_Pos targetSector : AroundSectors.Around)
@@ -966,7 +968,7 @@ void CTestServer::DeletePlayer(CMessage *msg)
                 return;
             }
             {
-                std::unique_lock SessionID_Hashlock(srw_Sectors[player->iSectorY][player->iSectorX]);
+                std::lock_guard<SharedMutex> SessionID_Hashlock(srw_Sectors[player->iSectorY][player->iSectorX]);
                 g_Sector[player->iSectorY][player->iSectorX].erase(SessionID);
             }
 
@@ -1174,6 +1176,7 @@ void CTestServer::Update()
 
 void CTestServer::BalanceThread()
 {
+    clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-20s ",
@@ -1303,13 +1306,13 @@ void CTestServer::BalanceUpdate()
 
         case en_PACKET_Player_Delete:
         {
-            std::unique_lock SessionID_Hashlock(srw_SessionID_Hash);
+            std::lock_guard<SharedMutex> SessionID_Hashlock(srw_SessionID_Hash);
             DeletePlayer(msg);
             break;
         }
         case en_PACKET_CS_CHAT_REQ_LOGIN:
         {
-            std::unique_lock SessionID_Hashlock(srw_SessionID_Hash);
+            std::lock_guard<SharedMutex> SessionID_Hashlock(srw_SessionID_Hash);
             if (PacketProc(l_sessionID, msg, wType) == false) // Login¸¸ ½ÇÇà.
             {
                 stTlsObjectPool<CMessage>::Release(msg);

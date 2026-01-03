@@ -156,7 +156,7 @@ class CTestServer : public CLanServer
         stSectorManager(Chat_Sector_Right, Chat_Sector_Bottom, Chat_Sector_Size);
 
     // Sector마다 Lock이 존재.  [Y][X]
-    std::shared_mutex 
+    SharedMutex
         srw_Sectors[Chat_Sector_Bottom / Chat_Sector_Size][Chat_Sector_Right / Chat_Sector_Size];
 
     /*
