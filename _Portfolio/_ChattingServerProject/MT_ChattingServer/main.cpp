@@ -89,29 +89,33 @@ int main()
                     CSystemLog::GetInstance()->SaveAsLog();
                     Profiler::SaveAsLog(buffer);
                 }
-                if (ch == 'D' || ch == 'd')
+                else if (ch == 'D' || ch == 'd')
                 {
                     Profiler::Reset();
                 }
-                if (ch == '1')
+                else if (ch == 'L' || ch == ';')
+                {
+                    clsDeadLockManager::GetInstance()->CreateLogFile_TlsInfo();
+                }
+                else if (ch == '1')
                 {
 
                     CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
                     printf("ERROR_Mode\n");
                 }
-                if (ch == '2')
+                else if (ch == '2')
                 {
 
                     CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_TargetMode);
                     printf("DEBUG_TargetMode\n");
                 }
-                if (ch == '3')
+                else if (ch == '3')
                 {
 
                     CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::DEBUG_Mode);
                     printf("DEBUG_Mode\n");
                 }
-                if (ch == 'P' || ch == 'p')
+                else if (ch == 'P' || ch == 'p')
                 {
                     Profiler::bOn = Profiler::bOn == true ? false : true; 
                 }

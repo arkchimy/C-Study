@@ -36,7 +36,7 @@ class clsDeadLockManager
 
         WaitForSingleObject(hMutexLogEvent, INFINITE);
 
-        LogTlsInfo();
+        CreateLogFile_TlsInfo();
 
         // 에러로인한 Log작성임.
         __debugbreak();
@@ -73,8 +73,10 @@ class clsDeadLockManager
         std::lock_guard<std::shared_mutex> m_lock(m);
         LockInfos.insert(info);
     }
-    void LogTlsInfo(const wchar_t *filename = L"TlsLockInfo.txt");
+    void CreateLogFile_TlsInfo(const wchar_t *filename = L"TlsLockInfo.txt");
     void RequestCreateLogFile_And_Debugbreak();
+
+  private:
     std::unordered_set<stTlsLockInfo *> LockInfos;
     std::shared_mutex m;
 

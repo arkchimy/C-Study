@@ -123,7 +123,7 @@ _Releases_shared_lock_(m) void DeadLockGuard::unlock_shared()
     m.unlock_shared();
 }
 
-void clsDeadLockManager::LogTlsInfo(const wchar_t *filename)
+void clsDeadLockManager::CreateLogFile_TlsInfo(const wchar_t *filename)
 {
     // Log를 위한 Lock
     std::lock_guard<std::mutex> m_lock(Log_m);
