@@ -415,8 +415,13 @@ void CTestServer::OnRelease(ull SessionID)
     player = SessionID_hash[SessionID];
 
     SessionID_hash.erase(SessionID);
-    if (Account_hash.find(player->m_AccountNo) != Account_hash.end())
-        Account_hash.erase(player->m_AccountNo);
+    auto iter = Account_hash.find(player->m_AccountNo);
+
+    if (iter != Account_hash.end())
+    {
+        if (iter->second == player)
+            Account_hash.erase(player->m_AccountNo);
+    }
 
     player_pool.Release(player);
 
