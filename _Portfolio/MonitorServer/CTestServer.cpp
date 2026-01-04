@@ -79,6 +79,13 @@ void CTestServer::REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, W
 {
     stPlayer *player;
     std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
+    auto ServerNoIter = ServerNo_hash.find(ServerNo);
+    if (ServerNoIter == ServerNo_hash.end())
+    {
+        Disconnect(SessionID);
+        return;
+    }
+
     auto iter = SessionID_hash.find(SessionID);
     if (iter == SessionID_hash.end())
     {
@@ -106,7 +113,7 @@ void CTestServer::REQ_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, i
 }
 void CTestServer::REQ_LOGIN_Client(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType , BYTE bBroadCast , std::vector<ull> *pIDVector , size_t wVectorLen ) 
 {
-
+    
 }
 void CTestServer::REQ_MONITOR_TOOL_UPDATE(ull SessionID, CMessage *msg, BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp, WORD wType , BYTE bBroadCast , std::vector<ull> *pIDVector , size_t wVectorLen ) 
 {

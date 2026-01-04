@@ -70,6 +70,8 @@ class CLanServer : public Stub, public Proxy
     HANDLE hReadyForStopEvent = INVALID_HANDLE_VALUE; // SignalOnForStop에서 사용할 이벤트객체
 
     bool Disconnect(const ull SessionID);
+    void SendAfterDisconnect(const ull SessionID, CMessage *msg);
+
     void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
 
     void DecrementIoCountAndMaybeDeleteSession(clsSession &session);

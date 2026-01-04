@@ -44,10 +44,11 @@ class CTestServer : public CLanServer
 
         // SessionID Key , Player접근.
     std::unordered_map<ull, stPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
+    std::unordered_map<int, stPlayer *> ServerNo_hash;  // 중복 접속을 제거하는 용도
 
 
     CObjectPool_UnSafeMT<stPlayer> player_pool;
     CObjectPool<stDBOverlapped> dbOverlapped_pool;
-    SharedMutex SessionID_hash_Lock;
+    SharedMutex SessionID_hash_Lock; // ServerNo_hash , SessionID_hash 둘다 이용도로 씀.
 
 };

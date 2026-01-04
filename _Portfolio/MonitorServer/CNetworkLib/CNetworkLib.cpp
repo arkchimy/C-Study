@@ -1,4 +1,5 @@
-﻿// CNetworkLib.cpp : 정적 라이브러리를 위한 함수를 정의합니다.
+﻿#include "CNetworkLib.h"
+// CNetworkLib.cpp : 정적 라이브러리를 위한 함수를 정의합니다.
 //
 #include "CNetworkLib.h"
 
@@ -139,6 +140,7 @@ unsigned AcceptThread(void *arg)
             session.m_sock = client_sock;
             session.m_blive = true;
             session.m_flag = 0;
+            session.m_SAR = enSendAfterRelease::None;
 
             InterlockedExchange(&session.m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
             InterlockedExchange(&session.m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
@@ -439,6 +441,21 @@ bool CLanServer::Disconnect(const ull SessionID)
     return true;
 }
 
+void CLanServer::SendAfterDisconnect(const ull SessionID,CMessage* msg)
+{
+    
+    if (SessionLock(SessionID) == false)
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
+    clsSession &session = sessions_vec[SessionID >> 47];
+    session.m_SAR = enSendAfterRelease::SendReq;
+    SendPacket(SessionID, msg,0);
+
+    SessionUnLock(SessionID);
+}
+
 void CLanServer::CancelIO_Routine(const ull SessionID)
 {
     // Session에 대한 안정성은  외부에서 보장해주세요.
@@ -587,6 +604,13 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
     if (useSize == 0)
     {
+        if (session.m_SAR == enSendAfterRelease::Sending)
+        {
+            session.m_SAR = enSendAfterRelease::None;
+            Disconnect(session.m_SeqID.SeqNumberAndIdx);
+            return;
+        }
+
         useSize = (ringBufferSize)session.m_sendBuffer.m_size;
         // flag 끄기
         if (_InterlockedCompareExchange(&session.m_flag, 0, 1) == 1)
@@ -635,6 +659,9 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
     if (session.m_blive)
     {
+        // 보내고 연결을 끊을 데이터.
+        if (session.m_SAR == enSendAfterRelease::SendReq)
+            session.m_SAR = enSendAfterRelease::Sending;
         local_IoCount = _InterlockedIncrement(&session.m_ioCount);
 
         if (bZeroCopy)

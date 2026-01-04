@@ -24,6 +24,12 @@ void clsSession::Release()
         stTlsObjectPool<CMessage>::Release(msg);
     }
 
+    for (DWORD i = 0; i < m_sendOverlapped.msgCnt; i++)
+    {
+        stTlsObjectPool<CMessage>::Release(m_sendOverlapped.msgs[i]);
+    }
+    m_sendOverlapped.msgCnt = 0;
+
     {
         ZeroMemory(&m_recvOverlapped, sizeof(OVERLAPPED));
         ZeroMemory(&m_sendOverlapped, sizeof(OVERLAPPED));

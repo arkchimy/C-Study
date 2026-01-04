@@ -12,6 +12,13 @@
 
 using ull = unsigned long long;
 
+enum class enSendAfterRelease : ull
+{
+    None,
+    SendReq,
+    Sending,
+    SendComplete,
+};
 enum class Job_Type : BYTE
 {
     Recv,
@@ -84,4 +91,6 @@ class clsSession
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0; // SendFlag
+
+    enSendAfterRelease m_SAR = enSendAfterRelease::None;
 };
