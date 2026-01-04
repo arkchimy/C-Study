@@ -25,17 +25,17 @@ class MessageException : public std::exception
     };
 
     MessageException(ErrorType type, const std::string &msg)
-        : _type(type), _msg(msg) {}
+        : m_type(type), _msg(msg) {}
 
     virtual const char *what() const noexcept override
     {
         return _msg.c_str();
     }
 
-    ErrorType type() const noexcept { return _type; }
+    ErrorType type() const noexcept { return m_type; }
 
   private:
-    ErrorType _type;
+    ErrorType m_type;
     std::string _msg;
 };
 

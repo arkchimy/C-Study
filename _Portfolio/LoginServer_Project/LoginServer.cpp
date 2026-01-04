@@ -358,7 +358,8 @@ void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
     WORD type;
     *msg >> type;
     PacketProc(SessionID,msg,type);
-
+    if (PacketProc(SessionID, msg, type) == false)
+        Disconnect(SessionID);
 }
 
 bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
