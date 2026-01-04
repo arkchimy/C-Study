@@ -79,6 +79,7 @@ class CLanServer : public Stub, public Proxy
     // void RecvComplete(class clsSession *const session, DWORD transferred);
     void RecvComplete(class clsSession &session, DWORD transferred);
     void SendComplete(class clsSession &session, DWORD transferred);
+    void ReleaseComplete(ull SessionID);
 
     bool SessionLock(ull SessionID);   // 내부에서 IO를 증가시켜 안전을 보장함.
     void SessionUnLock(ull SessionID); // 반환형 쓸때가 없음.

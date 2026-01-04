@@ -119,7 +119,7 @@ int main()
                 }
                 if (ch == 'L' || ch == 'l')
                 {
-                    MyMutexManager::GetInstance()->LogTlsInfo();
+                    clsDeadLockMananger::GetInstance()->LogTlsInfo();
                 }
                 if (ch == '1')
                 {
