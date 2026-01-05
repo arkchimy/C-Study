@@ -1026,7 +1026,6 @@ CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
         hBalanceEvent = CreateEvent(nullptr, false, false, nullptr);
     }
 
-
     pBalanceThread = std::thread(&CTestServer::BalanceThread, this);
     hr = SetThreadDescription(pBalanceThread.native_handle(), L"\tBalanceThread");
     RT_ASSERT(!FAILED(hr));
