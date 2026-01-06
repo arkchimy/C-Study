@@ -37,6 +37,8 @@ enum
 
 class CTestServer : public CLanServer
 {
+  private:
+    void MonitorThread();
   public:
     // Stub함수
     virtual void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *ID, WCHAR *Nickname, WCHAR *SessionKey, WORD wType = en_PACKET_CS_CHAT_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0) final;
@@ -112,7 +114,8 @@ class CTestServer : public CLanServer
     HANDLE hBalanceEvent; // EnQ를 알려주는 이벤트
     CLockFreeQueue<CMessage*> m_BalanceQ = CLockFreeQueue<CMessage*>(); 
     
-    HANDLE hMonitorThread = 0;
+    WinThread hMonitorThread;
+
     bool bMonitorThreadOn = true;
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
     HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;

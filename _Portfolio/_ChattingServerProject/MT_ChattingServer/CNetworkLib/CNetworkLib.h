@@ -102,7 +102,8 @@ class CLanServer : public Stub, public Proxy
     void WSARecvError(const DWORD LastError, const ull SessionID);
     void ReleaseSession(ull SessionID);
 
-  public:
+  protected:
+    std::vector<class clsSession> sessions_vec;
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
 
@@ -111,14 +112,13 @@ class CLanServer : public Stub, public Proxy
 
     bool bZeroCopy = false;
     bool bOn = false;
-    bool bEnCording = false;
+
     int bNoDelay = false;
 
     LONG64 m_SessionCount = 0;
     ull iDisCounnectCount = 0;
-    int headerSize = 0;
 
-    std::vector<class clsSession> sessions_vec;
+
 
     CLockFreeStack<ull> m_SessionIdxStack; // 반환된 Idx를 Stack형식으로
     int m_WorkThreadCnt = 0;               // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
@@ -131,4 +131,8 @@ class CLanServer : public Stub, public Proxy
     LONG64 m_NetworkMsgCount = 0;
 
     int m_AllocLimitCnt = 10000;
+
+    public:
+    bool bEnCording = false;
+    int headerSize = 0;
 };
