@@ -1,49 +1,36 @@
-﻿// stdThread방식.cpp : 이 파일에는 'main' 함수가 포함됩니다. 거기서 프로그램 실행이 시작되고 종료됩니다.
-//
-
-#include <iostream>
+﻿#include <iostream>
 #include <Windows.h>
-#include <thread>
+#include <process.h>
 
-
-class A
+class CLanServer
 {
   public:
-    void WorkerThread() {
-        std::cout << "WorkerThread\n";
-    }
+    void WorkerThread()
+    {
+        std::cout << "WorkerThread";
+    }; // 해당 함수를 시작하는 Thread를 생성하기를 원한다면.
 };
-template <typename T>
-using PMF = void (T::*)();
+// 과정
+// WorkerThread의 함수포인터와 Instance를 매개변수로 전달해줘야 한다.
+// std::thread도 __beginThread에 넘겨줄 기본 함수가 존재한다.
+// 그 기본 함수는 매개변수로 받고, 매개변수로 받은 함수를 해당 instance 를 이용해 멤버함수를 호출한다.
 
 template <typename T>
-unsigned ThreadTest(void *arg) 
+HANDLE MyCreateThread(void (T::*pmf)(void), T *instance = this) // 이거 되나?
 {
-    std::pair<T *, PMF<T>> *data = static_cast<std::pair<T *, PMF<T>> *>(arg);
-    
-    PMF<T> pmf = data->second;
-
-    (data->first->*pmf)();
-
-    delete data;
-
-    return 0;
+    std::pair<void (T::*)(void), T *> arg({pmf, instance});
+    return (HANDLE)_beginthreadex(nullptr, 0, &StartRoutine<T>, arg, 0, nullptr);
 }
 
 template <typename T>
-HANDLE MyCreateThread(void(T::*pmf)(),T* instance) 
+unsigned StartRoutine(void* arg)
 {
-    auto arg = new std::pair<T *, PMF<T>>(instance, pmf);
-    
-    return (HANDLE)_beginthreadex(nullptr, 0, &ThreadTest<T>, (void*)(arg), 0, nullptr);
-
+    std::pair<void (T::*)(void), T *> data = static_cast<std::pair<void (T::*)(void), T *>>(arg);
+    T *instance = data->second;
+    (instance->*)data->first();
 }
+
 int main()
 {
-    A a;
-    HANDLE hWorkerThread = MyCreateThread<A>(&A::WorkerThread, &a);
-    std::thread(&A::WorkerThread, &a);
 
-    WaitForSingleObject(hWorkerThread, INFINITE);
-    CloseHandle(hWorkerThread);
 }
