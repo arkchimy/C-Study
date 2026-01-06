@@ -39,9 +39,6 @@
     <ClCompile Include="Contents\Sector\SectorManager.cpp">
       <Filter>Contents\Sector</Filter>
     </ClCompile>
-    <ClCompile Include="Win32\Atomic.cpp">
-      <Filter>Win32</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CMTChattingServer.h">
@@ -55,9 +52,6 @@
     </ClInclude>
     <ClInclude Include="Contents\Player\stPlayer.h">
       <Filter>Contents\Player</Filter>
-    </ClInclude>
-    <ClInclude Include="Win32\Atomic.h">
-      <Filter>Win32</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

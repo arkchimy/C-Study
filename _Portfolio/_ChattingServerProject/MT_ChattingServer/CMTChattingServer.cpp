@@ -30,8 +30,6 @@
 #pragma comment(lib, "tacopie.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-#include "Win32/Atomic.h"
-
 thread_local cpp_redis::client *client;
 thread_local ull tls_ContentsQIdx; // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
 
@@ -342,7 +340,7 @@ unsigned MonitorThread(void *arg)
         // AcceptThread 종료
         {
 
-            waitThread_Retval = WaitForSingleObject(server->m_hAccept, 0);
+            waitThread_Retval = WaitForSingleObject(server->m_hAccept.native_handle(), 0);
             if (waitThread_Retval == WAIT_TIMEOUT)
             {
                 wprintf(L"\t%30s\n", (Accept_str + dot_str[Chance % 10]).c_str());
@@ -357,7 +355,7 @@ unsigned MonitorThread(void *arg)
         // WorkerThread 종료
         for (int i = 0; i < server->m_WorkThreadCnt; i++)
         {
-            waitThread_Retval = WaitForSingleObject( server->m_hWorkerThread[i], 0);
+            waitThread_Retval = WaitForSingleObject(server->m_hWorkerThread[i].native_handle(), 0);
             if (waitThread_Retval == WAIT_TIMEOUT)
             {
                 wprintf(L"\t%30s\n", (Worker_str + std::to_wstring(i) + dot_str[Chance % 10]).c_str());
@@ -1503,8 +1501,8 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
         // TODO : 실패의 경우의 수
         OnRecv(SessionID, msg,true);
 
-        Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
-        //_InterlockedIncrement64(&m_NetworkMsgCount);
+        //Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
+        _InterlockedIncrement64(&m_NetworkMsgCount);
     }
 
     return true;

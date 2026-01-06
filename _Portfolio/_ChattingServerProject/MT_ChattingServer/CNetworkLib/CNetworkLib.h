@@ -22,6 +22,7 @@
 
 #include "utility/Profiler_MultiThread/Profiler_MultiThread.h"
 #include "utility/DeadLockGuard/DeadLockGuard_lib.h"
+#include "Win32/WinThread.h"
 
 
 using ull = unsigned long long;
@@ -48,19 +49,11 @@ struct stWSAData
     }
 };
 
-struct stAcceptArgs
-{
-    HANDLE hiocp = INVALID_HANDLE_VALUE;
-    SOCKET listenSock = INVALID_SOCKET;
-    class CLanServer *server = nullptr;
-};
-struct stWorkerArgs
-{
-    HANDLE hiocp = INVALID_HANDLE_VALUE;
-    class CLanServer *server = nullptr;
-};
 class CLanServer : public Stub, public Proxy
 {
+  private:
+    void WorkerThread();
+    void AcceptThread();
   public:
     CLanServer(bool EnCoding = false);
     ~CLanServer();
@@ -112,9 +105,9 @@ class CLanServer : public Stub, public Proxy
   public:
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
-    HANDLE *m_hWorkerThread = nullptr;
 
-    HANDLE m_hAccept = INVALID_HANDLE_VALUE;
+    std::vector<WinThread> m_hWorkerThread;
+    WinThread m_hAccept;
 
     bool bZeroCopy = false;
     bool bOn = false;
@@ -132,9 +125,6 @@ class CLanServer : public Stub, public Proxy
 
     DWORD m_tlsIdxForTPS = 0; // Start에서 초기화
     LONG64 *arrTPS = nullptr; //  idx 0 : AcceptTps , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
-
-    stWorkerArgs WorkerArg{}; // WorkerThread __beginthreadex 매개변수
-    stAcceptArgs AcceptArg{}; // AcceptThread __beginthreadex 매개변수
 
     ull m_TotalAccept = 0;
     LONG64 m_AllocMsgCount = 0;

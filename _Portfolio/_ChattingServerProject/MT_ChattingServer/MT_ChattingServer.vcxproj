@@ -152,14 +152,12 @@
     <ClCompile Include="CMTChattingServer.cpp" />
     <ClCompile Include="Contents\Sector\SectorManager.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Win32\Atomic.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CMTChattingServer.h" />
     <ClInclude Include="Contents\Player\stPlayer.h" />
     <ClInclude Include="Contents\Sector\SectorManager.h" />
     <ClInclude Include="Contents\Sector\SectorTypes.h" />
-    <ClInclude Include="Win32\Atomic.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Config.txt" />
