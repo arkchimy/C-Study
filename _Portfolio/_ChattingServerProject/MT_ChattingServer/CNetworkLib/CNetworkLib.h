@@ -22,7 +22,8 @@
 
 #include "utility/Profiler_MultiThread/Profiler_MultiThread.h"
 #include "utility/DeadLockGuard/DeadLockGuard_lib.h"
-#include "Win32/WinThread.h"
+#include "WinAPI/WinThread.h"
+#include "WinAPI/Atomic.h"
 
 
 using ull = unsigned long long;
@@ -51,6 +52,8 @@ struct stWSAData
 
 class CLanServer : public Stub, public Proxy
 {
+    friend class Stub;
+    friend class Proxy;
   private:
     void WorkerThread();
     void AcceptThread();
@@ -123,8 +126,7 @@ class CLanServer : public Stub, public Proxy
     CLockFreeStack<ull> m_SessionIdxStack; // 반환된 Idx를 Stack형식으로
     int m_WorkThreadCnt = 0;               // MonitorThread에서 WorkerThread의 갯수를 알기위한 변수.
 
-    DWORD m_tlsIdxForTPS = 0; // Start에서 초기화
-    LONG64 *arrTPS = nullptr; //  idx 0 : AcceptTps , 나머지 : WorkerThread들이 측정할 Count변수의 동적 배열
+    std::vector<LONG64> arrTPS;
 
     ull m_TotalAccept = 0;
     LONG64 m_AllocMsgCount = 0;
@@ -132,7 +134,6 @@ class CLanServer : public Stub, public Proxy
 
     int m_AllocLimitCnt = 10000;
 
-    public:
     bool bEnCording = false;
     int headerSize = 0;
 };

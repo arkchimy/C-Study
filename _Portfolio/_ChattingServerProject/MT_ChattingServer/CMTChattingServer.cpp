@@ -111,13 +111,9 @@ void CTestServer::MonitorThread()
     LONG64 RecvTPS;
     LONG64 before_RecvTPS = 0;
 
-    LONG64 *arrTPS;
-    LONG64 *before_arrTPS;
 
-    arrTPS = new LONG64[m_WorkThreadCnt + 1]; // Accept + 1
-    before_arrTPS = new LONG64[m_WorkThreadCnt + 1];
-    ZeroMemory(arrTPS, sizeof(LONG64) * (m_WorkThreadCnt + 1));
-    ZeroMemory(before_arrTPS, sizeof(LONG64) * (m_WorkThreadCnt + 1));
+    std::vector<LONG64> before_arrTPS(m_WorkThreadCnt + 1, 0);
+    std::vector<LONG64> Send_arrTPS(m_WorkThreadCnt + 1, 0);
 
     LONG64 RecvMsgArr[en_PACKET_CS_CHAT__Max]{
         0,
@@ -130,17 +126,10 @@ void CTestServer::MonitorThread()
 
     timeBeginPeriod(1);
 
-    DWORD currentTime = timeGetTime();
+    DWORD currentTime;
     DWORD nextTime; // 내가 목표로하는 이상적인 시간.
-    nextTime = currentTime;
 
-    ////ServerInfo
-
-    int workthreadCnt = m_WorkThreadCnt;
-    bool ZeroCopy = bZeroCopy;
     size_t MaxSessions = sessions_vec.size();
-    int maxPlayers = m_maxPlayers;
-
 
     char ProfilerFormat[2][30] = {
         "Profiler_Mode : Off\n",
@@ -198,6 +187,10 @@ void CTestServer::MonitorThread()
         PDH_FMT_COUNTERVALUE totalVal[3];
         PDH_FMT_COUNTERVALUE vTcp4Retr, vTcp4Sent, vTcp4Recv;
 
+        currentTime = timeGetTime();
+        nextTime; // 내가 목표로하는 이상적인 시간.
+        nextTime = currentTime;
+
         while (bMonitorThreadOn)
         {
             nextTime += 1000;
@@ -206,17 +199,17 @@ void CTestServer::MonitorThread()
                 UpdateTPS = old_UpdateTPS - before_UpdateTPS;
                 before_UpdateTPS = old_UpdateTPS;
             }
-            for (int i = 0; i <= workthreadCnt; i++)
+            for (int i = 0; i <= m_WorkThreadCnt; i++)
             {
                 LONG64 old_arrTPS = arrTPS[i];
-                arrTPS[i] = old_arrTPS - before_arrTPS[i];
+                Send_arrTPS[i] = old_arrTPS - before_arrTPS[i];
                 before_arrTPS[i] = old_arrTPS;
             }
             printf(" ============================================ Config ============================================ \n");
 
-            printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", workthreadCnt, "SessionNum", GetSessionCount());
-            printf("%-25s : %10d  %-25s : %10d \n", "ZeroCopy", ZeroCopy, "Nodelay", bNoDelay);
-            printf("%-25s : %10zu  %-25s : %10d\n", "MaxSessions", MaxSessions, "MaxPlayers", maxPlayers);
+            printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", m_WorkThreadCnt, "SessionNum", GetSessionCount());
+            printf("%-25s : %10d  %-25s : %10d \n", "ZeroCopy", bZeroCopy, "Nodelay", bNoDelay);
+            printf("%-25s : %10zu  %-25s : %10d\n", "MaxSessions", MaxSessions, "MaxPlayers", m_maxPlayers);
 
             printf(" \n========================================= Server Runtime Status ====================================== \n");
 
@@ -231,7 +224,7 @@ void CTestServer::MonitorThread()
 
             printf(" ============================================ Contents Thread TPS ========================================== \n");
 
-            printf(" Accept TPS           : %lld\n", arrTPS[0]);
+            printf(" Accept TPS           : %lld\n", Send_arrTPS[0]);
             printf(" Update TPS           : %lld\n", UpdateTPS);
 
             {
@@ -244,8 +237,8 @@ void CTestServer::MonitorThread()
                 LONG64 sum = 0;
                 for (int i = 1; i <= m_WorkThreadCnt; i++)
                 {
-                    sum += arrTPS[i];
-                    printf("%20s %10lld \n", "Send TPS :", arrTPS[i]);
+                    sum += Send_arrTPS[i];
+                    printf("%20s %10lld \n", "Send TPS :", Send_arrTPS[i]);
                 }
                 printf(" ===================================================================================================== \n");
                 printf("%35s %10lld\n", "Total Send TPS :", sum);
@@ -253,7 +246,7 @@ void CTestServer::MonitorThread()
             }
 
             {
-                LONG64 sum = 0;
+           
                 // Contents 정보 Print
                 for (int idx = 0; idx < balanceVec.size(); idx++)
                 {
@@ -1444,8 +1437,9 @@ void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
         TargetQ->Push(msg);
     }
     SetEvent(hMsgQueuedEvent);
-        
-    _interlockedincrement64(&m_RecvTPS);
+
+    Win32::AtomicIncrement<LONG64>(m_RecvTPS);
+
     ContentsUseSize = TargetQ->m_size;
     
 }
@@ -1494,8 +1488,8 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
         // TODO : 실패의 경우의 수
         OnRecv(SessionID, msg,true);
 
-        //Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
-        _InterlockedIncrement64(&m_NetworkMsgCount);
+        Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
+        //_InterlockedIncrement64(&m_NetworkMsgCount);
     }
 
     return true;
@@ -1512,7 +1506,8 @@ void CTestServer::OnRelease(ull SessionID)
 
         OnRecv(SessionID, msg,true);
 
-        _InterlockedIncrement64(&m_NetworkMsgCount);
+        Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
+        //_InterlockedIncrement64(&m_NetworkMsgCount);
     }
 }
 

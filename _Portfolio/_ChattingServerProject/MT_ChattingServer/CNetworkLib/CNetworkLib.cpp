@@ -5,6 +5,7 @@
 #include <thread>
 
 thread_local stTlsLockInfo tls_LockInfo;
+thread_local LONG64 SendTPSidx;
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
     ADDRINFOW *pAddrInfo;
@@ -76,12 +77,7 @@ void CLanServer::WorkerThread()
     // 매개변수를 통한 초기화
 
     static LONG64 s_arrTPS_idx = 0;
-    LPVOID arrTPS_idx = TlsGetValue(m_tlsIdxForTPS);
-    // arrTPS 의 index 값을 셋팅함.
-    if (arrTPS_idx == nullptr)
-    {
-        TlsSetValue(m_tlsIdxForTPS, (void *)_interlockedincrement64(&s_arrTPS_idx));
-    }
+    SendTPSidx = _interlockedincrement64(&s_arrTPS_idx);
 
     DWORD transferred;
     ull key;
@@ -289,9 +285,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     HRESULT hr;
     SOCKADDR_IN serverAddr;
 
-    m_tlsIdxForTPS = TlsAlloc();
-    if (m_tlsIdxForTPS == TLS_OUT_OF_INDEXES)
-        __debugbreak();
 
     sessions_vec.resize(MaxSessions);
 
@@ -328,15 +321,14 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 
    
-    arrTPS = new LONG64[WorkerCreateCnt + 1];
-    ZeroMemory(arrTPS, sizeof(LONG64) * (WorkerCreateCnt + 1));
+    arrTPS.resize(WorkerCreateCnt + 1,0); //Accept가 0
 
     m_WorkThreadCnt = WorkerCreateCnt;
 
 
     bOn = true;
 
-    m_hAccept = WinThread(&CLanServer::AcceptThread, this);
+    m_hAccept = std::move(WinThread(&CLanServer::AcceptThread, this));
     SetThreadDescription(m_hAccept.native_handle(), L"\tAcceptThread");
 
     m_hWorkerThread.reserve(WorkerCreateCnt);
@@ -541,7 +533,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     WSABUF wsaBuf[500];
     DWORD LastError;
     // LONG64 beforeTPS;
-    LONG64 TPSidx;
+
     ull local_IoCount;
     CMessage *msg;
 
@@ -556,7 +548,6 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     }
 
     useSize = (ringBufferSize)session.m_sendBuffer.m_size;
-    TPSidx = (LONG64)TlsGetValue(m_tlsIdxForTPS);
 
     if (useSize == 0)
     {
@@ -606,7 +597,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
     }
 
     session.m_sendOverlapped.msgCnt = bufCnt;
-    arrTPS[TPSidx] += bufCnt;
+    arrTPS[SendTPSidx] += bufCnt;
 
     if (session.m_blive)
     {

@@ -55,7 +55,7 @@
     <Filter Include="utility\DeadLockGuard">
       <UniqueIdentifier>{2eb06613-0e68-476e-b222-ec09f37dbdb6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Win32">
+    <Filter Include="WinAPI">
       <UniqueIdentifier>{7ba138fe-a315-4610-8bf2-53e185c9c540}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -117,8 +117,11 @@
     <ClInclude Include="utility\DeadLockGuard\DeadLockGuard_lib.h">
       <Filter>utility\DeadLockGuard</Filter>
     </ClInclude>
-    <ClInclude Include="Win32\WinThread.h">
-      <Filter>Win32</Filter>
+    <ClInclude Include="WinAPI\Atomic.h">
+      <Filter>WinAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="WinAPI\WinThread.h">
+      <Filter>WinAPI</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -173,8 +176,11 @@
     <ClCompile Include="utility\DeadLockGuard\DeadLockGuard_lib.cpp">
       <Filter>utility\DeadLockGuard</Filter>
     </ClCompile>
-    <ClCompile Include="Win32\WinThread.cpp">
-      <Filter>Win32</Filter>
+    <ClCompile Include="WinAPI\Atomic.cpp">
+      <Filter>WinAPI</Filter>
+    </ClCompile>
+    <ClCompile Include="WinAPI\WinThread.cpp">
+      <Filter>WinAPI</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

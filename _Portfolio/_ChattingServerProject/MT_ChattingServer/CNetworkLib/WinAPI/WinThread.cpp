@@ -17,8 +17,3 @@ void example()
 
 
 
-
-WinThread::~WinThread()
-{
-    CloseHandle(_hThread);
-}

@@ -5,6 +5,28 @@
 class WinThread
 {
   public:
+    WinThread& operator=(const WinThread &) = delete;
+    WinThread(const WinThread &) = delete;
+
+    WinThread(WinThread&& other) noexcept
+    {
+        if (this == &other)
+            return ;
+        _hThread = other._hThread;
+        other._hThread = INVALID_HANDLE_VALUE;
+    }
+    WinThread &operator=(WinThread &&other) noexcept
+    {
+        if (this == &other)
+            return *this;
+
+        if (_hThread != INVALID_HANDLE_VALUE)
+            CloseHandle(_hThread);
+
+        _hThread = other._hThread;
+        other._hThread = INVALID_HANDLE_VALUE;
+        return *this;
+    }
     template <typename T>
     static unsigned StartRoutine(void *arg);
 
@@ -12,7 +34,13 @@ class WinThread
 
     template <typename T>
     WinThread(void (T::*pmf)(), T *instance);
-    ~WinThread();
+
+    ~WinThread()
+    {
+        if (_hThread == INVALID_HANDLE_VALUE)
+            return;
+        CloseHandle(_hThread);
+    }
 
     HANDLE native_handle() const { return _hThread; }
 
