@@ -129,6 +129,10 @@ void CLanServer::WorkerThread()
         case Job_Type::Send:
             SendComplete(*session, transferred);
             break;
+        case Job_Type::ReleasePost:
+            ReleaseComplete(key);
+            continue;
+
         default:
             CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stOverlapped *>(overlapped)->_mode);
             __debugbreak();
@@ -641,6 +645,46 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
             WSASendError(LastError, session.m_SeqID.SeqNumberAndIdx);
     }
 }
+void CLanServer::ReleaseComplete(ull SessionID) 
+{
+    // 로직상  Session당 한번만 호출되게 짰음.
+    int retval;
+    clsSession &session = sessions_vec[SessionID >> 47];
+    if (SessionID != session.m_SeqID.SeqNumberAndIdx)
+    {
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                       L"%-10s %10s %05lld  %10s %018llu  %10s %4llu %10s %018llu  %10s %4llu ",
+                                       L"ReleaseSessionNoequle",
+                                       L"HANDLE : ", session.m_sock,
+                                       L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"LocalseqID :", SessionID, L"LocalseqIndx : ", SessionID >> 47);
+        __debugbreak();
+        return;
+    }
+    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
+                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                   L"Closesocket",
+                                   L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                   L"IO_Count", session.m_ioCount);
+    OnRelease(SessionID);
+    session.Release();
+    retval = closesocket(session.m_sock);
+    DWORD LastError = GetLastError();
+    if (retval != 0)
+    {
+
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"closesocketError", LastError,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"IO_Count", session.m_ioCount);
+    }
+    else
+    {
+        m_SessionIdxStack.Push(SessionID >> 47);
+        _interlockeddecrement64(&m_SessionCount);
+    }
+}
 bool CLanServer::SessionLock(ull SessionID)
 {
     /*
@@ -939,31 +983,8 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
 
 void CLanServer::ReleaseSession(ull SessionID)
 {
-    int retval;
-
     clsSession &session = sessions_vec[SessionID >> 47];
-    if (SessionID != session.m_SeqID.SeqNumberAndIdx)
-    {
-        __debugbreak();
-        return;
-    }
+    ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
+    PostQueuedCompletionStatus(m_hIOCP, 0, SessionID, &session.m_releaseOverlapped);
 
-    OnRelease(SessionID);
-    session.Release();
-    retval = closesocket(session.m_sock);
-    DWORD LastError = GetLastError();
-    if (retval != 0)
-    {
-
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"closesocketError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
-                                       L"IO_Count", session.m_ioCount);
-    }
-    else
-    {
-        m_SessionIdxStack.Push(SessionID >> 47);
-        _interlockeddecrement64(&m_SessionCount);
-    }
 }

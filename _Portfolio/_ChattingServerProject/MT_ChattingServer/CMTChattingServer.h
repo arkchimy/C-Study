@@ -63,7 +63,7 @@ class CTestServer : public CLanServer
     void HeartBeat();
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
-    virtual void OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
+    virtual void OnRecv(ull SessionID, CMessage *msg) override;
 
     virtual bool OnAccept(ull SessionID,SOCKADDR_IN& addr) override;
     virtual void OnRelease(ull SessionID) override;
@@ -97,9 +97,10 @@ class CTestServer : public CLanServer
     std::vector<WinThread> hContentsThread_vec; // HANDLE of ContentThread 
     int m_ContentsThreadCnt;  // 생성자를 통해 받은 ContentsQ 개수 .
     
-    ull m_ContentsThreadIdX = -1;  // ContentsThread가 생성시에 Interlock으로 1씩 증가.
+    // ContentsThread가 생성시에 Interlock으로 1씩 증가.
+    ull m_ContentsThreadIdX = 0;  
 
-    // 메세지 Q의 주소로 Lock과 SetEvent를할 HANDLE을 가져 옴.
+    // Event호출 방식.  [0] 은 초기 Player [ delete, Create ] 
     std::vector<CLockFreeQueue<CMessage*>> m_CotentsQ_vec; // ContentsQ vec
     std::map<CLockFreeQueue<CMessage*> *, HANDLE> m_ContentsQMap; // HANDLE 은 OnRecv후 호출하는 Event
 
@@ -107,13 +108,10 @@ class CTestServer : public CLanServer
     ////////////////////////// BalanceThread //////////////////////////
     //
     WinThread pBalanceThread;
-    std::vector<std::pair<DWORD, int>> balanceVec;
+    //  [0] = 기본 큐, 밸런스 대상아님. value는 Player 수 
+    std::vector<DWORD> balanceVec;
 
     HANDLE hBalanceThread; 
-    //SRWLOCK srw_BalanceQ;  // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
-    //std::shared_mutex srw_BalanceQ; // PlayerAlloc,Delete 과  LoginPacket을 처리하는 Q  Balance Thread
-    HANDLE hBalanceEvent; // EnQ를 알려주는 이벤트
-    CLockFreeQueue<CMessage*> m_BalanceQ = CLockFreeQueue<CMessage*>(); 
     
     WinThread hMonitorThread;
 

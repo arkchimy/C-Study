@@ -78,6 +78,7 @@ class CLanServer : public Stub, public Proxy
     // void RecvComplete(class clsSession *const session, DWORD transferred);
     void RecvComplete(class clsSession &session, DWORD transferred);
     void SendComplete(class clsSession &session, DWORD transferred);
+    void ReleaseComplete(ull SessionID);
 
     bool SessionLock(ull SessionID);   // 내부에서 IO를 증가시켜 안전을 보장함.
     void SessionUnLock(ull SessionID); // 반환형 쓸때가 없음.
@@ -90,7 +91,7 @@ class CLanServer : public Stub, public Proxy
     void RecvPacket(class clsSession &session);
 
     virtual bool OnAccept(ull SessionID , SOCKADDR_IN& addr) = 0;
-    virtual void OnRecv(ull SessionID, struct CMessage *msg, bool bBalanceQ = false) = 0;
+    virtual void OnRecv(ull SessionID, struct CMessage *msg) = 0;
     virtual void OnRelease(ull SessionID) = 0;
 
     LONG64 GetSessionCount() const ; 

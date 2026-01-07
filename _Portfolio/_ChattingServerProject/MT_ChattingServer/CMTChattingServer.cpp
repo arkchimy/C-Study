@@ -184,11 +184,16 @@ void CTestServer::MonitorThread()
             {
            
                 // Contents 정보 Print
-                for (int idx = 0; idx < balanceVec.size(); idx++)
+                printf("%15s %10s %05d  %10s %05lld\n",
+                       "Balance ",
+                       "Player :", balanceVec[0],
+                       "UpdateMessage_Queue", m_CotentsQ_vec[0].m_size);
+                printf(" ===================================================================================================== \n");
+                for (int idx = 1; idx < balanceVec.size(); idx++)
                 {
                     printf("%15s %10s %05d  %10s %05lld\n",
                            "Contetent",
-                           "Session :", balanceVec[idx].second,
+                           "Player :", balanceVec[idx],
                            "UpdateMessage_Queue", m_CotentsQ_vec[idx].m_size);
                 }
             }
@@ -420,13 +425,22 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         Disconnect(AccountNo_hash[AccountNo]->m_sessionID);
         //return;
     }
-    std::vector<std::pair<DWORD, int>>::iterator iter = std::min_element(balanceVec.begin(), balanceVec.end(),
-                                  [](const std::pair<DWORD, int> &a, const std::pair<DWORD, int> &b)
-                                {
-                                    return a.second < b.second; // value 기준으로 비교
-                                });
-    DWORD idx = iter->first;
-    iter->second++;
+    DWORD idx = 1;
+    DWORD _min = INT_MAX;
+
+    balanceVec[0]--;
+
+    for (size_t i = 1; i < balanceVec.size(); i++)
+    {
+        DWORD element = balanceVec[i];
+        if (_min > element)
+        {
+            _min = element;
+            idx = i;
+        }
+    }
+
+    Win32::AtomicIncrement<DWORD>(balanceVec[idx]);
 
     player->m_State = enPlayerState::Player;
     InterlockedExchange64((LONG64*) & player->m_AccountNo, AccountNo);
@@ -784,6 +798,10 @@ void CTestServer::AllocPlayer(CMessage *msg)
     *msg >> player->m_port;
 
     m_prePlayerCount++;
+
+
+
+    balanceVec[0]++;
     _InterlockedDecrement64(&m_NetworkMsgCount);
     stTlsObjectPool<CMessage>::Release(msg);
 
@@ -871,16 +889,6 @@ void CTestServer::DeletePlayer(CMessage *msg)
             }
 
             player->m_State = enPlayerState::DisConnect;
-
-
-            for (auto& element : balanceVec)
-            {
-                if (element.first == player->m_ContentsQIdx)
-                {
-                    element.second--;
-                    break;
-                }
-            }
             player_pool.Release(player);
         }
     
@@ -896,13 +904,14 @@ void CTestServer::DeletePlayer(CMessage *msg)
 
         player_pool.Release(player);
     }
+
     _InterlockedDecrement64(&m_NetworkMsgCount);
     stTlsObjectPool<CMessage>::Release(msg);
 
 }
 
 CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
-    : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0), hBalanceThread(0)
+    : CLanServer(iEncording), m_ContentsThreadCnt(ContentsThreadCnt), m_RecvTPS(0), m_UpdateTPS(0), m_UpdateMessage_Queue(0)
 {
     HRESULT hr;
     player_pool.Initalize(m_maxPlayers);
@@ -915,7 +924,7 @@ CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
     {
 
         m_ServerOffEvent = CreateEvent(nullptr, true, false, nullptr);
-        hBalanceEvent = CreateEvent(nullptr, false, false, nullptr);
+
     }
 
     pBalanceThread = WinThread(&CTestServer::BalanceThread, this);
@@ -925,14 +934,13 @@ CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
     //    std::map<CRingBuffer *, SRWLOCK> m_SrwMap;
     //    각 메세지 Q에 대해서 SRWLOCK을 획득하는 자료구조 초기화 하기.
     {
-        balanceVec.reserve(ContentsThreadCnt);
+        balanceVec.resize(ContentsThreadCnt + 1,0);
 
-        m_CotentsQ_vec.reserve(ContentsThreadCnt);
-        hContentsThread_vec.reserve(ContentsThreadCnt);
+        m_CotentsQ_vec.reserve(ContentsThreadCnt + 1);
+        hContentsThread_vec.reserve(ContentsThreadCnt + 1);
 
-        for (int i = 0; i < ContentsThreadCnt; i++)
+        for (int i = 0; i < ContentsThreadCnt + 1; i++)
         {
-            balanceVec.emplace_back(i, 0);
             m_CotentsQ_vec.emplace_back();
             m_ContentsQMap[&m_CotentsQ_vec[i]] = CreateEvent(nullptr, false, false, nullptr);
         }
@@ -1092,7 +1100,7 @@ void CTestServer::BalanceThread()
     DWORD hSignalIdx;
     ringBufferSize ContentsUseSize;
     // m_ServerOffEvent 는 ESCAPE 누를 시 호출 
-    HANDLE hWaitHandle[2] = {hBalanceEvent, m_ServerOffEvent};
+    HANDLE hWaitHandle[2] = {m_ContentsQMap[&m_CotentsQ_vec[0]], m_ServerOffEvent};
 
     cpp_redis::client a;
     client = &a;
@@ -1107,7 +1115,7 @@ void CTestServer::BalanceThread()
             BalanceUpdate();
         }
 
-        ContentsUseSize = m_BalanceQ.m_size;
+        ContentsUseSize = m_CotentsQ_vec[0].m_size;
 
         //모니터링 변수 초기화.
         {
@@ -1201,7 +1209,7 @@ void CTestServer::BalanceUpdate()
 
     WORD wType;
 
-    CLockFreeQueue<CMessage*> *CotentsQ = &m_BalanceQ;
+    CLockFreeQueue<CMessage *> *CotentsQ = &m_CotentsQ_vec[0];
 
     
     // msg  크기 메세지 하나에 8Byte
@@ -1365,50 +1373,41 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
 
 
 
-void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
+void CTestServer::OnRecv(ull SessionID, CMessage *msg)
 {
-    // double CurrentQ;
     ringBufferSize ContentsUseSize;
-    CMessage **ppMsg;
+
     CLockFreeQueue<CMessage*> *TargetQ; //  Q 가 많아졌으므로 Q를 찾아오기.
     HANDLE hMsgQueuedEvent; // Q에 데이터가 들어왔음을 알림.
 
-    std::wstring ProfileName; 
+    stPlayer *player;
 
-    if (bBalanceQ)
-    {
-        TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
-        //pSrw = &srw_BalanceQ;
-        hMsgQueuedEvent = hBalanceEvent;
-        ProfileName = L"EnQueue_BalanceQ";
-    }
-    else
     {
         std::shared_lock<SharedMutex> SessionID_Hashlock(srw_SessionID_Hash);
+
         auto iter = SessionID_hash.find(SessionID);
         if (iter == SessionID_hash.end())
         {
-            TargetQ = &m_BalanceQ; // Q랑 매핑되는 SRWLock을 획득하기.
-            hMsgQueuedEvent = hBalanceEvent;
-            ProfileName = L"EnQueue_BalanceQ";
+            // 메시지의 경우
+            // Player가 존재하지않으므로 직접 값넣기
+            TargetQ = &m_CotentsQ_vec[0]; // Q랑 매핑되는 SRWLock을 획득하기.
+            hMsgQueuedEvent = m_ContentsQMap[TargetQ];
         }
         else
         {
-            stPlayer *player = iter->second;
+            player = iter->second;
 
             TargetQ = &m_CotentsQ_vec[player->m_ContentsQIdx];
             hMsgQueuedEvent = m_ContentsQMap[TargetQ];
-            ProfileName = L"EnQueue_CotentsQ" + std::to_wstring(player->m_ContentsQIdx);
-               
         }
     }
-    ppMsg = &msg;
+
+
     {
         Profiler profile(L"Target_Enqeue");
         TargetQ->Push(msg);
     }
     SetEvent(hMsgQueuedEvent);
-
     Win32::AtomicIncrement<LONG64>(m_RecvTPS);
 
     ContentsUseSize = TargetQ->m_size;
@@ -1457,7 +1456,7 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
         *msg << port; 
         InterlockedExchange(&msg->ownerID, SessionID);
         // TODO : 실패의 경우의 수
-        OnRecv(SessionID, msg,true);
+        OnRecv(SessionID, msg);
 
         Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
         //_InterlockedIncrement64(&m_NetworkMsgCount);
@@ -1468,18 +1467,31 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
 
 void CTestServer::OnRelease(ull SessionID)
 {
+    stPlayer *player;
+    CMessage *msg;
+
     {
-        CMessage *msg;
+        std::shared_lock<SharedMutex> lock(srw_SessionID_Hash);
 
-        msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
-        *msg << (unsigned short)en_PACKET_Player_Delete;
-        InterlockedExchange(&msg->ownerID, SessionID);
+        auto iter = SessionID_hash.find(SessionID);
+        if (iter != SessionID_hash.end())
+        {
+            player = iter->second;
 
-        OnRecv(SessionID, msg,true);
-
-        Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
-        //_InterlockedIncrement64(&m_NetworkMsgCount);
+            Win32::AtomicDecrement<DWORD>(balanceVec[player->m_ContentsQIdx]);
+            player->m_ContentsQIdx = 0;
+        }
     }
+
+    msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+    *msg << (unsigned short)en_PACKET_Player_Delete;
+    InterlockedExchange(&msg->ownerID, SessionID);
+
+    OnRecv(SessionID, msg);
+
+    Win32::AtomicIncrement<LONG64>(m_NetworkMsgCount);
+    //_InterlockedIncrement64(&m_NetworkMsgCount);
+    
 }
 
 void MsgTypePrint(WORD type, LONG64 val)

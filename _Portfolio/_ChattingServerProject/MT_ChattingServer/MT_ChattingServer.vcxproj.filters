@@ -25,9 +25,6 @@
     <Filter Include="Contents\Types">
       <UniqueIdentifier>{ffdaa2b0-e73d-4f38-9b36-b6bda22d8631}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Win32">
-      <UniqueIdentifier>{91d348ba-37fd-4b7f-a72f-70acc75e16ff}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
