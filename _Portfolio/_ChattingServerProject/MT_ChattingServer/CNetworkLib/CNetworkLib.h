@@ -63,8 +63,10 @@ class CLanServer : public Stub, public Proxy
 
     // 오픈 IP / 포트 / 제로카피 여부 /워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
-    virtual void Stop();
-    virtual void SignalOnForStop();//Stop에서 사용할 종료 조건
+    // Lock을 소유한 곳에서는 호출 금지. SignalOnForStop의 이벤트를 대기함.
+    virtual void Stop();           
+    // Player가 0으로 떨어졌을때 반드시 호출 해줘야 함.
+    virtual void SignalOnForStop();
     HANDLE hReadyForStopEvent = INVALID_HANDLE_VALUE; // SignalOnForStop에서 사용할 이벤트객체
 
     bool Disconnect(const ull SessionID);

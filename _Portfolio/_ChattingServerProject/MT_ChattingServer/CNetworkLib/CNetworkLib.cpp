@@ -4,7 +4,6 @@
 
 #include <thread>
 
-thread_local stTlsLockInfo tls_LockInfo;
 thread_local LONG64 SendTPSidx;
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
@@ -63,7 +62,7 @@ BOOL GetLogicalProcess(DWORD &out)
 void CLanServer::WorkerThread()
 {
 
-    clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
+    //clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
 
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
@@ -346,24 +345,39 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
 void CLanServer::Stop()
 {
-
     closesocket(m_listen_sock);
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"m_listen_sock");
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Wait For AcceptThread Finish ");
+    m_hAccept.join();
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" AcceptThread Finish ");
+
+
+    
     for (clsSession &session : sessions_vec)
     {
         Disconnect(session.m_SeqID.SeqNumberAndIdx);
     }
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WaitForSingleObject : hReadyForStopEvent");
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Every Session DisConnect ");
+
     //SignalOnForStop 호출을 대기
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Wait For Contents Singnal ");
     WaitForSingleObject(hReadyForStopEvent, INFINITE);
 
+
+
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Try WorkThread Finish PQCS ");
     for (int i = 0; i < m_WorkThreadCnt; i++)
         PostQueuedCompletionStatus(m_hIOCP, 0, 0, nullptr);
 
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join WorkerThread ");
+    for (int i = 0; i < m_WorkThreadCnt; i++)
+        m_hWorkerThread[i].join();
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Success WorkerThread Finish ");
 }
 
 void CLanServer::SignalOnForStop()
 {
+    // Listen을 닫고, 유저들을 전부 내보낸 후에. WorkerThread를 종료시킬 필요가있다.
+    // Player의 종료 또한 PQCS를 통한 절차가 이루어지므로 모든 Player의 종료를 Contents가 알려줄 필요가있다.
     SetEvent(hReadyForStopEvent);
 }
 

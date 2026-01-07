@@ -33,72 +33,8 @@
 thread_local cpp_redis::client *client;
 thread_local ull tls_ContentsQIdx; // ContentsThread 에서 사용하는 Q에  접근하기위한 Idx
 
-
-
 void MsgTypePrint(WORD type, LONG64 val);
 
-
-void ContentsThread(void *arg)
-{
-    clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
-
-    DWORD hSignalIdx;
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-
-    CLockFreeQueue<CMessage*> *CotentsQ;
-    HANDLE local_ContentsEvent;
-
-    cpp_redis::client a;
-    client = &a;
-
-    client->connect(server->RedisIpAddress, 6379);
-
-
-    {
-        tls_ContentsQIdx = InterlockedIncrement(&server->m_ContentsThreadIdX);
-        CotentsQ = &server->m_CotentsQ_vec[tls_ContentsQIdx];
-        local_ContentsEvent = server->m_ContentsQMap[CotentsQ];
-    }
-
-    HANDLE hWaitHandle[2] = {local_ContentsEvent, server->m_ServerOffEvent};
-
-    // bool 이 좋아보임.
-    {
-        std::wstring ContentsThreadName;
-        WCHAR* DS;
-        GetThreadDescription(GetCurrentThread(), &DS);
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
-                                       L"%-20s ",
-                                       DS);
-        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
-                                       L"%-20s ",
-                                       DS);
-    }
-    ringBufferSize ContentsUseSize;
-
-    while (1)
-    {
-        hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
-      
-        {
-            Profiler profile(L"Update");
-            server->Update();
-        }
-        if (hSignalIdx - WAIT_OBJECT_0 == 1)
-        {
-            break;
-        }
-
-        ContentsUseSize = CotentsQ->m_size;
-        server->m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
-
-        server->prePlayer_hash_size = server->prePlayer_hash.size();
-        server->AccountNo_hash_size = server->AccountNo_hash.size();
-        server->SessionID_hash_size = server->SessionID_hash.size();
-    }
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"ContentsThread Terminated %d", 0);
-
-}
 
 void CTestServer::MonitorThread()
 {
@@ -1010,7 +946,7 @@ CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
         hBalanceEvent = CreateEvent(nullptr, false, false, nullptr);
     }
 
-    pBalanceThread = std::thread(&CTestServer::BalanceThread, this);
+    pBalanceThread = WinThread(&CTestServer::BalanceThread, this);
     hr = SetThreadDescription(pBalanceThread.native_handle(), L"\tBalanceThread");
     RT_ASSERT(!FAILED(hr));
 
@@ -1038,7 +974,7 @@ CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
     {
         std::wstring ContentsThreadName = L"\tContentsThread" + std::to_wstring(i);
 
-        hContentsThread_vec[i] = std::move(std::thread(ContentsThread, this));
+        hContentsThread_vec[i] = WinThread(&CTestServer::ContentsThread, this);
 
         RT_ASSERT(hContentsThread_vec[i].native_handle() != nullptr);
 
@@ -1166,7 +1102,7 @@ void CTestServer::Update()
 
 void CTestServer::BalanceThread()
 {
-    clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
+    //clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-20s ",
@@ -1221,6 +1157,64 @@ void CTestServer::BalanceThread()
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"BalanceThread Terminated %d", 0);
     // return 0;
+}
+
+void CTestServer::ContentsThread()
+{//clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
+
+    DWORD hSignalIdx;
+
+    CLockFreeQueue<CMessage *> *CotentsQ;
+    HANDLE local_ContentsEvent;
+
+    cpp_redis::client a;
+    client = &a;
+
+    client->connect(RedisIpAddress, 6379);
+
+    {
+        tls_ContentsQIdx = InterlockedIncrement(&m_ContentsThreadIdX);
+        CotentsQ = &m_CotentsQ_vec[tls_ContentsQIdx];
+        local_ContentsEvent = m_ContentsQMap[CotentsQ];
+    }
+
+    HANDLE hWaitHandle[2] = {local_ContentsEvent, m_ServerOffEvent};
+
+    // bool 이 좋아보임.
+    {
+        std::wstring ContentsThreadName;
+        WCHAR *DS;
+        GetThreadDescription(GetCurrentThread(), &DS);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       DS);
+        CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode,
+                                       L"%-20s ",
+                                       DS);
+    }
+    ringBufferSize ContentsUseSize;
+
+    while (1)
+    {
+        hSignalIdx = WaitForMultipleObjects(2, hWaitHandle, false, 20);
+
+        {
+            Profiler profile(L"Update");
+            Update();
+        }
+        if (hSignalIdx - WAIT_OBJECT_0 == 1)
+        {
+            break;
+        }
+
+        ContentsUseSize = CotentsQ->m_size;
+        m_UpdateMessage_Queue = (LONG64)(ContentsUseSize / 8);
+
+        prePlayer_hash_size = prePlayer_hash.size();
+        AccountNo_hash_size = AccountNo_hash.size();
+        SessionID_hash_size = SessionID_hash.size();
+    }
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"ContentsThread Terminated %d", 0);
 }
 
 void CTestServer::BalanceUpdate()

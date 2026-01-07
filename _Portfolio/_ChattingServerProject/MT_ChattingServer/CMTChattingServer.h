@@ -58,6 +58,7 @@ class CTestServer : public CLanServer
 
     void Update();
     void BalanceThread();
+    void ContentsThread();
     void BalanceUpdate();
     void HeartBeat();
 
@@ -93,7 +94,7 @@ class CTestServer : public CLanServer
     ////////////////////////// ContentsThread //////////////////////////
     // 
     //ContentsThread 만큼 reSize함.
-    std::vector<std::thread> hContentsThread_vec; // HANDLE of ContentThread 
+    std::vector<WinThread> hContentsThread_vec; // HANDLE of ContentThread 
     int m_ContentsThreadCnt;  // 생성자를 통해 받은 ContentsQ 개수 .
     
     ull m_ContentsThreadIdX = -1;  // ContentsThread가 생성시에 Interlock으로 1씩 증가.
@@ -105,7 +106,7 @@ class CTestServer : public CLanServer
     ////////////////////////////////////////////////////////////////////
     ////////////////////////// BalanceThread //////////////////////////
     //
-    std::thread pBalanceThread;
+    WinThread pBalanceThread;
     std::vector<std::pair<DWORD, int>> balanceVec;
 
     HANDLE hBalanceThread; 

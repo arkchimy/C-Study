@@ -1,7 +1,9 @@
 #pragma once
 #include <Windows.h>
 #include <thread>
+#include "../utility/DeadLockGuard/DeadLockGuard_lib.h"
 
+extern thread_local stTlsLockInfo tls_LockInfo;
 class WinThread
 {
   public:
@@ -21,7 +23,7 @@ class WinThread
             return *this;
 
         if (_hThread != INVALID_HANDLE_VALUE)
-            CloseHandle(_hThread);
+            __debugbreak();// this가 갖고있던 값이 있었음. 
 
         _hThread = other._hThread;
         other._hThread = INVALID_HANDLE_VALUE;
@@ -39,9 +41,9 @@ class WinThread
     {
         if (_hThread == INVALID_HANDLE_VALUE)
             return;
-        CloseHandle(_hThread);
+        __debugbreak(); //Join 안 함.
     }
-
+    void join()  ;
     HANDLE native_handle() const { return _hThread; }
 
   private:
@@ -51,6 +53,8 @@ class WinThread
 template <typename T>
 inline unsigned WinThread::StartRoutine(void *arg)
 {
+    clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
+
     std::pair<void (T::*)(), T *> *data = static_cast<std::pair<void (T::*)(), T *> *>(arg);
     (data->second->*data->first)();
     delete data;
