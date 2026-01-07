@@ -292,100 +292,72 @@ void CTestServer::MonitorThread()
     }
     // 종료 절차.
 
-    DWORD waitThread_Retval;
-    std::wstring Accept_str(L"AcceptThread Shutdown in progress");
-    std::wstring Worker_str(L"WorkerThread Shutdown in progress");
-    std::wstring Contents_str(L"ContentsThread Shutdown in progress");
+    //DWORD waitThread_Retval;
+    //std::wstring Accept_str(L"AcceptThread Shutdown in progress");
+    //std::wstring Worker_str(L"WorkerThread Shutdown in progress");
+    //std::wstring Contents_str(L"ContentsThread Shutdown in progress");
 
-    std::wstring Accept_str2(L"AcceptThread Shutdown complete.");
-    std::wstring Worker_str2(L"WorkerThread");
-    std::wstring Contents_str2(L"ContentsThread");
+    //std::wstring Accept_str2(L"AcceptThread Shutdown complete.");
+    //std::wstring Worker_str2(L"WorkerThread");
+    //std::wstring Contents_str2(L"ContentsThread");
 
-    wchar_t dot_str[][11] = {
-        L".",
-        L"..",
-        L"...",
-        L"....",
-        L".....",
-        L"......",
-        L".......",
-        L"........",
-        L".........",
-        L"..........",
-    };
-    bool bOn = true;
-    while (bOn)
-    {
-        static DWORD Chance = 0;
-        if (Chance % 10000 == 0)
-            bOn = false;
+    //wchar_t dot_str[][11] = {
+    //    L".",
+    //    L"..",
+    //    L"...",
+    //    L"....",
+    //    L".....",
+    //    L"......",
+    //    L".......",
+    //    L"........",
+    //    L".........",
+    //    L"..........",
+    //};
+    //bool bOn = true;
+    //while (bOn)
+    //{
+    //    static DWORD Chance = 0;
+    //    if (Chance % 10000 == 0)
+    //        bOn = false;
 
-        Chance++;
+    //    Chance++;
 
-        nextTime += 1000;
-        printf(" =========================Waiting for Threads to terminate...=========================\n");
-        // AcceptThread 종료
-        {
+    //    nextTime += 1000;
+    //    printf(" =========================Waiting for Threads to terminate...=========================\n");
+    //    // AcceptThread 종료
+    //    {
 
-            waitThread_Retval = WaitForSingleObject(m_hAccept.native_handle(), 0);
-            if (waitThread_Retval == WAIT_TIMEOUT)
-            {
-                wprintf(L"\t%30s\n", (Accept_str + dot_str[Chance % 10]).c_str());
-                bOn = true;
-            }
-            else
-            {
-                wprintf(L"\t%30s\n", (Accept_str2).c_str());
-            }
-        }
-        // WorkerThread 종료
-        for (int i = 0; i < m_WorkThreadCnt; i++)
-        {
-            waitThread_Retval = WaitForSingleObject(m_hWorkerThread[i].native_handle(), 0);
-            if (waitThread_Retval == WAIT_TIMEOUT)
-            {
-                wprintf(L"\t%30s\n", (Worker_str + std::to_wstring(i) + dot_str[Chance % 10]).c_str());
-                bOn = true;
-            }
-            else
-            {
-                wprintf(L"\t%30s :  %20s\n", (Worker_str2 + std::to_wstring(i)).c_str(), L"\tShutdown complete.");
-            }
-        }
+    //        waitThread_Retval = WaitForSingleObject(m_hAccept.native_handle(), 0);
+    //        if (waitThread_Retval == WAIT_TIMEOUT)
+    //        {
+    //            wprintf(L"\t%30s\n", (Accept_str + dot_str[Chance % 10]).c_str());
+    //            bOn = true;
+    //        }
+    //        else
+    //        {
+    //            wprintf(L"\t%30s\n", (Accept_str2).c_str());
+    //        }
+    //    }
+    //
+    //    printf(" =========================  Wait for Job Process terminate  =========================\n");
 
-        // ContentsThread 종료
-        for (int i = 0; i < m_ContentsThreadCnt; i++)
-        {
-            waitThread_Retval = WaitForSingleObject(hContentsThread_vec[i].native_handle(), 0);
-            if (waitThread_Retval == WAIT_TIMEOUT)
-            {
-                wprintf(L"%30s\n", (Contents_str + std::to_wstring(i) + dot_str[Chance % 10]).c_str());
-                bOn = true;
-            }
-            else
-            {
-                wprintf(L"\t %30s :  %20s\n", (Contents_str2 + std::to_wstring(i)).c_str(), L"\tShutdown complete.");
-            }
-        }
-        printf(" =========================  Wait for Job Process terminate  =========================\n");
+    //    LONG64 sum = 0;
+    //    for (int idx = 0; idx < balanceVec.size(); idx++)
+    //    {
+    //        sum += balanceVec[idx].second;
+    //        printf("%15s %10s %05d  %10s %05lld\n",
+    //               "Contetent",
+    //               "Session :", balanceVec[idx].second,
+    //               "UpdateMessage_Queue", m_CotentsQ_vec[idx].m_size);
+    //    }
+    //    if (sum != 0)
+    //        bOn = true;
 
-        LONG64 sum = 0;
-        for (int idx = 0; idx < balanceVec.size(); idx++)
-        {
-            sum += balanceVec[idx].second;
-            printf("%15s %10s %05d  %10s %05lld\n",
-                   "Contetent",
-                   "Session :", balanceVec[idx].second,
-                   "UpdateMessage_Queue", m_CotentsQ_vec[idx].m_size);
-        }
-        if (sum != 0)
-            bOn = true;
-
-        currentTime = timeGetTime();
-        if (nextTime > currentTime)
-            Sleep(nextTime - currentTime);
-        printf(" ===================================================================================\n");
-    }
+    //    currentTime = timeGetTime();
+    //    if (nextTime > currentTime)
+    //        Sleep(nextTime - currentTime);
+    //    printf(" ===================================================================================\n");
+    //}
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"MonitorThread Terminated %d", 0);
 
 }
@@ -988,11 +960,16 @@ CTestServer::CTestServer(int ContentsThreadCnt, int iEncording)
 
 CTestServer::~CTestServer()
 {
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join for pBalanceThread Finish ");
+
     pBalanceThread.join(); // Balance
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Success pBalanceThread ");
 
     for (int i = 0; i < m_ContentsThreadCnt; i++)
     {
+        CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join for ContentsThread Finish ");
         hContentsThread_vec[i].join();
+        CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Success ContentsThread ");
     }
 }
 

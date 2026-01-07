@@ -59,7 +59,7 @@ class CLanServer : public Stub, public Proxy
     void AcceptThread();
   public:
     CLanServer(bool EnCoding = false);
-    ~CLanServer();
+    virtual ~CLanServer();
 
     // 오픈 IP / 포트 / 제로카피 여부 /워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
@@ -99,6 +99,7 @@ class CLanServer : public Stub, public Proxy
 
     ull getTotalAccept() const { return m_TotalAccept; }
     ull getNetworkMsgCount() const { return m_NetworkMsgCount; }
+
     int getAcceptTPS();
     int getRecvMessageTPS();
     int getSendMessageTPS();

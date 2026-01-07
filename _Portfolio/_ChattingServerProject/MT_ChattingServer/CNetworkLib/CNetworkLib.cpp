@@ -147,7 +147,7 @@ void CLanServer::WorkerThread()
             ReleaseSession(seqID);
         }
     }
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThreadID Terminated ");
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThread Terminated ");
 
 }
 
@@ -346,7 +346,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 void CLanServer::Stop()
 {
     closesocket(m_listen_sock);
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Wait For AcceptThread Finish ");
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join For AcceptThread Finish ");
     m_hAccept.join();
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" AcceptThread Finish ");
 
@@ -361,17 +361,25 @@ void CLanServer::Stop()
     //SignalOnForStop 호출을 대기
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Wait For Contents Singnal ");
     WaitForSingleObject(hReadyForStopEvent, INFINITE);
+    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Catch Contents Singnal ");
 
 
 
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Try WorkThread Finish PQCS ");
     for (int i = 0; i < m_WorkThreadCnt; i++)
+    {
+        CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Try WorkThread Finish PQCS ");
         PostQueuedCompletionStatus(m_hIOCP, 0, 0, nullptr);
+    }
 
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join WorkerThread ");
+    
     for (int i = 0; i < m_WorkThreadCnt; i++)
+    {
+        CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join WorkerThread ");
         m_hWorkerThread[i].join();
-    CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Success WorkerThread Finish ");
+        CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Success WorkerThread Finish ");
+
+    }
+  
 }
 
 void CLanServer::SignalOnForStop()
