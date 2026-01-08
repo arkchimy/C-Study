@@ -72,16 +72,88 @@ BYTE CTestServer::WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *
     return dfLOGIN_STATUS_SESSION_MISS;
 }
 
+void CTestServer::MonitorThread()
+{
+    while (1)
+    {
+        Sleep(1000);
 
-void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
+        printf(" ====================================================================== \n");
+        printf("%20s : %10lld\n", "DBQuery_RemainCount", m_DBMessageCnt);
+        printf("%20s : %10lld\n", "Total Account", cnt);
+        printf("%20s : %10lld\n", "DisConnectConunt", iDisCounnectCount);
+        printf("%20s : %10lld\n", "SessionID_hash.size", SessionID_hash.size());
+        printf("%20s : %10d\n", "player_pool.ActiveCnt", player_pool.m_AllocatedCount);
+        printf("%20s : %10d\n", "dbOverlapped_pool.iNodeCnt", dbOverlapped_pool.iNodeCnt);
+        printf(" ======================================================================\n ");
+    }
+}
+
+void CTestServer::HeartBeatThread()
+{
+    DWORD retval;
+
+    while (1)
+    {
+        retval = WaitForSingleObject(m_ServerOffEvent, 20);
+        if (retval != WAIT_TIMEOUT)
+            return;
+        // server->Update();
+    }
+}
+
+void CTestServer::DBworkerThread()
+{
+    DWORD transferred;
+    ull key;
+    OVERLAPPED *overlapped;
+    clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
+
+    stDBOverlapped *dbOverlapped;
+    cpp_redis::client a;
+    client = &a;
+
+    client->connect(RedisIpAddress, 6379);
+
+    db.Connect(AccountDB_IPAddress, DBuser, password, schema, DBPort);
+
+    while (1)
+    {
+        // 지역변수 초기화
+        {
+            transferred = 0;
+            key = 0;
+            overlapped = nullptr;
+            session = nullptr;
+        }
+        GetQueuedCompletionStatus(m_hDBIOCP, &transferred, &key, &overlapped, INFINITE);
+        _interlockeddecrement64(&m_DBMessageCnt);
+        dbOverlapped = reinterpret_cast<stDBOverlapped *>(overlapped);
+        if (overlapped == nullptr)
+            __debugbreak();
+
+        // TODO : DB_VerifySession의 반환값에 따른 동작이 이게 맞나?
+        DB_VerifySession(dbOverlapped->msg);
+        dbOverlapped_pool.Release(dbOverlapped);
+    }
+
+}
+
+
+void CTestServer::DB_VerifySession( CMessage *msg)
 {
     INT64 AccountNo;
+    ull SessionID;
+
+
     WCHAR SessionKey[32];
     BYTE retval;
     WCHAR ID[20];      // 사용자 ID		. null 포함
     WCHAR Nickname[20]; // 사용자 닉네임	. null 포함
 
     *msg >> AccountNo;
+    *msg >> SessionID;
+
     msg->GetData(SessionKey, 64);
 
     retval = WaitDB(AccountNo, SessionKey, ID,Nickname);
@@ -115,85 +187,6 @@ void CTestServer::DB_VerifySession(ull SessionID, CMessage *msg)
         
     }
 
-}
-void MonitorThread(void *arg)
-{
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-
-    while (1)
-    {
-        Sleep(1000);
-
-        printf("======================================================================");
-        printf("%20s : %10lld\n", "DBQuery_RemainCount", server->m_DBMessageCnt);
-        printf("%20s : %10lld\n", "Total Account", cnt);
-        printf("%20s : %10lld\n", "DisConnectConunt", server->iDisCounnectCount);
-        printf("%20s : %10lld\n", "SessionID_hash.size", server->SessionID_hash.size());
-        printf("%20s : %10d\n", "player_pool.iNodeCnt", server->player_pool.iNodeCnt);
-        printf("%20s : %10d\n", "dbOverlapped_pool.iNodeCnt", server->dbOverlapped_pool.iNodeCnt);
-        printf("======================================================================");
-
-    }
-}
-
-void HeartBeatThread(void *arg) 
-{
-    clsDeadLockMananger::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
-
-    DWORD retval;
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-
-
-    while (1)
-    {
-        retval = WaitForSingleObject(server->m_ServerOffEvent, 20);
-        if (retval != WAIT_TIMEOUT)
-            return;
-        //server->Update();
-
-    }
-    
-}
-
-void DBworkerThread(void *arg)
-{
-    clsDeadLockMananger::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo); 
-
-    CTestServer *server = reinterpret_cast<CTestServer *>(arg);
-
-    DWORD transferred;
-    ull key;
-    OVERLAPPED *overlapped;
-    clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
-
-    stDBOverlapped *dbOverlapped;
-    cpp_redis::client a;
-    client = &a;
-
-    client->connect(server->RedisIpAddress, 6379);
-
-    db.Connect(server->AccountDB_IPAddress,server->DBuser,server->password,server->schema,server->DBPort);
-    
-    while (1)
-    {
-        // 지역변수 초기화
-        {
-            transferred = 0;
-            key = 0;
-            overlapped = nullptr;
-            session = nullptr;
-        }
-        GetQueuedCompletionStatus(server->m_hDBIOCP, &transferred, &key, &overlapped, INFINITE);
-        _interlockeddecrement64(&server->m_DBMessageCnt);
-        dbOverlapped = reinterpret_cast<stDBOverlapped *>(overlapped);
-        if (overlapped == nullptr)
-            __debugbreak();
-
-        // TODO : DB_VerifySession의 반환값에 따른 동작이 이게 맞나?
-        server->DB_VerifySession(dbOverlapped->SessionID,dbOverlapped->msg);
-        server->dbOverlapped_pool.Release(dbOverlapped);
-    }
-    
 }
 
 void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, WORD wVectorLen)
@@ -238,12 +231,13 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
         // TODO : dbOverlapped_pool.pool 모니터링 필요
         stDBOverlapped *overlapped = reinterpret_cast<stDBOverlapped *>(dbOverlapped_pool.Alloc());
         ZeroMemory(overlapped, sizeof(stDBOverlapped));
+        overlapped->_mode = Job_Type::Post;
 
         msg->InitMessage();
         *msg << AccountNo;
+        *msg << SessionID;
         msg->PutData(SessionKey, 64);
         overlapped->msg = msg;
-        overlapped->SessionID = SessionID;
 
         PostQueuedCompletionStatus(m_hDBIOCP, 0, 0, (LPOVERLAPPED)overlapped);
         _interlockedincrement64(&m_DBMessageCnt);
@@ -302,11 +296,11 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
         m_ContentsEvent = CreateEvent(nullptr, false, false, nullptr);
     }
     // ContentsThread의 생성
-    hHeartBeatThread = std::move(std::thread(HeartBeatThread, this));
+    hHeartBeatThread = WinThread(&CTestServer::HeartBeatThread, this);
     hr = SetThreadDescription(hHeartBeatThread.native_handle(), L"HeartBeatThread");
     RT_ASSERT(!FAILED(hr));
 
-    hMonitorThread = std::move(std::thread(MonitorThread, this));
+    hMonitorThread =  WinThread(&CTestServer::MonitorThread, this);
     hr = SetThreadDescription(hMonitorThread.native_handle(), L"MonitorThread");
     RT_ASSERT(!FAILED(hr));
     hDBThread_vec.resize(DBThreadCnt);
@@ -315,7 +309,7 @@ CTestServer::CTestServer(DWORD ContentsThreadCnt, int iEncording, int reduceThre
     {
         std::wstring ContentsThreadName = L"\tDBThread" + std::to_wstring(i);
 
-        hDBThread_vec[i] = std::move(std::thread(DBworkerThread, this));
+        hDBThread_vec[i] =  WinThread(&CTestServer::DBworkerThread, this);
 
         RT_ASSERT(hDBThread_vec[i].native_handle() != nullptr);
 
@@ -353,13 +347,11 @@ BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, in
     return retval;
 }
 
-void CTestServer::OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ)
+void CTestServer::OnRecv(ull SessionID, CMessage *msg)
 {
     WORD type;
     *msg >> type;
     PacketProc(SessionID,msg,type);
-    if (PacketProc(SessionID, msg, type) == false)
-        Disconnect(SessionID);
 }
 
 bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)

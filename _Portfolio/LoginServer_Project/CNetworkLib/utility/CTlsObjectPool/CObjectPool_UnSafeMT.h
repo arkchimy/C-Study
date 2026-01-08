@@ -71,10 +71,7 @@ class CObjectPool_UnSafeMT
     void Initalize(DWORD iSize)
     {
         for (DWORD i = 0; i < iSize; i++)
-        {
             Release(new stNode());
-            iNodeCnt++;
-        }
     }
     void Limite_Lock()
     {
@@ -98,7 +95,6 @@ class CObjectPool_UnSafeMT
                 return nullptr;
 
             oldTop = new stNode();
-            iNodeCnt++;
 #ifdef POOLTEST
 
 #endif
@@ -135,5 +131,4 @@ class CObjectPool_UnSafeMT
     bool m_blimite = false;
     ll seqNumber = -1;
     ll m_size = 0;
-    int iNodeCnt = 0;
 };

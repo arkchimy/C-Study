@@ -3,13 +3,10 @@
 #include "CrushDump_lib/CrushDump_lib.h"
 
 #include <set>
-#include <stack>
-#include <unordered_map>
-#include <thread>
 #include <shared_mutex>
-
-#include "../../_Portfolio/DeadLockGuard_lib/DeadLockGuard_lib.h"
-
+#include <stack>
+#include <thread>
+#include <unordered_map>
 
 enum class en_State : ull
 {
@@ -17,7 +14,6 @@ enum class en_State : ull
     LoginWait,
     Max,
 };
-
 
 struct CPlayer
 {
@@ -35,7 +31,7 @@ struct CPlayer
     USHORT m_port;
 };
 
-    // DB연동서버
+// DB연동서버
 enum
 {
     IP_LEN = 16,
@@ -45,32 +41,43 @@ enum
     Password_LEN = 16,
 };
 
-class CTestServer :public CLanServer
+class CTestServer : public CLanServer
 {
   public:
     virtual void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType = en_PACKET_CS_LOGIN_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, WORD wVectorLen = 0);
 
-     public:
-    //void AllocPlayer(CMessage *msg);
-    //void DeletePlayer(CMessage *msg);
+  public:
+    // void AllocPlayer(CMessage *msg);
+    // void DeletePlayer(CMessage *msg);
     //////////////////////////////////////////////////////// 하트 비트 전용////////////////////////////////////////////////////////
-    void Update(); 
+    void Update();
     //////////////////////////////////////////////////////// DB에서 토큰 대조하는 함수 ////////////////////////////////////////////////////////
-    void DB_VerifySession(ull SessionID, CMessage *msg);
-    BYTE WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *ID, WCHAR* Nick);
+    void DB_VerifySession(CMessage *msg);
+    BYTE WaitDB(INT64 AccountNo, const WCHAR *const SessionKey, WCHAR *ID, WCHAR *Nick);
+
+  private:
+    void MonitorThread();
+    void HeartBeatThread();
+    void DBworkerThread();
+
   public:
     CTestServer(DWORD ContentsThreadCnt = 1, int iEncording = false, int reduceThreadCount = 0);
     virtual ~CTestServer();
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
-    virtual void OnRecv(ull SessionID, CMessage *msg, bool bBalanceQ = false) override;
+    virtual void OnRecv(ull SessionID, CMessage *msg) override;
 
-     virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) override;
+    virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) override;
     virtual void OnRelease(ull SessionID) override;
 
-    std::thread hMonitorThread;
+    WinThread hMonitorThread;
+    bool bMonitorThreadOn = true;
+    HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
+
+  private:
+    WinThread hHeartBeatThread;
+
     ////////////////////////// HeartBeatThread  //////////////////////////
-    std::thread hHeartBeatThread;
 
     ////////////////////////// jobQueue of DBThread  //////////////////////////
     HANDLE m_hDBIOCP = INVALID_HANDLE_VALUE;
@@ -79,12 +86,10 @@ class CTestServer :public CLanServer
 
     DWORD m_ContentsThreadCnt;
 
-    std::vector<std::thread> hDBThread_vec;
-    inline static ringBufferSize s_ContentsQsize;
+    std::vector<WinThread> hDBThread_vec;
+    // inline static ringBufferSize s_ContentsQsize;
 
-    bool bMonitorThreadOn = true;
     HANDLE m_ContentsEvent = INVALID_HANDLE_VALUE;
-    HANDLE m_ServerOffEvent = INVALID_HANDLE_VALUE;
 
     int m_maxSessions = 0;
     int m_maxPlayers = 20000;
@@ -109,9 +114,9 @@ class CTestServer :public CLanServer
 
     // SessionID Key , Player접근.
     std::unordered_map<ull, CPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
-    std::unordered_map<ull, CPlayer *> Account_hash; // 중복 접속을 제거하는 용도
+    std::unordered_map<ull, CPlayer *> Account_hash;   // 중복 접속을 제거하는 용도
 
-
+  public:
     WCHAR GameServerIP[16] = L"0.0.0.0";
     USHORT GameServerPort = 0;
 
@@ -120,7 +125,7 @@ class CTestServer :public CLanServer
     WCHAR Dummy2_ChatServerIP[16]{};
     USHORT ChatServerPort = 6000;
 
-    //DB연동서버 
+    // DB연동서버
 
     char AccountDB_IPAddress[IP_LEN];
     char RedisIpAddress[IP_LEN];
@@ -135,20 +140,20 @@ class CTestServer :public CLanServer
 //// Debuging 정보
 //////////////////////////////////////////////////////////////////////////
 //
-//LONG64 m_UpdateMessage_Queue; // Update 이후 남아있는 Msg의 수.
-//LONG64 m_UpdateTPS;
-//LONG64 m_RecvTPS; // OnRecv를 통한 RecvTPS 측정
+// LONG64 m_UpdateMessage_Queue; // Update 이후 남아있는 Msg의 수.
+// LONG64 m_UpdateTPS;
+// LONG64 m_RecvTPS; // OnRecv를 통한 RecvTPS 측정
 //
-//LONG64 *m_RecvMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; // Update에서 ContentsQ에서 빼는 MsgTPS
+// LONG64 *m_RecvMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; // Update에서 ContentsQ에서 빼는 MsgTPS
 //// LONG64 *m_SendMsgArr = new LONG64[en_PACKET_CS_CHAT__Max]; //
 //
-//LONG64 prePlayer_hash_size = 0;
-//LONG64 AccountNo_hash_size = 0;
-//LONG64 SessionID_hash_size = 0;
+// LONG64 prePlayer_hash_size = 0;
+// LONG64 AccountNo_hash_size = 0;
+// LONG64 SessionID_hash_size = 0;
 //
 //     virtual LONG64 GetPlayerCount() { return m_TotalPlayers; }
-//LONG64 GetprePlayer_hash() { return prePlayer_hash_size; }
-//LONG64 GetAccountNo_hash() { return AccountNo_hash_size; }
-//LONG64 GetSessionID_hash() { return SessionID_hash_size; }
+// LONG64 GetprePlayer_hash() { return prePlayer_hash_size; }
+// LONG64 GetAccountNo_hash() { return AccountNo_hash_size; }
+// LONG64 GetSessionID_hash() { return SessionID_hash_size; }
 //
 /////////////////////////////////////////////////////////////////////////

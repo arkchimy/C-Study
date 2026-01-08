@@ -9,7 +9,6 @@
 constexpr size_t DebugVectorSize = 500000;
 
 LONG64 m_seqNumber = 0;
-SRWLOCK g_srw_DebugQlock;
 // Debug용도
 struct stDebugInfo
 {
@@ -77,9 +76,6 @@ reWfopen:
 CSystemLog::CSystemLog()
 {
     // 소멸자에서 제거하기. 하기싫음 말고
-
-    InitializeSRWLock(&srw_Errorlock);
-    InitializeSRWLock(&g_srw_DebugQlock);
 
     m_LogThreadEvent = CreateEvent(nullptr, 0, 0, nullptr);
 
@@ -233,19 +229,18 @@ void CSystemLog::Log(const WCHAR *szType, en_LOG_LEVEL LogLevel, const WCHAR *sz
 
     // Lock 걸고 들어감.
     {
-        AcquireSRWLockExclusive(&srw_Errorlock);
+        std::lock_guard<SharedMutex> lock(srw_Errorlock);
+
         _wfopen_s(&LogFile, LogFileName, L"a+ , ccs = UTF-16LE");
 
         if (LogFile == nullptr)
         {
-            ReleaseSRWLockExclusive(&srw_Errorlock);
+
             return;
         }
         fwrite(LogHeaderBuffer, 2, wcslen(LogHeaderBuffer), LogFile);
         fclose(LogFile);
     }
-
-    ReleaseSRWLockExclusive(&srw_Errorlock);
 }
 
 void CSystemLog::LogHex(WCHAR *szType, en_LOG_LEVEL LogLevel, WCHAR *szLog, BYTE *pByte, int iByteLen)

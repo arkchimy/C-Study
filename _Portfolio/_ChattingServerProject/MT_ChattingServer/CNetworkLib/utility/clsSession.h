@@ -36,6 +36,14 @@ struct stSendOverlapped : public OVERLAPPED
     struct CMessage *msgs[500]{0,};
 
 };
+struct stDBOverlapped : public OVERLAPPED
+{
+    stDBOverlapped(Job_Type mode) : _mode(mode) {}
+    Job_Type _mode = Job_Type::Post;
+
+    CMessage *msg = nullptr; // AccountNo
+};
+
 typedef struct stSessionId
 {
     bool operator==(const stSessionId other)

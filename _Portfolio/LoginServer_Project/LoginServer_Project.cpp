@@ -1,13 +1,11 @@
 ﻿// LoginServer_Project.cpp : 이 파일에는 'main' 함수가 포함됩니다. 거기서 프로그램 실행이 시작되고 종료됩니다.
 //
-
-#include <iostream>
 #include "LoginServer.h"
+#include <iostream>
+
 #include <conio.h>
 #include <thread>
 
-#include "CrushDump_lib/CrushDump_lib.h"
-#include "../DeadLockGuard_lib/DeadLockGuard_lib.h"
 int main()
 {
 
@@ -70,7 +68,7 @@ int main()
 
         parser.GetValue(L"ContentsThreadCnt", ContentsThreadCnt);
         parser.GetValue(L"RingBufferSize", iRingBufferSize);
-        parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
+        //parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
         parser.GetValue(L"EnCording", iEnCording);
 
         CRingBuffer::s_BufferSize = iRingBufferSize;
@@ -81,7 +79,7 @@ int main()
     StringCchPrintfW(buffer, 100, L"Profiler_%hs.txt", __DATE__);
 
     {
-        CTestServer::s_ContentsQsize = ContentsRingBufferSize;
+        //CTestServer::s_ContentsQsize = ContentsRingBufferSize;
         // 생성자에서 넘겨주는 것이 DB컨커런트
         CTestServer *LoginServer = new CTestServer(DBWorkerThreadCnt, iEnCording, DBContentsThreadCnt);
         CSystemLog::GetInstance()->SetDirectory(L"SystemLog");
@@ -99,10 +97,11 @@ int main()
             {
                 CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
                 CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::SYSTEM_Mode, L"Server Stop");
-                LoginServer->Stop();
+     
                 LoginServer->bMonitorThreadOn = false;
-
                 SetEvent(LoginServer->m_ServerOffEvent);
+                LoginServer->Stop();
+
                 break;
             }
             if (_kbhit())
@@ -119,7 +118,7 @@ int main()
                 }
                 if (ch == 'L' || ch == 'l')
                 {
-                    clsDeadLockMananger::GetInstance()->LogTlsInfo();
+                    clsDeadLockManager::GetInstance()->CreateLogFile_TlsInfo();
                 }
                 if (ch == '1')
                 {
@@ -146,12 +145,7 @@ int main()
             }
         }
 
-        waitThread_Retval = WaitForSingleObject(LoginServer->hMonitorThread.native_handle(), INFINITE);
-        if (waitThread_Retval == WAIT_TIMEOUT)
-        {
-            // TODO : 시간 정한다면 어찌할지 정하기.
-            __debugbreak();
-        }
+        LoginServer->hMonitorThread.join();
         CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"ContentsThread_Terminate");
     }
 }

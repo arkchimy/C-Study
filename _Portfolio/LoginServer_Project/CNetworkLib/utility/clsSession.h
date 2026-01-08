@@ -37,10 +37,11 @@ struct stSendOverlapped : public OVERLAPPED
 };
 struct stDBOverlapped : public OVERLAPPED
 {
+    stDBOverlapped() = default;
+    stDBOverlapped(Job_Type mode) : _mode(mode) {}
     Job_Type _mode = Job_Type::Post;
 
-    ull SessionID;
-    CMessage *msg;
+    CMessage *msg = nullptr;//AccountNo
 };
 
 
