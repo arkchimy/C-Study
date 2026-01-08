@@ -16,6 +16,7 @@ enum class Job_Type : BYTE
 {
     Recv,
     Send,
+    // 해당 msg의 완료통지로 세션 끊김 절차.
     ReleasePost,
     Post,
     MAX,

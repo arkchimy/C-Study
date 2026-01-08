@@ -4,6 +4,7 @@
 
 #include <thread>
 
+
 thread_local LONG64 SendTPSidx;
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
@@ -61,9 +62,6 @@ BOOL GetLogicalProcess(DWORD &out)
 
 void CLanServer::WorkerThread()
 {
-
-    //clsDeadLockManager::GetInstance()->RegisterTlsInfoAndHandle(&tls_LockInfo);
-
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::SYSTEM_Mode,
                                        L"%-20s ",
@@ -100,12 +98,11 @@ void CLanServer::WorkerThread()
         if (transferred == 0 && overlapped == nullptr && key == 0)
             break;
 
-        // overalpped가 nullptr인 메세지를 PQCS 하지 않도록 하기.
-        // 만일 진짜 실패면 지역변수를 초기화 하였기에 IocpWorkerThread가 종료.
+        // PQCS로 overlapped에 nullptr을 넣는 경우를 제한 함.
         if (overlapped == nullptr && bGQCS)
         {
             CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
-            __debugbreak(); // PQCS로 overlapped에 nullptr을 넣음.
+            __debugbreak(); 
         }
         else if (overlapped == nullptr)
         {
@@ -476,7 +473,10 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
             break;
         if (bEnCording)
         {
-            bChkSum = msg->DeCoding();
+            {
+                Profiler profile(L"DeCoding");
+                bChkSum = msg->DeCoding();
+            }
             if (bChkSum == false)
             {
                 // Attack : 조작된 패킷으로 checkSum이 다름.

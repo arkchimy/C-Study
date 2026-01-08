@@ -9,8 +9,6 @@
 #pragma comment(lib, "winmm")
 #pragma comment(lib, "ws2_32")
 
-#include <list>
-#include <map>
 #include <vector>
 
 #include "utility/CLockFreeQueue/CLockFreeQueue.h"
@@ -27,7 +25,6 @@
 
 
 using ull = unsigned long long;
-extern thread_local stTlsLockInfo tls_LockInfo;
 
 struct stWSAData
 {
@@ -63,11 +60,12 @@ class CLanServer : public Stub, public Proxy
 
     // 오픈 IP / 포트 / 제로카피 여부 /워커스레드 수 (생성수, 러닝수) / 나글옵션 / 최대접속자 수
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
+    
     // Lock을 소유한 곳에서는 호출 금지. SignalOnForStop의 이벤트를 대기함.
     virtual void Stop();           
+
     // Player가 0으로 떨어졌을때 반드시 호출 해줘야 함.
     virtual void SignalOnForStop();
-    HANDLE hReadyForStopEvent = INVALID_HANDLE_VALUE; // SignalOnForStop에서 사용할 이벤트객체
 
     bool Disconnect(const ull SessionID);
     void CancelIO_Routine(const ull SessionID); // Session에 대한 안정성은  외부에서 보장해주세요.
@@ -110,6 +108,9 @@ class CLanServer : public Stub, public Proxy
     void ReleaseSession(ull SessionID);
 
   protected:
+    // SignalOnForStop에서 사용할 이벤트객체
+    HANDLE hReadyForStopEvent = INVALID_HANDLE_VALUE; 
+
     std::vector<class clsSession> sessions_vec;
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
