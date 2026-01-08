@@ -33,7 +33,7 @@ class CTestServer : public CLanServer
     CTestServer(bool EnCoding = false);
 
     virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) override ;
-    virtual void OnRecv(ull SessionID, struct CMessage *msg, bool bBalanceQ = false) override;
+    virtual void OnRecv(ull SessionID, struct CMessage *msg) override;
     virtual void OnRelease(ull SessionID) override;
 
 
@@ -43,12 +43,19 @@ class CTestServer : public CLanServer
     virtual void REQ_MONITOR_TOOL_UPDATE(ull SessionID, CMessage *msg, BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
 
         // SessionID Key , Player접근.
-    std::unordered_map<ull, stPlayer *> SessionID_hash; // 중복 접속을 제거하는 용도
+
+    std::unordered_map<ull, stPlayer *> SessionID_hash; // LoginPack을 받은 Session.
     std::unordered_map<int, stPlayer *> ServerNo_hash;  // 중복 접속을 제거하는 용도
+    std::unordered_map<ull, stPlayer *> waitLogin_hash; // LoginPack을 받기 전 Session.
 
 
+    // 락을 잡은상태에서 잡을경우 선언 순서대로 잡기.
+    SharedMutex SessionID_hash_Lock; // SessionID_hash 이용도로 씀.
+    SharedMutex ServerNo_hash_Lock;  // ServerNo_hash  이용도로 씀.
+    SharedMutex waitLogin_hash_Lock; // waitLogin_hash 이용도로 씀.
+
+    
     CObjectPool_UnSafeMT<stPlayer> player_pool;
     CObjectPool<stDBOverlapped> dbOverlapped_pool;
-    SharedMutex SessionID_hash_Lock; // ServerNo_hash , SessionID_hash 둘다 이용도로 씀.
 
 };

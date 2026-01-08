@@ -90,8 +90,8 @@ struct stTlsLockInfo
     stTlsLockInfo()
         : _size(0), waitLock(nullptr), _shared_size(0)
     {
-        holding.reserve(30);        // 30개의 Lock을 잡을일은 없겠지
-        shared_holding.reserve(30); // 30개의 Lock을 잡을일은 없겠지
+        holding.reserve(100);        // 100개의 Lock을 잡을일은 없겠지
+        shared_holding.reserve(100); // 100개의 Lock을 잡을일은 없겠지
 
         HANDLE hThread2 = GetCurrentThread();
         DuplicateHandle(GetCurrentProcess(), hThread2, GetCurrentProcess(), &hThread, 0, false, DUPLICATE_SAME_ACCESS);
@@ -113,7 +113,7 @@ struct stTlsLockInfo
         const wchar_t HoldStartFormat[] =
             L"│ HOLD  : %016p                                           │\n";
         const wchar_t ShardHoldStartFormat[] =
-            L"│ HOLD  : %016p                                           │\n";
+            L"│ SHARED_HOLD  : %016p                                           │\n";
 
         const wchar_t ThreadCloseFormat[] =
             L"└──────────────────────────────────────────────────────────────┘\n\n";
