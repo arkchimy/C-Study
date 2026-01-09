@@ -1,6 +1,8 @@
 #include "CTestServer.h"
 #include <timeapi.h>
 
+static const std::string gLoginKey = "ajfw@!cv980dSZ[fje#@fdj123948djf";
+
 CTestServer::CTestServer(bool EnCoding)
     : CLanServer(EnCoding)
 {
@@ -60,7 +62,7 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
     // TODO : 이부분 Flush 되나?
     waitLogin_hash.insert({SessionID, player});
 
-    player->m_type = ClientType::Max;
+    player->m_type = enClientType::Max;
     player->m_Timer = timeGetTime();
     player->m_sessionID = SessionID;
     player->m_ServerNo = 0;
@@ -119,7 +121,7 @@ void CTestServer::OnRelease(ull SessionID)
     __debugbreak();
 }
 
-void CTestServer::REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
+void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
     stPlayer *player;
 
@@ -146,7 +148,7 @@ void CTestServer::REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, W
             Disconnect(SessionID);
             return;
         }
-      
+
         {
             // WaitLoginHash에 없다면 끊음.
             std::lock_guard<SharedMutex> waitLoginHashLock(waitLogin_hash_Lock);
@@ -165,14 +167,12 @@ void CTestServer::REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, W
         }
     }
 
-
-
     if (ServerNo < 10)
-        player->m_type = ClientType::LoginServer;
+        player->m_type = enClientType::LoginServer;
     else if (ServerNo < 20)
-        player->m_type = ClientType::ChatServer;
+        player->m_type = enClientType::ChatServer;
     else if (ServerNo < 50)
-        player->m_type = ClientType::GameServer;
+        player->m_type = enClientType::GameServer;
 
     player->m_ServerNo = ServerNo;
 
@@ -184,33 +184,53 @@ void CTestServer::REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, W
             __debugbreak();
         SessionID_hash.insert({SessionID, player});
     }
-
 }
 
-void CTestServer::REQ_TOOL_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
+void CTestServer::REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
-    // 해당 메세지는  타이머 쓰레드를 만들어서
-    // PQCS를 할예정  데이터를 그대로 전송한다.
-
+    // 해당 메세지는 Server에서 보내준 것
+    // 완료통지로 모든 Tool에게 보낸다.
     std::shared_lock<SharedMutex> SessionIDHashLock(SessionID_hash_Lock);
     auto iter = SessionID_hash.find(SessionID);
     if (iter == SessionID_hash.end())
     {
-        //Login이 오지않았는데 메세지가 옴.
+        // Login이 오지않았는데 메세지가 옴.
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
         return;
     }
 
-    Proxy::RES_TOOL_DATA_UPDATE(SessionID, msg, DataType, DataValue, TimeStamp);
-
-
-
+    std::vector<ull> sendTarget;
+    for (auto& element : SessionID_hash)
+    {
+        if (element.second->m_type == enClientType::MonitorClient)
+            sendTarget.emplace_back(element.first);
+    }
+    Proxy::RES_MONITOR_UPDATE(SessionID, msg, DataType, DataValue, TimeStamp, en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, true, &sendTarget, sendTarget.size());
 }
-void CTestServer::REQ_LOGIN_Client(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
+
+void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
+    clsSession &session = sessions_vec[SessionID >> 47];
+    
+    char *Loginkey = (char *)LoginSessionKey;
+    
+    if (gLoginKey.compare(Loginkey) != 0)
+    {
+        Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_SESSIONKEY);
+        return;
+    }
 
+    std::shared_lock<SharedMutex> sessionHashLock(SessionID_hash_Lock);
+    auto iter = SessionID_hash.find(SessionID);
+    if(iter->second->m_type != enClientType::MonitorClient)
+    {
+        Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_NOSERVER);
+        return;
+    }
+
+    Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_OK);
 }
-void CTestServer::REQ_MONITOR_TOOL_UPDATE(ull SessionID, CMessage *msg, BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
-{
-}
+
+
+

@@ -4,7 +4,7 @@
 
 #include <unordered_map>
 
-enum class ClientType : uint8_t
+enum class enClientType : uint8_t
 {
     LoginServer,
     ChatServer,
@@ -17,7 +17,7 @@ enum class ClientType : uint8_t
 
 struct stPlayer
 {
-    ClientType m_type = ClientType::Max;
+    enClientType m_type = enClientType::Max;
     int m_ServerNo = 0;
     ull m_sessionID = 0;
 
@@ -42,10 +42,9 @@ class CTestServer : public CLanServer
     virtual void OnRelease(ull SessionID) override;
 
 
-    virtual void REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, WORD wType = en_PACKET_SS_MONITOR_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0) ;
-    virtual void REQ_TOOL_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_SS_MONITOR_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
-    virtual void REQ_LOGIN_Client(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType = en_PACKET_CS_MONITOR_TOOL_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
-    virtual void REQ_MONITOR_TOOL_UPDATE(ull SessionID, CMessage *msg, BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
+    virtual void REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, WORD wType = en_PACKET_SS_MONITOR_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
+    virtual void REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_SS_MONITOR_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
+    virtual void REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType = en_PACKET_CS_MONITOR_TOOL_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
 
         // SessionID Key , Player¡¢±Ÿ.
 
