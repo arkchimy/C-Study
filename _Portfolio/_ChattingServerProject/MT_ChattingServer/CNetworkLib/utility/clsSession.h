@@ -44,24 +44,7 @@ struct stDBOverlapped : public OVERLAPPED
     CMessage *msg = nullptr; // AccountNo
 };
 
-typedef struct stSessionId
-{
-    bool operator==(const stSessionId other)
-    {
-        return SeqNumberAndIdx == other.SeqNumberAndIdx;
-    }
 
-    union
-    {
-        struct
-        {
-            ull seqNumber : 47;
-            ull idx : 17;
-        };
-        ull SeqNumberAndIdx = 0;
-    };
-
-} stSessionId;
 
 class clsSession
 {
@@ -80,7 +63,7 @@ class clsSession
     CTlsLockFreeQueue<struct CMessage *> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
 
-    stSessionId m_SeqID{0};
+    ull m_SeqID = 0;
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0; // SendFlag

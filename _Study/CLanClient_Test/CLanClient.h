@@ -76,6 +76,8 @@ class CLanClient
     bool Connect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress = nullptr, int workerThreadCnt = 1, int bNagle = true, int reduceThreadCount = 0 , int userCnt = 1); // 바인딩 IP, 서버IP / 워커스레드 수 / 나글옵션
     bool Disconnect();
 
+     CMessage *CreateMessage(class clsSession &session, struct stHeader &header) const;
+
     void SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
                     std::vector<ull> *pIDVector, WORD wVecLen);
     void Unicast(ull SessionID, CMessage *msg, LONG64 Account = 0);
@@ -105,4 +107,8 @@ class CLanClient
     std::stack<ull> _IdxStack; 
 
     ull g_ID = 0; //  [ IDX :17  SEQ : 47 ]
+
+    bool bEnCording = false;
+    int headerSize = 0;
+
 };

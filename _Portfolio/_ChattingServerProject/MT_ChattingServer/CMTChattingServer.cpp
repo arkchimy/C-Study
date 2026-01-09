@@ -1387,7 +1387,7 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
                                        L"%-10s %10s %4llu %10s %05lld  %10s %012llu  %10s %4llu  ",
                                        L"AllocMsg_Refuse",
                                        L"LocalMsgCnt", localAllocCnt,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx);
+                                       L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID, L"seqIndx : ", session.m_SeqID >> 47);
 
         // 다시 감소 시키고, Session의 삭제 절차.
         localAllocCnt = _InterlockedDecrement64(&m_AllocMsgCount);

@@ -39,8 +39,12 @@ BOOL GetLogicalProcess(DWORD &out)
 }
 
 CLanClient::CLanClient(bool EnCoding )
+    : bEnCording(EnCoding)
 {    
-
+        if (bEnCording)
+        headerSize = sizeof(stHeader);
+    else
+        headerSize = offsetof(stHeader, sDataLen);
 }
 
 void CLanClient::WorkerThread()
@@ -182,7 +186,64 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
 
 bool CLanClient::Disconnect()
 {
-    return false;
+    // WorkerThread에서 호출하는 DisConnect이므로  IO가 '0' 이 되는 경우의 수가 없음.
+    clsSession &session = sessions_vec[SessionID >> 47];
+
+    ull Local_ioCount;
+
+    // session의 보장 장치.
+    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
+
+    if ((Local_ioCount & (ull)1 << 47) != 0)
+    {
+        return false;
+    }
+
+    if (SessionID != session.m_SeqID.SeqNumberAndIdx)
+    {
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        return false;
+    }
+
+    ull retval = InterlockedExchange(&session.m_blive, 0);
+    if (retval == 1)
+    {
+        InterlockedIncrement(&iDisCounnectCount);
+    }
+    CancelIO_Routine(SessionID);
+    // ContentsThread가 호출하게되면, 연결이 끊긴 Session의 ID가 올 수 있다.
+
+    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+        ReleaseSession(SessionID);
+    return true;
+}
+
+CMessage *CLanClient::CreateMessage(clsSession &session, stHeader &header) const
+{
+    // TODO : Header를 읽고, 생성하고
+
+    CMessage *msg;
+    ringBufferSize deQsize;
+
+    // 메세지 할당
+    {
+
+        {
+            Profiler profile(L"PoolAlloc");
+            msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
+        }
+    }
+    // 순수하게 데이터만 가져옴.  EnCording 의 경우 RandKey와 CheckSum도 가져옴.
+    deQsize = session.m_recvBuffer.Dequeue(msg->_frontPtr, header.sDataLen + headerSize);
+    msg->_rearPtr = msg->_frontPtr + deQsize;
+
+    if (header.sDataLen + headerSize != deQsize)
+    {
+        return nullptr;
+    }
+    return msg;
 }
 
 void CLanClient::SendPacket(ull SessionID, CMessage *msg, BYTE SendType, std::vector<ull> *pIDVector, WORD wVecLen)
@@ -272,6 +333,63 @@ void CLanClient::BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVe
 
 void CLanClient::RecvComplete(clsSession &session, DWORD transferred)
 {
+    stHeader header;
+    ringBufferSize useSize;
+
+    ull SessionID;
+    bool bChkSum = false;
+    {
+        session.m_recvBuffer.MoveRear(transferred);
+        SessionID = session.m_SeqID.SeqNumberAndIdx;
+    }
+    // Header의 크기만큼을 확인.
+    while (session.m_recvBuffer.Peek(&header, headerSize) == headerSize)
+    {
+        useSize = session.m_recvBuffer.GetUseSize();
+        if (useSize < header.sDataLen + headerSize)
+        {
+            // 데이터가 덜 옴.
+            break;
+        }
+        // 메세지 생성
+        CMessage *msg = CreateMessage(session, header);
+        if (msg == nullptr)
+            break;
+        if (bEnCording)
+        {
+            {
+                Profiler profile(L"DeCoding");
+                bChkSum = msg->DeCoding();
+            }
+            if (bChkSum == false)
+            {
+                // Attack : 조작된 패킷으로 checkSum이 다름.
+                InterlockedExchange(&session.m_blive, 0);
+                CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
+                static bool bOn = false;
+                if (bOn == false)
+                {
+                    bOn = true;
+                    CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                                                   L"%-20s ",
+                                                   L" false Packet CheckSum Not Equle ");
+                }
+                stTlsObjectPool<CMessage>::Release(msg);
+                return;
+            }
+        }
+
+        InterlockedExchange(&msg->ownerID, SessionID);
+
+        msg->_frontPtr = msg->_frontPtr + headerSize;
+
+        // PayLoad를 읽고 무엇인가 처리하는 Logic이 NetWork에 들어가선 안된다.
+        {
+            Profiler profile(L"OnRecv");
+            OnRecv(SessionID, msg);
+        }
+    }
+    RecvPacket(session);
 }
 
 void CLanClient::SendComplete(clsSession &session, DWORD transferred)

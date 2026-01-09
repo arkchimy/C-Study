@@ -4,7 +4,6 @@
 
 #include <thread>
 
-
 thread_local LONG64 SendTPSidx;
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
@@ -58,7 +57,7 @@ BOOL GetLogicalProcess(DWORD &out)
     out = temp;
     return true;
 }
-//SRWLOCK srw_Log;
+// SRWLOCK srw_Log;
 
 void CLanServer::WorkerThread()
 {
@@ -102,7 +101,7 @@ void CLanServer::WorkerThread()
         if (overlapped == nullptr && bGQCS)
         {
             CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
-            __debugbreak(); 
+            __debugbreak();
         }
         else if (overlapped == nullptr)
         {
@@ -144,12 +143,11 @@ void CLanServer::WorkerThread()
                 continue;
             }
 
-            ull seqID = session->m_SeqID.SeqNumberAndIdx;
+            ull seqID = session->m_SeqID;
             ReleaseSession(seqID);
         }
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThread Terminated ");
-
 }
 
 void CLanServer::AcceptThread()
@@ -172,7 +170,6 @@ void CLanServer::AcceptThread()
     ull idx;
 
     int addrlen;
-    stSessionId stsessionID;
 
     addrlen = sizeof(addr);
 
@@ -213,14 +210,13 @@ void CLanServer::AcceptThread()
             __debugbreak();
         // Session 초기화 부분.
         {
-            stsessionID.idx = idx;
-            stsessionID.seqNumber = session_id++;
+            ull m_SeqID = (idx << 47) + session_id++;
 
             session.m_sock = client_sock;
             session.m_blive = true;
             session.m_flag = 0;
 
-            InterlockedExchange(&session.m_SeqID.SeqNumberAndIdx, stsessionID.SeqNumberAndIdx);
+            InterlockedExchange(&session.m_SeqID, m_SeqID);
             InterlockedExchange(&session.m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
         }
 
@@ -237,7 +233,7 @@ void CLanServer::AcceptThread()
             }
         }
         // AllocMsg의 처리가 너무 많이 발생한다면 False를 반환.
-        if (OnAccept(session.m_SeqID.SeqNumberAndIdx, addr) == false)
+        if (OnAccept(session.m_SeqID, addr) == false)
         {
             DecrementIoCountAndMaybeDeleteSession(session);
             continue;
@@ -248,16 +244,14 @@ void CLanServer::AcceptThread()
         DecrementIoCountAndMaybeDeleteSession(session);
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"AcceptThread Terminated %d", 0);
-
 }
 
 CLanServer::CLanServer(bool EnCoding)
     : bEnCording(EnCoding)
 {
-    hReadyForStopEvent = CreateEvent(nullptr,true, false, nullptr);
+    hReadyForStopEvent = CreateEvent(nullptr, true, false, nullptr);
     if (hReadyForStopEvent == nullptr)
         __debugbreak();
-
 
     if (bEnCording)
         headerSize = sizeof(stHeader);
@@ -278,19 +272,17 @@ CLanServer::~CLanServer()
 
 BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
 {
-    linger linger{1,0};
+    linger linger{1, 0};
     int buflen;
     DWORD lProcessCnt;
     DWORD bind_retval;
     HRESULT hr;
     SOCKADDR_IN serverAddr;
 
-
     sessions_vec.resize(MaxSessions);
 
     for (ull idx = 0; idx < MaxSessions; idx++)
         m_SessionIdxStack.Push(idx);
-
 
     ZeroMemory(&serverAddr, sizeof(serverAddr));
 
@@ -320,11 +312,9 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 
-   
-    arrTPS.resize(WorkerCreateCnt + 1,0); //Accept가 0
+    arrTPS.resize(WorkerCreateCnt + 1, 0); // Accept가 0
 
     m_WorkThreadCnt = WorkerCreateCnt;
-
 
     bOn = true;
 
@@ -338,7 +328,6 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
         std::wstring name = L"\tWorkerThread" + std::to_wstring(i);
 
         hr = SetThreadDescription(m_hWorkerThread[i].native_handle(), name.c_str());
-
     }
 
     return true;
@@ -351,20 +340,16 @@ void CLanServer::Stop()
     m_hAccept.join();
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" AcceptThread Finish ");
 
-
-    
     for (clsSession &session : sessions_vec)
     {
-        Disconnect(session.m_SeqID.SeqNumberAndIdx);
+        Disconnect(session.m_SeqID);
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Every Session DisConnect ");
 
-    //SignalOnForStop 호출을 대기
+    // SignalOnForStop 호출을 대기
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Wait For Contents Singnal ");
     WaitForSingleObject(hReadyForStopEvent, INFINITE);
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Catch Contents Singnal ");
-
-
 
     for (int i = 0; i < m_WorkThreadCnt; i++)
     {
@@ -372,15 +357,12 @@ void CLanServer::Stop()
         PostQueuedCompletionStatus(m_hIOCP, 0, 0, nullptr);
     }
 
-    
     for (int i = 0; i < m_WorkThreadCnt; i++)
     {
         CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join WorkerThread ");
         m_hWorkerThread[i].join();
         CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Success WorkerThread Finish ");
-
     }
-  
 }
 
 void CLanServer::SignalOnForStop()
@@ -405,7 +387,7 @@ bool CLanServer::Disconnect(const ull SessionID)
         return false;
     }
 
-    if (SessionID != session.m_SeqID.SeqNumberAndIdx)
+    if (SessionID != session.m_SeqID)
     {
         Local_ioCount = InterlockedDecrement(&session.m_ioCount);
         return false;
@@ -456,7 +438,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
     bool bChkSum = false;
     {
         session.m_recvBuffer.MoveRear(transferred);
-        SessionID = session.m_SeqID.SeqNumberAndIdx;
+        SessionID = session.m_SeqID;
     }
     // Header의 크기만큼을 확인.
     while (session.m_recvBuffer.Peek(&header, headerSize) == headerSize)
@@ -492,7 +474,6 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
                 }
                 stTlsObjectPool<CMessage>::Release(msg);
                 return;
-                
             }
         }
 
@@ -519,7 +500,7 @@ void CLanServer::DecrementIoCountAndMaybeDeleteSession(clsSession &session)
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) != 0)
             return;
-        ReleaseSession(session.m_SeqID.SeqNumberAndIdx);
+        ReleaseSession(session.m_SeqID);
     }
 }
 
@@ -532,7 +513,7 @@ CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header
 
     // 메세지 할당
     {
- 
+
         {
             Profiler profile(L"PoolAlloc");
             msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
@@ -605,8 +586,6 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
     bufCnt = 0;
 
-
-
     {
         Profiler profile(L"LFQ_Pop");
         while (session.m_sendBuffer.Pop(msg))
@@ -642,21 +621,21 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
             LastError = GetLastError();
         }
         if (send_retval < 0)
-            WSASendError(LastError, session.m_SeqID.SeqNumberAndIdx);
+            WSASendError(LastError, session.m_SeqID);
     }
 }
-void CLanServer::ReleaseComplete(ull SessionID) 
+void CLanServer::ReleaseComplete(ull SessionID)
 {
     // 로직상  Session당 한번만 호출되게 짰음.
     int retval;
     clsSession &session = sessions_vec[SessionID >> 47];
-    if (SessionID != session.m_SeqID.SeqNumberAndIdx)
+    if (SessionID != session.m_SeqID)
     {
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                        L"%-10s %10s %05lld  %10s %018llu  %10s %4llu %10s %018llu  %10s %4llu ",
                                        L"ReleaseSessionNoequle",
                                        L"HANDLE : ", session.m_sock,
-                                       L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"seqID :", session.m_SeqID, L"seqIndx : ", session.m_SeqID >> 47,
                                        L"LocalseqID :", SessionID, L"LocalseqIndx : ", SessionID >> 47);
         __debugbreak();
         return;
@@ -664,7 +643,7 @@ void CLanServer::ReleaseComplete(ull SessionID)
     CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
                                    L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                    L"Closesocket",
-                                   L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID.SeqNumberAndIdx, L"seqIndx : ", session.m_SeqID.idx,
+                                   L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID, L"seqIndx : ", session.m_SeqID >> 47,
                                    L"IO_Count", session.m_ioCount);
     OnRelease(SessionID);
     session.Release();
@@ -676,7 +655,7 @@ void CLanServer::ReleaseComplete(ull SessionID)
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"closesocketError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID >> 47,
                                        L"IO_Count", session.m_ioCount);
     }
     else
@@ -711,7 +690,7 @@ bool CLanServer::SessionLock(ull SessionID)
     }
 
     // session의 Release는 막았으므로 변경되지않음.
-    seqID = session.m_SeqID.SeqNumberAndIdx;
+    seqID = session.m_SeqID;
     if (seqID != SessionID)
     {
         // 새로 세팅된 Session이므로 다른 연결이라 판단.
@@ -753,7 +732,7 @@ void CLanServer::SessionUnLock(ull SessionID)
 void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
                             std::vector<ull> *pIDVector, size_t wVecLen)
 {
-    //InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
+    // InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
     switch (SendType)
     {
     case 0:
@@ -781,12 +760,10 @@ void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
 
     {
 
-  
         {
             Profiler profile(L"LFQ_Push");
             session.m_sendBuffer.Push(msg);
         }
-
     }
 
     // PQCS를 시도.
@@ -831,10 +808,9 @@ void CLanServer::BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVe
 
             PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
         }
-        
+
         SessionUnLock(currentSessionID);
     }
-
 }
 void CLanServer::RecvPacket(clsSession &session)
 {
@@ -893,7 +869,7 @@ void CLanServer::RecvPacket(clsSession &session)
 
         LastError = GetLastError();
         if (wsaRecv_retval < 0)
-            WSARecvError(LastError, session.m_SeqID.SeqNumberAndIdx);
+            WSARecvError(LastError, session.m_SeqID);
     }
 }
 
@@ -940,7 +916,7 @@ void CLanServer::WSASendError(const DWORD LastError, const ull SessionID)
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"Send_UnDefineError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID >> 47,
                                        L"IO_Count", session.m_ioCount);
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
@@ -974,7 +950,7 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
         CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
                                        L"[ %-10s %05d ] %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
                                        L"Recv_UnDefineError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID.idx,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID >> 47,
                                        L"IO_Count", session.m_ioCount);
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
@@ -986,5 +962,4 @@ void CLanServer::ReleaseSession(ull SessionID)
     clsSession &session = sessions_vec[SessionID >> 47];
     ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
     PostQueuedCompletionStatus(m_hIOCP, 0, SessionID, &session.m_releaseOverlapped);
-
 }
