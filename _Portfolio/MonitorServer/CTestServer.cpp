@@ -187,9 +187,11 @@ void CTestServer::REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, W
 
 }
 
-void CTestServer::REQ_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
+void CTestServer::REQ_TOOL_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
-    //해당 REQ는  타이머 쓰레드를 만들어서 PQCS를 할예정  데이터를 그대로 전송한다.
+    // 해당 메세지는  타이머 쓰레드를 만들어서
+    // PQCS를 할예정  데이터를 그대로 전송한다.
+
     std::shared_lock<SharedMutex> SessionIDHashLock(SessionID_hash_Lock);
     auto iter = SessionID_hash.find(SessionID);
     if (iter == SessionID_hash.end())
@@ -200,29 +202,14 @@ void CTestServer::REQ_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, i
         return;
     }
 
-    Proxy::RES_DATA_UPDATE(SessionID, msg, DataType, DataValue, TimeStamp);
-
-    // 서버가 모니터링서버로 데이터 전송
-    // 각 서버는 자신이 모니터링중인 수치를 1초마다 모니터링 서버로 전송.
-    //
-    // 서버의 다운 및 기타 이유로 모니터링 데이터가 전달되지 못할떄를 대비하여 TimeStamp 를 전달한다.
-    // 이는 모니터링 클라이언트에서 계산,비교 사용한다.
-    //
-    //	{
-    //		WORD	Type
-    //
-    //		BYTE	DataType				// 모니터링 데이터 Type 하단 Define 됨.
-    //		int		DataValue				// 해당 데이터 수치.
-    //		int		TimeStamp				// 해당 데이터를 얻은 시간 TIMESTAMP  (time() 함수)
-    //										// 본래 time 함수는 time_t 타입변수이나 64bit 로 낭비스러우니
-    //										// int 로 캐스팅하여 전송. 그래서 2038년 까지만 사용가능
-    //	}
+    Proxy::RES_TOOL_DATA_UPDATE(SessionID, msg, DataType, DataValue, TimeStamp);
 
 
 
 }
 void CTestServer::REQ_LOGIN_Client(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
+
 }
 void CTestServer::REQ_MONITOR_TOOL_UPDATE(ull SessionID, CMessage *msg, BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {

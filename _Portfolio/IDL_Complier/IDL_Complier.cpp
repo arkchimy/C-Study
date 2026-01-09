@@ -12,10 +12,10 @@ wchar_t TargetPath[FILENAME_MAX];
 WORD TypeOffset;
 
 #define BufferMax 700
-#define PackStartFormat L"\n\t const static BYTE %s \t=\t %s ;"
+#define PackStartFormat L"\n\t const static WORD %s \t=\t %s ;"
 
-#define CMessageDefaultFormat L"\tconst BYTE %s \t= \t (%s + %d) ;" // 1 씩증가
-#define CMessageCustomFormat L"\tconst BYTE %s \t= \t  %s      ;"   // 직접 정의
+#define CMessageDefaultFormat L"\tconst WORD %s \t= \t (%s + %d) ;" // 1 씩증가
+#define CMessageCustomFormat L"\tconst WORD %s \t= \t  %s      ;"   // 직접 정의
 
 #define InitCommonFORMAT L"#pragma once\n#define WIN32_LEAN_AND_MEAN \n#include <Windows.h>\n#ifndef CONSTANTS_H \n #define CONSTANTS_H \n"
 #define CommonFORMAT L"\t %s \n"
@@ -306,6 +306,7 @@ wchar_t *WordSplit(
     {
         left = GlobalPacketSplit(left, right, limit, temp);
         right = left;
+        cnt = 0;
     }
     // 뜯어낸 단어가 void일때  gRPCvec에 작성 되어야하는 목록
     else if (wcscmp(L"void", *temp) == 0)

@@ -25,6 +25,11 @@ struct stPlayer
 
     char m_ipAddress[16];
     USHORT m_port;
+
+
+    int32_t DataSet[dfMONITOR_DATA_TYPE_MONITOR_MAX];
+    // 본래 time 함수는 time_t 타입변수이나 64bit 로 낭비스러우니 int로 캐스팅 38년까지만 사용가능
+    int32_t timeStamp; 
 };
 
 class CTestServer : public CLanServer
@@ -38,7 +43,7 @@ class CTestServer : public CLanServer
 
 
     virtual void REQ_LOGIN_Server(ull SessionID, CMessage *msg, int ServerNo, WORD wType = en_PACKET_SS_MONITOR_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0) ;
-    virtual void REQ_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_SS_MONITOR_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
+    virtual void REQ_TOOL_DATA_UPDATE(ull SessionID, CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_SS_MONITOR_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
     virtual void REQ_LOGIN_Client(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType = en_PACKET_CS_MONITOR_TOOL_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
     virtual void REQ_MONITOR_TOOL_UPDATE(ull SessionID, CMessage *msg, BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
 
