@@ -3,9 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36127.28
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CLanClient_Test", "CLanClient_Test.vcxproj", "{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CNetworkLib", "..\..\_Portfolio\MonitorServer\CNetworkLib\CNetworkLib.vcxproj", "{BC14B27D-D39D-458E-BE1F-20C972C7220E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CNetworkLib", "CNetworkLib.vcxproj", "{BC14B27D-D39D-458E-BE1F-20C972C7220E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,14 +13,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Debug|x64.ActiveCfg = Debug|x64
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Debug|x64.Build.0 = Debug|x64
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Debug|x86.ActiveCfg = Debug|Win32
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Debug|x86.Build.0 = Debug|Win32
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Release|x64.ActiveCfg = Release|x64
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Release|x64.Build.0 = Release|x64
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Release|x86.ActiveCfg = Release|Win32
-		{231885B0-D549-4FA7-AE3F-EB1982CF6FFC}.Release|x86.Build.0 = Release|Win32
 		{BC14B27D-D39D-458E-BE1F-20C972C7220E}.Debug|x64.ActiveCfg = Debug|x64
 		{BC14B27D-D39D-458E-BE1F-20C972C7220E}.Debug|x64.Build.0 = Debug|x64
 		{BC14B27D-D39D-458E-BE1F-20C972C7220E}.Debug|x86.ActiveCfg = Debug|Win32
@@ -36,6 +26,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {5D5EAED4-4851-4A68-9CA3-014FF0571B07}
+		SolutionGuid = {6764DEFA-B393-4FCD-A447-F718F2A3B0D2}
 	EndGlobalSection
 EndGlobal

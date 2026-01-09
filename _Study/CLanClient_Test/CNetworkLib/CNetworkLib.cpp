@@ -4,6 +4,7 @@
 
 #include <thread>
 
+
 thread_local LONG64 SendTPSidx;
 BOOL DomainToIP(const wchar_t *szDomain, IN_ADDR *pAddr)
 {
@@ -57,7 +58,7 @@ BOOL GetLogicalProcess(DWORD &out)
     out = temp;
     return true;
 }
-// SRWLOCK srw_Log;
+//SRWLOCK srw_Log;
 
 void CLanServer::WorkerThread()
 {
@@ -101,7 +102,7 @@ void CLanServer::WorkerThread()
         if (overlapped == nullptr && bGQCS)
         {
             CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
-            __debugbreak();
+            __debugbreak(); 
         }
         else if (overlapped == nullptr)
         {
@@ -148,6 +149,7 @@ void CLanServer::WorkerThread()
         }
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"WorkerThread Terminated ");
+
 }
 
 void CLanServer::AcceptThread()
@@ -212,6 +214,7 @@ void CLanServer::AcceptThread()
         {
             ull m_SeqID = (idx << 47) + session_id++;
 
+
             session.m_sock = client_sock;
             session.m_blive = true;
             session.m_flag = 0;
@@ -244,14 +247,16 @@ void CLanServer::AcceptThread()
         DecrementIoCountAndMaybeDeleteSession(session);
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L"AcceptThread Terminated %d", 0);
+
 }
 
 CLanServer::CLanServer(bool EnCoding)
     : bEnCording(EnCoding)
 {
-    hReadyForStopEvent = CreateEvent(nullptr, true, false, nullptr);
+    hReadyForStopEvent = CreateEvent(nullptr,true, false, nullptr);
     if (hReadyForStopEvent == nullptr)
         __debugbreak();
+
 
     if (bEnCording)
         headerSize = sizeof(stHeader);
@@ -272,17 +277,19 @@ CLanServer::~CLanServer()
 
 BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int reduceThreadCount, int noDelay, int MaxSessions)
 {
-    linger linger{1, 0};
+    linger linger{1,0};
     int buflen;
     DWORD lProcessCnt;
     DWORD bind_retval;
     HRESULT hr;
     SOCKADDR_IN serverAddr;
 
+
     sessions_vec.resize(MaxSessions);
 
     for (ull idx = 0; idx < MaxSessions; idx++)
         m_SessionIdxStack.Push(idx);
+
 
     ZeroMemory(&serverAddr, sizeof(serverAddr));
 
@@ -312,9 +319,11 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     m_hIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, lProcessCnt - reduceThreadCount);
 
-    arrTPS.resize(WorkerCreateCnt + 1, 0); // Accept가 0
+   
+    arrTPS.resize(WorkerCreateCnt + 1,0); //Accept가 0
 
     m_WorkThreadCnt = WorkerCreateCnt;
+
 
     bOn = true;
 
@@ -328,6 +337,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
         std::wstring name = L"\tWorkerThread" + std::to_wstring(i);
 
         hr = SetThreadDescription(m_hWorkerThread[i].native_handle(), name.c_str());
+
     }
 
     return true;
@@ -340,16 +350,20 @@ void CLanServer::Stop()
     m_hAccept.join();
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" AcceptThread Finish ");
 
+
+    
     for (clsSession &session : sessions_vec)
     {
         Disconnect(session.m_SeqID);
     }
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Every Session DisConnect ");
 
-    // SignalOnForStop 호출을 대기
+    //SignalOnForStop 호출을 대기
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Wait For Contents Singnal ");
     WaitForSingleObject(hReadyForStopEvent, INFINITE);
     CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Catch Contents Singnal ");
+
+
 
     for (int i = 0; i < m_WorkThreadCnt; i++)
     {
@@ -357,12 +371,15 @@ void CLanServer::Stop()
         PostQueuedCompletionStatus(m_hIOCP, 0, 0, nullptr);
     }
 
+    
     for (int i = 0; i < m_WorkThreadCnt; i++)
     {
         CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Join WorkerThread ");
         m_hWorkerThread[i].join();
         CSystemLog::GetInstance()->Log(L"SystemLog.txt", en_LOG_LEVEL::SYSTEM_Mode, L" Success WorkerThread Finish ");
+
     }
+  
 }
 
 void CLanServer::SignalOnForStop()
@@ -474,6 +491,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
                 }
                 stTlsObjectPool<CMessage>::Release(msg);
                 return;
+                
             }
         }
 
@@ -513,7 +531,7 @@ CMessage *CLanServer::CreateMessage(clsSession &session, struct stHeader &header
 
     // 메세지 할당
     {
-
+ 
         {
             Profiler profile(L"PoolAlloc");
             msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
@@ -586,6 +604,8 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
 
     bufCnt = 0;
 
+
+
     {
         Profiler profile(L"LFQ_Pop");
         while (session.m_sendBuffer.Pop(msg))
@@ -624,7 +644,7 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
             WSASendError(LastError, session.m_SeqID);
     }
 }
-void CLanServer::ReleaseComplete(ull SessionID)
+void CLanServer::ReleaseComplete(ull SessionID) 
 {
     // 로직상  Session당 한번만 호출되게 짰음.
     int retval;
@@ -732,7 +752,7 @@ void CLanServer::SessionUnLock(ull SessionID)
 void CLanServer::SendPacket(ull SessionID, CMessage *msg, BYTE SendType,
                             std::vector<ull> *pIDVector, size_t wVecLen)
 {
-    // InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
+    //InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_MESSAGE]);
     switch (SendType)
     {
     case 0:
@@ -760,10 +780,12 @@ void CLanServer::Unicast(ull SessionID, CMessage *msg, LONG64 Account)
 
     {
 
+  
         {
             Profiler profile(L"LFQ_Push");
             session.m_sendBuffer.Push(msg);
         }
+
     }
 
     // PQCS를 시도.
@@ -808,9 +830,10 @@ void CLanServer::BroadCast(ull SessionID, CMessage *msg, std::vector<ull> *pIDVe
 
             PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
         }
-
+        
         SessionUnLock(currentSessionID);
     }
+
 }
 void CLanServer::RecvPacket(clsSession &session)
 {
@@ -962,4 +985,5 @@ void CLanServer::ReleaseSession(ull SessionID)
     clsSession &session = sessions_vec[SessionID >> 47];
     ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
     PostQueuedCompletionStatus(m_hIOCP, 0, SessionID, &session.m_releaseOverlapped);
+
 }

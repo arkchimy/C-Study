@@ -4,8 +4,9 @@
 
 #include <unordered_map>
 #include <shared_mutex>
+#include <stack>
 
-struct CPlayer
+struct stPlayer
 {
     ull _SessionID;
 };
@@ -25,7 +26,7 @@ class CClient :public CLanClient
 
     private:
         
-        std::stack<CPlayer *> playerStack;
-        std::unordered_map<ull, CPlayer *> SessionID_map;
+        std::stack<stPlayer *> playerStack;
+        std::unordered_map<ull, stPlayer *> SessionID_map;
         std::shared_mutex m_SessionMap;
 };

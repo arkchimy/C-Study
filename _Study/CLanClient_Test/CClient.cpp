@@ -9,20 +9,19 @@ bool CClient::PackProc(CMessage *msg)
     return false;
 }
 
-
 CClient::CClient(int PlayerMaxCnt)
 {
-    CPlayer *player; 
+    stPlayer *player;
     for (int i = 0; i < PlayerMaxCnt; i++)
     {
-        player = new CPlayer();
+        player = new stPlayer();
         playerStack.push(player);
     }
 }
 
 void CClient::OnEnterJoinServer(ull SessionID)
 {
-    CPlayer *player;
+    stPlayer *player;
     if (playerStack.empty())
         __debugbreak();
 
@@ -35,9 +34,6 @@ void CClient::OnEnterJoinServer(ull SessionID)
     playerStack.pop();
     player->_SessionID = SessionID;
     SessionID_map.emplace(SessionID, player);
-
-
-
 }
 
 void CClient::OnLeaveServer(ull SessionID)
@@ -45,7 +41,7 @@ void CClient::OnLeaveServer(ull SessionID)
 
     std::lock_guard<std::shared_mutex> lock(m_SessionMap);
 
-    CPlayer *player;
+    stPlayer *player;
     if (SessionID_map.find(SessionID) == SessionID_map.end())
         __debugbreak();
     player = SessionID_map[SessionID];
@@ -54,20 +50,26 @@ void CClient::OnLeaveServer(ull SessionID)
     playerStack.push(player);
 }
 
-void CClient::OnRecv(CMessage * msg)
+void CClient::OnRecv(CMessage *msg)
 {
     bool ProcRetval;
     ProcRetval = PackProc(msg);
-
 }
 
 void CClient::OnSend(int sendsize)
 {
-
 }
 
 void CClient::OnRelease(ull SessionID)
 {
+    stPlayer *player;
+    CMessage *msg;
+
+
+    msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+    *msg << (unsigned short)en_PACKET_Player_Delete;
+    InterlockedExchange(&msg->ownerID, SessionID);
+
+    OnRecv(msg);
 
 }
-
