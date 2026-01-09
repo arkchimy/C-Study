@@ -2,6 +2,10 @@
 #include <timeapi.h>
 
 static const std::string gLoginKey = "ajfw@!cv980dSZ[fje#@fdj123948djf";
+static const std::string LanIP[2] = {
+    "10.0.1.2",
+    "10.0.2.2",
+};
 
 CTestServer::CTestServer(bool EnCoding)
     : CLanServer(EnCoding)
@@ -133,52 +137,60 @@ void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, 
 
         return;
     }
-
-    // 이미 ServerNo가 존재한다면 둘 다 끊음.
-    {
-        std::lock_guard<SharedMutex> ServerNoHashLock(ServerNo_hash_Lock);
-        auto ServerNoIter = ServerNo_hash.find(ServerNo);
-
-        if (ServerNoIter != ServerNo_hash.end())
-        {
-            // 겹치는 ServerNo면 둘다 끊기
-            player = ServerNoIter->second;
-            stTlsObjectPool<CMessage>::Release(msg);
-            Disconnect(player->m_sessionID);
-            Disconnect(SessionID);
-            return;
-        }
-
-        {
-            // WaitLoginHash에 없다면 끊음.
-            std::lock_guard<SharedMutex> waitLoginHashLock(waitLogin_hash_Lock);
-
-            auto waitLoginiter = waitLogin_hash.find(SessionID);
-            if (waitLoginiter == waitLogin_hash.end())
-            {
-                stTlsObjectPool<CMessage>::Release(msg);
-                Disconnect(SessionID);
-                return;
-            }
-            player = waitLoginiter->second;
-            waitLogin_hash.erase(waitLoginiter);
-
-            ServerNo_hash.insert({ServerNo, player});
-        }
-    }
-
-    if (ServerNo < 10)
-        player->m_type = enClientType::LoginServer;
-    else if (ServerNo < 20)
-        player->m_type = enClientType::ChatServer;
-    else if (ServerNo < 50)
-        player->m_type = enClientType::GameServer;
-
-    player->m_ServerNo = ServerNo;
-
     {
         // WaitLoginHash에 없다면 끊음.
         std::lock_guard<SharedMutex> SessionIDHashLock(SessionID_hash_Lock);
+        // 이미 ServerNo가 존재한다면 둘 다 끊음.
+        {
+            std::lock_guard<SharedMutex> ServerNoHashLock(ServerNo_hash_Lock);
+            auto ServerNoIter = ServerNo_hash.find(ServerNo);
+
+            if (ServerNoIter != ServerNo_hash.end())
+            {
+                // 겹치는 ServerNo면 둘다 끊기
+                player = ServerNoIter->second;
+                stTlsObjectPool<CMessage>::Release(msg);
+                Disconnect(player->m_sessionID);
+                Disconnect(SessionID);
+                return;
+            }
+
+            {
+                // WaitLoginHash에 없다면 끊음.
+                std::lock_guard<SharedMutex> waitLoginHashLock(waitLogin_hash_Lock);
+
+                auto waitLoginiter = waitLogin_hash.find(SessionID);
+                if (waitLoginiter == waitLogin_hash.end())
+                {
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    Disconnect(SessionID);
+                    return;
+                }
+                player = waitLoginiter->second;
+                if (LanIP[0].compare(player->m_ipAddress) == 0 || LanIP[1].compare(player->m_ipAddress) == 0)
+                {
+                    waitLogin_hash.erase(waitLoginiter);
+                    ServerNo_hash.insert({ServerNo, player});
+                }
+                else
+                {
+                    // Lan이 아닌 경우 끊기.
+                    stTlsObjectPool<CMessage>::Release(msg);
+                    Disconnect(SessionID);
+                    return;
+                }
+            }
+        }
+
+        if (ServerNo < 10)
+            player->m_type = enClientType::LoginServer;
+        else if (ServerNo < 20)
+            player->m_type = enClientType::ChatServer;
+        else if (ServerNo < 50)
+            player->m_type = enClientType::GameServer;
+
+        player->m_ServerNo = ServerNo;
+
         auto iter = SessionID_hash.find(SessionID);
         if (iter != SessionID_hash.end())
             __debugbreak();
@@ -201,7 +213,7 @@ void CTestServer::REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType
     }
 
     std::vector<ull> sendTarget;
-    for (auto& element : SessionID_hash)
+    for (auto &element : SessionID_hash)
     {
         if (element.second->m_type == enClientType::MonitorClient)
             sendTarget.emplace_back(element.first);
@@ -212,25 +224,24 @@ void CTestServer::REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType
 void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
-    
+
     char *Loginkey = (char *)LoginSessionKey;
-    
+
     if (gLoginKey.compare(Loginkey) != 0)
     {
         Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_SESSIONKEY);
+        // DisConnect
         return;
     }
 
     std::shared_lock<SharedMutex> sessionHashLock(SessionID_hash_Lock);
     auto iter = SessionID_hash.find(SessionID);
-    if(iter->second->m_type != enClientType::MonitorClient)
+    if (iter->second->m_type != enClientType::MonitorClient)
     {
         Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_NOSERVER);
+        // DisConnect
         return;
     }
 
     Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_OK);
 }
-
-
-

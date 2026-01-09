@@ -37,6 +37,7 @@ class CTestServer : public CLanServer
   public:
     CTestServer(bool EnCoding = false);
 
+
     virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) override ;
     virtual void OnRecv(ull SessionID, struct CMessage *msg) override;
     virtual void OnRelease(ull SessionID) override;
