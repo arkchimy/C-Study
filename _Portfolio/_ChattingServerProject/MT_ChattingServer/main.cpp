@@ -60,7 +60,6 @@ int main()
 
     {
         CTestServer *ChattingServer = new CTestServer(ContentsThreadCnt, iEnCording);
-        ClientFunc();
 
         size_t i;
         wcstombs_s(&i, ChattingServer->RedisIpAddress, IP_LEN, RedisIpAddress, IP_LEN);
@@ -68,6 +67,8 @@ int main()
 
         
         ChattingServer->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+        ClientFunc();
+
         CSystemLog::GetInstance()->SetLogLevel(en_LOG_LEVEL::ERROR_Mode);
         while (1)
         {

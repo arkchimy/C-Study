@@ -280,9 +280,8 @@ void CLanClient::Unicast(CClientMessage *msg, LONG64 Account)
     Profiler profile(L"UnitCast_Cnt");
 
     // 여기까지 왔다면, 같은 Session으로 판단하자.
-    CClientMessage **ppMsg;
     ull local_IoCount;
-    ppMsg = &msg;
+
 
     {
         Profiler profile(L"LFQ_Push");
