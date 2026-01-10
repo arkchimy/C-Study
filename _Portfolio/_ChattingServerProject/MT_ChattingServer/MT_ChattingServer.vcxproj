@@ -153,18 +153,25 @@
   <ItemGroup>
     <ClCompile Include="CMTChattingServer.cpp" />
     <ClCompile Include="Contents\Sector\SectorManager.cpp" />
+    <ClCompile Include="CTestClient.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MonitorData.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CMTChattingServer.h" />
     <ClInclude Include="Contents\Player\stPlayer.h" />
     <ClInclude Include="Contents\Sector\SectorManager.h" />
     <ClInclude Include="Contents\Sector\SectorTypes.h" />
+    <ClInclude Include="CTestClient.h" />
+    <ClInclude Include="MonitorData.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Config.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="CLanClient\CLanClient.vcxproj">
+      <Project>{39e2d828-ea33-41eb-b19b-e5604710ff6c}</Project>
+    </ProjectReference>
     <ProjectReference Include="CNetworkLib\CNetworkLib.vcxproj">
       <Project>{bc14b27d-d39d-458e-be1f-20c972c7220e}</Project>
     </ProjectReference>

@@ -14,6 +14,7 @@
 
 #include "CMTChattingServer.h"
 #include "CNetworkLib/CNetworkLib.h"
+#include "MonitorData.h"
 
 #include <Pdh.h>
 #include <stdio.h>
@@ -23,6 +24,7 @@
 #include "./CNetworkLib/utility/CCpuUsage/CCpuUsage.h"
 
 #include <cpp_redis/cpp_redis>
+
 
 #pragma comment(lib, "cpp_redis.lib")
 #pragma comment(lib, "tacopie.lib")
@@ -122,7 +124,7 @@ void CTestServer::MonitorThread()
         currentTime = timeGetTime();
         nextTime; // 내가 목표로하는 이상적인 시간.
         nextTime = currentTime;
-
+        LONG64 TotalTPS  = 0;
         while (bMonitorThreadOn)
         {
             nextTime += 1000;
@@ -137,9 +139,11 @@ void CTestServer::MonitorThread()
                 Send_arrTPS[i] = old_arrTPS - before_arrTPS[i];
                 before_arrTPS[i] = old_arrTPS;
             }
+
             printf(" ============================================ Config ============================================ \n");
 
             printf("%-25s : %10d  %-25s : %10lld\n", "WorkerThread Cnt", m_WorkThreadCnt, "SessionNum", GetSessionCount());
+
             printf("%-25s : %10d  %-25s : %10d \n", "ZeroCopy", bZeroCopy, "Nodelay", bNoDelay);
             printf("%-25s : %10zu  %-25s : %10d\n", "MaxSessions", MaxSessions, "MaxPlayers", m_maxPlayers);
 
@@ -166,14 +170,14 @@ void CTestServer::MonitorThread()
                 printf(" Recv TPS : %lld\n", RecvTPS);
             }
             {
-                LONG64 sum = 0;
+                TotalTPS = 0;
                 for (int i = 1; i <= m_WorkThreadCnt; i++)
                 {
-                    sum += Send_arrTPS[i];
+                    TotalTPS += Send_arrTPS[i];
                     printf("%20s %10lld \n", "Send TPS :", Send_arrTPS[i]);
                 }
                 printf(" ===================================================================================================== \n");
-                printf("%35s %10lld\n", "Total Send TPS :", sum);
+                printf("%35s %10lld\n", "Total Send TPS :", TotalTPS);
                 printf(" ===================================================================================================== \n");
             }
 
@@ -287,6 +291,21 @@ void CTestServer::MonitorThread()
             }
 
             currentTime = timeGetTime();
+            // MonitorData
+            {
+                g_MonitorData[enMonitorType::TimeStamp] = currentTime;
+                g_MonitorData[enMonitorType::On] = bOn;
+                g_MonitorData[enMonitorType::Cpu] = (int)CPUTime.ProcessTotal();
+                g_MonitorData[enMonitorType::Memory] = (int)(Process_PrivateByteVal.largeValue / 1024 / 1024);
+                g_MonitorData[enMonitorType::SessionCnt] = (int)GetSessionCount();
+                g_MonitorData[enMonitorType::UserCnt] = (int)GetprePlayer_hash();
+                g_MonitorData[enMonitorType::TotalSendTps] = (int)TotalTPS;
+                g_MonitorData[enMonitorType::TotalPackPool_Cnt] = (int)stTlsObjectPool<CMessage>::instance.m_TotalCount;
+                g_MonitorData[enMonitorType::UpdatePackPool_Cnt] = (int)stTlsObjectPool<CMessage>::instance.m_TotalCount;
+
+                SetEvent(g_hMonitorEvent);
+            }
+
             if (nextTime > currentTime)
                 Sleep(nextTime - currentTime);
         }

@@ -138,6 +138,9 @@
     <ClInclude Include="CTestServer.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\_3Course\lib\CrushDump_lib\CrushDump_lib\CrushDump_lib.vcxproj">
+      <Project>{b5035720-6cd1-4206-a4d5-c190fab6cdde}</Project>
+    </ProjectReference>
     <ProjectReference Include="CNetworkLib\CNetworkLib.vcxproj">
       <Project>{bc14b27d-d39d-458e-be1f-20c972c7220e}</Project>
     </ProjectReference>

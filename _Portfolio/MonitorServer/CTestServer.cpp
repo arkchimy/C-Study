@@ -2,7 +2,9 @@
 #include <timeapi.h>
 
 static const std::string gLoginKey = "ajfw@!cv980dSZ[fje#@fdj123948djf";
-static const std::string LanIP[2] = {
+static const std::string LanIP[3] = 
+{
+    "127.0.0.1",
     "10.0.1.2",
     "10.0.2.2",
 };
@@ -167,7 +169,7 @@ void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, 
                     return;
                 }
                 player = waitLoginiter->second;
-                if (LanIP[0].compare(player->m_ipAddress) == 0 || LanIP[1].compare(player->m_ipAddress) == 0)
+                if (LanIP[0].compare(player->m_ipAddress) == 0 || LanIP[1].compare(player->m_ipAddress) ||  LanIP[2].compare(player->m_ipAddress) == 0)
                 {
                     waitLogin_hash.erase(waitLoginiter);
                     ServerNo_hash.insert({ServerNo, player});

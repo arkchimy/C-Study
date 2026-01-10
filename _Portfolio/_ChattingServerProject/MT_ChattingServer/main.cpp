@@ -3,6 +3,8 @@
 
 #include "CMTChattingServer.h"
 #include "CrushDump_lib/CrushDump_lib.h"
+#include "MonitorData.h"
+
 
 int main()
 {
@@ -58,6 +60,7 @@ int main()
 
     {
         CTestServer *ChattingServer = new CTestServer(ContentsThreadCnt, iEnCording);
+        ClientFunc();
 
         size_t i;
         wcstombs_s(&i, ChattingServer->RedisIpAddress, IP_LEN, RedisIpAddress, IP_LEN);
