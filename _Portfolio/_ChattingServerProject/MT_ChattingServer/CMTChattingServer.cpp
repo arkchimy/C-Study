@@ -289,11 +289,14 @@ void CTestServer::MonitorThread()
 
                 wprintf(L" ============================================================================================================== \n");
             }
-
             currentTime = timeGetTime();
+
+            time_t currenttt;
+            time(&currenttt);
             // MonitorData
             {
-                g_MonitorData[enMonitorType::TimeStamp] = currentTime;
+                //InterlockedExchange((DWORD *)&g_MonitorData[enMonitorType::TimeStamp], currenttt);
+                g_MonitorData[enMonitorType::TimeStamp] = (int)currenttt;
                 g_MonitorData[enMonitorType::On] = bOn;
                 g_MonitorData[enMonitorType::Cpu] = (int)CPUTime.ProcessTotal();
                 g_MonitorData[enMonitorType::Memory] = (int)(Process_PrivateByteVal.largeValue / 1024 / 1024);

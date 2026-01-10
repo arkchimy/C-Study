@@ -76,7 +76,7 @@ class CLanServer : public Stub, public Proxy
     // void RecvComplete(class clsSession *const session, DWORD transferred);
     void RecvComplete(class clsSession &session, DWORD transferred);
     void SendComplete(class clsSession &session, DWORD transferred);
-    void ReleaseComplete(ull SessionID);
+    void ReleaseComplete(clsSession& session);
 
     bool SessionLock(ull SessionID);   // 내부에서 IO를 증가시켜 안전을 보장함.
     void SessionUnLock(ull SessionID); // 반환형 쓸때가 없음.
@@ -111,7 +111,7 @@ class CLanServer : public Stub, public Proxy
     // SignalOnForStop에서 사용할 이벤트객체
     HANDLE hReadyForStopEvent = INVALID_HANDLE_VALUE; 
 
-    std::vector<class clsSession> sessions_vec;
+    std::vector<clsSession> sessions_vec;
     SOCKET m_listen_sock = INVALID_SOCKET;
     HANDLE m_hIOCP = INVALID_HANDLE_VALUE;
 

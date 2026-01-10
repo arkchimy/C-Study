@@ -127,7 +127,7 @@ void CLanServer::WorkerThread()
             SendComplete(*session, transferred);
             break;
         case Job_Type::ReleasePost:
-            ReleaseComplete(key);
+            ReleaseComplete(*session);
             continue;
 
         default:
@@ -183,13 +183,13 @@ void CLanServer::AcceptThread()
     if (listen_retval == 0)
         printf("Listen Sucess\n");
     else
-        CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Listen_Falied %d", WSAGetLastError());
+        CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"Listen_Falied %d", GetLastError());
     while (1)
     {
         client_sock = accept(m_listen_sock, (sockaddr *)&addr, &addrlen);
         if (client_sock == INVALID_SOCKET)
         {
-            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET  GetLastError : %05d", WSAGetLastError());
+            CSystemLog::GetInstance()->Log(L"Socket_Error.txt", en_LOG_LEVEL::ERROR_Mode, L"accept Reseult INVALID_SOCKET  GetLastError : %05d", GetLastError());
             break;
         }
 
@@ -327,7 +327,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     bOn = true;
 
-    m_hAccept = std::move(WinThread(&CLanServer::AcceptThread, this));
+    m_hAccept = WinThread(&CLanServer::AcceptThread, this);
     SetThreadDescription(m_hAccept.native_handle(), L"\tAcceptThread");
 
     m_hWorkerThread.reserve(WorkerCreateCnt);
@@ -644,45 +644,18 @@ void CLanServer::SendComplete(clsSession &session, DWORD transferred)
             WSASendError(LastError, session.m_SeqID);
     }
 }
-void CLanServer::ReleaseComplete(ull SessionID) 
+void CLanServer::ReleaseComplete(clsSession& session)
 {
     // 로직상  Session당 한번만 호출되게 짰음.
-    int retval;
-    clsSession &session = sessions_vec[SessionID >> 47];
-    if (SessionID != session.m_SeqID)
-    {
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                       L"%-10s %10s %05lld  %10s %018llu  %10s %4llu %10s %018llu  %10s %4llu ",
-                                       L"ReleaseSessionNoequle",
-                                       L"HANDLE : ", session.m_sock,
-                                       L"seqID :", session.m_SeqID, L"seqIndx : ", session.m_SeqID >> 47,
-                                       L"LocalseqID :", SessionID, L"LocalseqIndx : ", SessionID >> 47);
-        __debugbreak();
-        return;
-    }
-    CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::DEBUG_Mode,
-                                   L"%-10s %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                   L"Closesocket",
-                                   L"HANDLE : ", session.m_sock, L"seqID :", session.m_SeqID, L"seqIndx : ", session.m_SeqID >> 47,
-                                   L"IO_Count", session.m_ioCount);
-    OnRelease(SessionID);
-    session.Release();
-    retval = closesocket(session.m_sock);
-    DWORD LastError = GetLastError();
-    if (retval != 0)
-    {
 
-        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
-                                       L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
-                                       L"closesocketError", LastError,
-                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID >> 47,
-                                       L"IO_Count", session.m_ioCount);
-    }
-    else
-    {
-        m_SessionIdxStack.Push(SessionID >> 47);
-        _interlockeddecrement64(&m_SessionCount);
-    }
+
+    OnRelease(session.m_SeqID);
+    session.Release();
+    closesocket(session.m_sock);
+
+    m_SessionIdxStack.Push(session.m_SeqID >> 47);
+    _interlockeddecrement64(&m_SessionCount);
+    
 }
 bool CLanServer::SessionLock(ull SessionID)
 {
@@ -984,6 +957,6 @@ void CLanServer::ReleaseSession(ull SessionID)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
     ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
-    PostQueuedCompletionStatus(m_hIOCP, 0, SessionID, &session.m_releaseOverlapped);
+    PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR) & session, &session.m_releaseOverlapped);
 
 }

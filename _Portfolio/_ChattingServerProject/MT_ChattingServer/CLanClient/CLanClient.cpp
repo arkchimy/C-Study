@@ -271,8 +271,8 @@ void CLanClient::PostReQuest_iocp(CClientMessage *msg)
 {
     stPostOverlapped *overlapped = (stPostOverlapped*)postPool.Alloc();
     overlapped->msg = msg;
-
-    PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR)&session, overlapped );
+    ZeroMemory(overlapped, sizeof(OVERLAPPED));
+    PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR)&session, overlapped);
 }
 
 void CLanClient::Unicast(CClientMessage *msg, LONG64 Account)
@@ -470,7 +470,7 @@ void CLanClient::ReleaseSession()
 {
     ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
 
-    PostQueuedCompletionStatus(_hIOCP, 0, session.m_SeqID, &session.m_releaseOverlapped);
+    PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR) &session, &session.m_releaseOverlapped);
 }
 void CLanClient::WSASendError(const DWORD LastError)
 {

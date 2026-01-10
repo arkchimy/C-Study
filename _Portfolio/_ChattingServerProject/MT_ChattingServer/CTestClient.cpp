@@ -15,7 +15,12 @@ void CTestClient::TimerThread()
 
     while (1)
     {
+        int MonitorData[enMonitorType::Max]{0,};
         WaitForSingleObject(g_hMonitorEvent, INFINITE);
+        for (int i = 0; i < enMonitorType::Max; i++)
+        {
+            MonitorData[i] = g_MonitorData[i];
+        }
 
         for (int i = 1; i < enMonitorType::Max; i++)
         {
@@ -23,8 +28,8 @@ void CTestClient::TimerThread()
 
             *msg << en_PACKET_SS_MONITOR_DATA_UPDATE;
             *msg << (BYTE)(dfMONITOR_DATA_TYPE_CHAT_SERVER_RUN + i - 1);
-            *msg << g_MonitorData[i];
-            *msg << g_MonitorData[0];// timeStamp
+            *msg << MonitorData[i];
+            *msg << MonitorData[0]; // timeStamp
             PostReQuest_iocp(msg);
 
         }
