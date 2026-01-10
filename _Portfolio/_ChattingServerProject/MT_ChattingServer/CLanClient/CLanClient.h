@@ -38,19 +38,19 @@ class CLanClient : public Stub, public Proxy
     bool Connect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress = nullptr, int workerThreadCnt = 1, int bNagle = true, int reduceThreadCount = 0, int userCnt = 1); // 바인딩 IP, 서버IP / 워커스레드 수 / 나글옵션
     void Disconnect();
 
-    CMessage *CreateMessage(class clsSession &session, struct stHeader &header) const;
+    CClientMessage *CreateMessage(class clsSession &session, struct stHeader &header) const;
 
     void RecvPacket(class clsSession &session);
-    void SendPacket(CMessage *msg, BYTE SendType,
+    void SendPacket(CClientMessage *msg, BYTE SendType,
                     std::vector<ull> *pIDVector, WORD wVecLen);
 
-    void PostReQuest_iocp(CMessage *msg);
-    void Unicast(CMessage *msg, LONG64 Account = 0);
+    void PostReQuest_iocp(CClientMessage *msg);
+    void Unicast(CClientMessage *msg, LONG64 Account = 0);
 
     void RecvComplete(DWORD transferred);
     void SendComplete(DWORD transferred);
 
-    void PostComplete(CMessage* msg);
+    void PostComplete(CClientMessage* msg);
 
 
     void ReleaseComplete();
@@ -62,7 +62,7 @@ class CLanClient : public Stub, public Proxy
     virtual void OnEnterJoinServer() = 0; // OnConnect
     virtual void OnLeaveServer() = 0;     // OnRelease
 
-    virtual void OnRecv(CMessage * msg) = 0; //< 하나의 패킷 수신 완료 후
+    virtual void OnRecv(CClientMessage * msg) = 0; //< 하나의 패킷 수신 완료 후
 
   private:
     HANDLE _hIOCP = INVALID_HANDLE_VALUE;

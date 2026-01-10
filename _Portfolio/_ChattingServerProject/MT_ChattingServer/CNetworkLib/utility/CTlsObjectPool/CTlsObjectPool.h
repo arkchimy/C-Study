@@ -17,7 +17,7 @@
 
 #define assert RT_ASSERT
 
-extern int tlsPool_init_Capacity;
+extern int tlsPool_init_Capacity2;
 
 template <typename T>
 using ObjectPoolType = CObjectPool_UnSafeMT<T>;
@@ -33,7 +33,7 @@ struct stTlsObjectPoolManager
         if (parser.LoadFile(L"Config.txt") == false)
             __debugbreak();
 
-        if (parser.GetValue(L"tlsPool_init_Capacity", tlsPool_init_Capacity) == false)
+        if (parser.GetValue(L"tlsPool_init_Capacity", tlsPool_init_Capacity2) == false)
             __debugbreak();
     }
     struct stNode
@@ -53,14 +53,14 @@ struct stTlsObjectPoolManager
         {
             if (emptyPools.Pop(retval))
             {
-                retval->Initalize(tlsPool_init_Capacity);
+                retval->Initalize(tlsPool_init_Capacity2);
                 CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
                                                L"[ new tlsPool_init_Capacity => FullPool ]", retval);
             }
             else
             {
                 retval = new ObjectPoolType<T>();
-                retval->Initalize(tlsPool_init_Capacity);
+                retval->Initalize(tlsPool_init_Capacity2);
 
                 CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
                                                L"[ Create New FullPool ]", retval);
@@ -132,14 +132,14 @@ struct stTlsObjectPool
     {
         LONG64 currentTotalCnt;
         allocPool = new ObjectPoolType<T>();
-        allocPool->Initalize(tlsPool_init_Capacity);
+        allocPool->Initalize(tlsPool_init_Capacity2);
         assert(allocPool != nullptr);
 
         do
         {
             currentTotalCnt = instance.m_TotalCount;
 
-        } while (InterlockedCompareExchange64(&instance.m_TotalCount, currentTotalCnt + tlsPool_init_Capacity, currentTotalCnt) != currentTotalCnt);
+        } while (InterlockedCompareExchange64(&instance.m_TotalCount, currentTotalCnt + tlsPool_init_Capacity2, currentTotalCnt) != currentTotalCnt);
 
         CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::SYSTEM_Mode, L"%15s  : %p -  TLSAlloc",
                                        L"[ Create New FullPool ]", allocPool);
@@ -168,7 +168,7 @@ struct stTlsObjectPool
             CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t InputData  : %p  Data Size : %lld",
                                            L"[ emptyPools Push ]", instance.emptyPools.m_size, allocPool, allocPool->m_size);
         }
-        if (releasePool->m_size != tlsPool_init_Capacity)
+        if (releasePool->m_size != tlsPool_init_Capacity2)
         {
             instance.emptyPools.Push(releasePool);
             CSystemLog::GetInstance()->Log(L"TlsObjectPool", en_LOG_LEVEL::DEBUG_Mode, L"%15s  Size :%lld \t InputData  : %p  Data Size : %lld",
@@ -244,7 +244,7 @@ struct stTlsObjectPool
         pool->releasePool->Release(node);
 
         swap = pool->releasePool;
-        if (pool->releasePool->m_size == tlsPool_init_Capacity )
+        if (pool->releasePool->m_size == tlsPool_init_Capacity2 )
         {
 
             pool->releasePool = instance.GetEmptyPool(swap);

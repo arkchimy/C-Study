@@ -11,7 +11,7 @@ CTestClient::CTestClient(bool bEncoding)
 
 void CTestClient::TimerThread()
 {
-    CMessage *msg;
+    CClientMessage *msg;
 
     while (1)
     {
@@ -19,7 +19,7 @@ void CTestClient::TimerThread()
 
         for (int i = 1; i < enMonitorType::Max; i++)
         {
-            msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+            msg = (CClientMessage *)stTlsObjectPool<CClientMessage>::Alloc();
 
             *msg << en_PACKET_SS_MONITOR_DATA_UPDATE;
             *msg << (BYTE)(dfMONITOR_DATA_TYPE_CHAT_SERVER_RUN + i - 1);
@@ -56,11 +56,11 @@ void CTestClient::TimerThread()
 void CTestClient::OnEnterJoinServer()
 {
     //pqcs를 통해 내  IOCP 에 REQ_MONITOR_LOGIN 메세지를 만들어 PQCS 한다.
-    CMessage* msg =  (CMessage*)stTlsObjectPool<CMessage>::Alloc();
+    CClientMessage* msg =  (CClientMessage*)stTlsObjectPool<CClientMessage>::Alloc();
     // 내가 직접 넣는다고치고 PQCS를 하면 디코드를 하지않을까. 
     // 그러면 Decode를 하지않고, 바로 받아보자. 
     // 보낼때만 Encode하는 방식
-    int ServerNo = 1;
+    int ServerNo = 11;
 
     *msg << en_PACKET_SS_MONITOR_LOGIN;
     *msg << ServerNo;
@@ -74,7 +74,7 @@ void CTestClient::OnLeaveServer()
 
 }
 
-void CTestClient::OnRecv(CMessage *msg)
+void CTestClient::OnRecv(CClientMessage *msg)
 {
     WORD type;
     *msg >> type;
@@ -82,13 +82,13 @@ void CTestClient::OnRecv(CMessage *msg)
         Disconnect();
 }
 
-void CTestClient::REQ_MONITOR_LOGIN( CMessage *msg, int ServerNo, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
+void CTestClient::REQ_MONITOR_LOGIN( CClientMessage *msg, int ServerNo, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
     
     Proxy::RES_MONITOR_LOGIN(msg, ServerNo );
 }
 
-void CTestClient::REQ_MONITOR_UPDATE(CMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
+void CTestClient::REQ_MONITOR_UPDATE(CClientMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
     
     Proxy::RES_MONITOR_UPDATE(msg, DataType, DataValue, TimeStamp);

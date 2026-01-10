@@ -41,7 +41,7 @@ class MessageException : public std::exception
 
 template <typename T>
 concept Fundamental = std::is_fundamental_v<T>;
-struct CMessage
+struct CClientMessage
 {
     enum en_BufferSize : DWORD
     {
@@ -60,16 +60,16 @@ struct CMessage
         MAX,
     };
 
-    CMessage();
-    ~CMessage();
+    CClientMessage();
+    ~CClientMessage();
     void InitMessage();
-    CMessage(const CMessage &) = delete;
-    CMessage &operator=(const CMessage &) = delete;
-    CMessage(CMessage &&) = delete;
-    CMessage &operator=(CMessage &&) = delete;
+    CClientMessage(const CClientMessage &) = delete;
+    CClientMessage &operator=(const CClientMessage &) = delete;
+    CClientMessage(CClientMessage &&) = delete;
+    CClientMessage &operator=(CClientMessage &&) = delete;
 
     template <Fundamental T>
-    CMessage &operator<<(const T data)
+    CClientMessage &operator<<(const T data)
     {
         if (_end < _rearPtr + sizeof(data))
         {
@@ -91,7 +91,7 @@ struct CMessage
         return *this;
     }
     // std::string
-    CMessage &operator << (char* const str)
+    CClientMessage &operator << (char* const str)
     {
         size_t len = strlen(str);
         if (_end < _rearPtr + len)
@@ -113,7 +113,7 @@ struct CMessage
         return *this;
     }
     template <Fundamental T>
-    CMessage &operator>>(T &data)
+    CClientMessage &operator>>(T &data)
     {
         size_t len = sizeof(T);
         if (_frontPtr + len > _rearPtr)
@@ -125,7 +125,7 @@ struct CMessage
         _frontPtr = _frontPtr + sizeof(data);
         return *this;
     }
-    CMessage& operator >> (char* const str)
+    CClientMessage& operator >> (char* const str)
     {
         //뒤에 모든 데이터를 한번에 긁자.
 

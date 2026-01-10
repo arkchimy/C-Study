@@ -9,9 +9,9 @@ int tlsPool_init_Capacity;
 
 
 template <>
-ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetFullPool(ObjectPoolType<CMessage> *emptyStack)
+ObjectPoolType<CClientMessage> * stTlsObjectPoolManager<CClientMessage>::GetFullPool(ObjectPoolType<CClientMessage> *emptyStack)
 {
-    ObjectPoolType<CMessage> *retval;
+    ObjectPoolType<CClientMessage> *retval;
     LONG64 currentTotalCnt;
 
     emptyPools.Push(emptyStack);
@@ -34,7 +34,7 @@ ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetFullPool(ObjectP
         }
         else
         {
-            retval = new ObjectPoolType<CMessage>();
+            retval = new ObjectPoolType<CClientMessage>();
             retval->Initalize(tlsPool_init_Capacity);
             do
             {
@@ -60,9 +60,9 @@ ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetFullPool(ObjectP
 }
 
 template <>
-ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetEmptyPool(ObjectPoolType<CMessage> *fullStack)
+ObjectPoolType<CClientMessage> * stTlsObjectPoolManager<CClientMessage>::GetEmptyPool(ObjectPoolType<CClientMessage> *fullStack)
 {
-    ObjectPoolType<CMessage> *retval;
+    ObjectPoolType<CClientMessage> *retval;
 
     fullPools.Push(fullStack);
     CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%15s fullPools.m_size :%lld \t InputData  : %p  Data Size : %lld",
@@ -70,7 +70,7 @@ ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetEmptyPool(Object
 
     if (emptyPools.Pop(retval) == false)
     {
-        retval = new ObjectPoolType<CMessage>();
+        retval = new ObjectPoolType<CClientMessage>();
         CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - emptyPools.m_size == 0 ",
                                         L"[ Create New EmptyPool ]", retval);
         return retval;
@@ -89,7 +89,7 @@ ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetEmptyPool(Object
 
 // 직렬화버퍼의 특수화
 template <>
-PVOID stTlsObjectPool<CMessage>::Alloc()
+PVOID stTlsObjectPool<CClientMessage>::Alloc()
 {
     static ull AllocCnt = 0;
     ull localAllocCnt;
@@ -98,7 +98,7 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
     CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::DEBUG_Mode, L"%15s %08llu ",
                                    L"CMessage Alloc : ", localAllocCnt);
     stTlsObjectPool *pool = nullptr;
-    ObjectPoolType<CMessage> *swap;
+    ObjectPoolType<CClientMessage> *swap;
     if (s_tlsIdx == TLS_OUT_OF_INDEXES)
     {
         CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::ERROR_Mode, L"%10s %15s ",
@@ -129,7 +129,7 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
     }
     PVOID node = pool->allocPool->Alloc();
 
-    CMessage *msg = reinterpret_cast<CMessage *>(node);
+    CClientMessage *msg = reinterpret_cast<CClientMessage *>(node);
     msg->InitMessage();
     if (msg->_frontPtr == nullptr)
         __debugbreak();
@@ -140,18 +140,18 @@ PVOID stTlsObjectPool<CMessage>::Alloc()
 }
 
 template <>
-void stTlsObjectPool<CMessage>::Release(PVOID node)
+void stTlsObjectPool<CClientMessage>::Release(PVOID node)
 {
     stTlsObjectPool *pool;          // Tls에 존재하는 ObjectPool
-    ObjectPoolType<CMessage> *swap; // PoolManager에서 주는 Pool과 swap 용도 변수
-    CMessage *msg;
+    ObjectPoolType<CClientMessage> *swap; // PoolManager에서 주는 Pool과 swap 용도 변수
+    CClientMessage *msg;
     LONG64 iUseCnt;
 
     static LONG64 ReleaseCnt = 0;
     LONG64 localReleaseCnt;
 
 
-    msg = reinterpret_cast<CMessage *>(node);
+    msg = reinterpret_cast<CClientMessage *>(node);
     
     iUseCnt = InterlockedDecrement64(&msg->iUseCnt);
 
@@ -206,4 +206,4 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
 }
 
 // 명시적 인스턴스화
-template struct stTlsObjectPool<CMessage>;
+template struct stTlsObjectPool<CClientMessage>;

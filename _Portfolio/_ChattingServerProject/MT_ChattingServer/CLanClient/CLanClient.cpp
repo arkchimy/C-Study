@@ -164,9 +164,11 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
         __debugbreak();
     }
     session.m_sock = sock;
+    session.m_blive = true;
     CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
     OnEnterJoinServer();
 
+    RecvPacket(session);
     return false;
 }
 
@@ -176,11 +178,11 @@ void CLanClient::Disconnect()
     OnLeaveServer();
 }
 
-CMessage *CLanClient::CreateMessage(clsSession &session, stHeader &header) const
+CClientMessage *CLanClient::CreateMessage(clsSession &session, stHeader &header) const
 {
     // TODO : Header를 읽고, 생성하고
 
-    CMessage *msg;
+    CClientMessage *msg;
     ringBufferSize deQsize;
 
     // 메세지 할당
@@ -188,7 +190,7 @@ CMessage *CLanClient::CreateMessage(clsSession &session, stHeader &header) const
 
         {
             Profiler profile(L"PoolAlloc");
-            msg = reinterpret_cast<CMessage *>(stTlsObjectPool<CMessage>::Alloc());
+            msg = reinterpret_cast<CClientMessage *>(stTlsObjectPool<CClientMessage>::Alloc());
         }
     }
     // 순수하게 데이터만 가져옴.  EnCording 의 경우 RandKey와 CheckSum도 가져옴.
@@ -261,11 +263,11 @@ void CLanClient::RecvPacket(clsSession &session)
             WSARecvError(LastError);
     }
 }
-void CLanClient::SendPacket(CMessage *msg, BYTE SendType, std::vector<ull> *pIDVector, WORD wVecLen)
+void CLanClient::SendPacket(CClientMessage *msg, BYTE SendType, std::vector<ull> *pIDVector, WORD wVecLen)
 {
     Unicast(msg);
 }
-void CLanClient::PostReQuest_iocp(CMessage *msg)
+void CLanClient::PostReQuest_iocp(CClientMessage *msg)
 {
     stPostOverlapped *overlapped = (stPostOverlapped*)postPool.Alloc();
     overlapped->msg = msg;
@@ -273,12 +275,12 @@ void CLanClient::PostReQuest_iocp(CMessage *msg)
     PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR)&session, overlapped );
 }
 
-void CLanClient::Unicast(CMessage *msg, LONG64 Account)
+void CLanClient::Unicast(CClientMessage *msg, LONG64 Account)
 {
     Profiler profile(L"UnitCast_Cnt");
 
     // 여기까지 왔다면, 같은 Session으로 판단하자.
-    CMessage **ppMsg;
+    CClientMessage **ppMsg;
     ull local_IoCount;
     ppMsg = &msg;
 
@@ -319,7 +321,7 @@ void CLanClient::RecvComplete(DWORD transferred)
             break;
         }
         // 메세지 생성
-        CMessage *msg = CreateMessage(session, header);
+        CClientMessage *msg = CreateMessage(session, header);
         if (msg == nullptr)
             break;
         if (bEnCording)
@@ -341,7 +343,7 @@ void CLanClient::RecvComplete(DWORD transferred)
                                                    L"%-20s ",
                                                    L" false Packet CheckSum Not Equle ");
                 }
-                stTlsObjectPool<CMessage>::Release(msg);
+                stTlsObjectPool<CClientMessage>::Release(msg);
                 return;
             }
         }
@@ -371,11 +373,11 @@ void CLanClient::SendComplete(DWORD transferred)
     // LONG64 beforeTPS;
 
     ull local_IoCount;
-    CMessage *msg;
+    CClientMessage *msg;
 
     for (DWORD i = 0; i < session.m_sendOverlapped.msgCnt; i++)
     {
-        stTlsObjectPool<CMessage>::Release(session.m_sendOverlapped.msgs[i]);
+        stTlsObjectPool<CClientMessage>::Release(session.m_sendOverlapped.msgs[i]);
     }
 
     {
@@ -445,7 +447,7 @@ void CLanClient::SendComplete(DWORD transferred)
     }
 }
 
-void CLanClient::PostComplete(CMessage* msg) 
+void CLanClient::PostComplete(CClientMessage* msg) 
 {
     // PayLoad를 읽고 무엇인가 처리하는 Logic이 NetWork에 들어가선 안된다.
  

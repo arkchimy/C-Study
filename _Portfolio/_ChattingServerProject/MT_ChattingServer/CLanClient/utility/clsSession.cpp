@@ -18,15 +18,15 @@ clsSession::~clsSession()
 
 void clsSession::Release()
 {
-    CMessage *msg;
+    CClientMessage *msg;
     while (m_sendBuffer.Pop(msg))
     {
-        stTlsObjectPool<CMessage>::Release(msg);
+        stTlsObjectPool<CClientMessage>::Release(msg);
     }
 
     for (DWORD i = 0; i < m_sendOverlapped.msgCnt; i++)
     {
-        stTlsObjectPool<CMessage>::Release(m_sendOverlapped.msgs[i]);
+        stTlsObjectPool<CClientMessage>::Release(m_sendOverlapped.msgs[i]);
     }
     m_sendOverlapped.msgCnt = 0;
 

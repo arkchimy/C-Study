@@ -6,7 +6,7 @@ HANDLE g_hMonitorEvent = CreateEvent(nullptr, 0, false, nullptr);
 
 void ClientFunc()
 {
-    CTestClient *client = new CTestClient();
+    CTestClient *client = new CTestClient(true);
     wchar_t ip[] = L"127.0.0.1";
 
     client->Connect(ip, 21350);

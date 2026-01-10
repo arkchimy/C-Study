@@ -17,7 +17,7 @@
 
 #define assert RT_ASSERT
 
-extern int tlsPool_init_Capacity;
+extern  int tlsPool_init_Capacity;
 
 template <typename T>
 using ObjectPoolType = CObjectPool_UnSafeMT<T>;
@@ -260,9 +260,9 @@ struct stTlsObjectPool
     ObjectPoolType<T> *releasePool = nullptr;
 };
 template <>
-PVOID stTlsObjectPool<CMessage>::Alloc();
+PVOID stTlsObjectPool<CClientMessage>::Alloc();
 
 template <>
-void stTlsObjectPool<CMessage>::Release(PVOID node);
+void stTlsObjectPool<CClientMessage>::Release(PVOID node);
 
-extern template struct stTlsObjectPool<CMessage>;
+extern template struct stTlsObjectPool<CClientMessage>;

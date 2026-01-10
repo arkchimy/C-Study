@@ -220,14 +220,17 @@ void CTestServer::REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType
         if (element.second->m_type == enClientType::MonitorClient)
             sendTarget.emplace_back(element.first);
     }
-    Proxy::RES_MONITOR_UPDATE(SessionID, msg, DataType, DataValue, TimeStamp, en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, true, &sendTarget, sendTarget.size());
+    Proxy::RES_MONITOR_UPDATE(SessionID, msg, 0 ,DataType, DataValue, TimeStamp, en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, true, &sendTarget, sendTarget.size());
 }
 
 void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
+    stPlayer* player;
 
-    char *Loginkey = (char *)LoginSessionKey;
+    char Loginkey[33];
+    memset(Loginkey,0,33);
+    memcpy(Loginkey, LoginSessionKey,32);
 
     if (gLoginKey.compare(Loginkey) != 0)
     {
@@ -236,13 +239,29 @@ void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *Lo
         return;
     }
 
-    std::shared_lock<SharedMutex> sessionHashLock(SessionID_hash_Lock);
+    std::lock_guard<SharedMutex> sessionHashLock(SessionID_hash_Lock);
     auto iter = SessionID_hash.find(SessionID);
-    if (iter->second->m_type != enClientType::MonitorClient)
+    if (iter != SessionID_hash.end())
     {
-        Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_NOSERVER);
-        // DisConnect
+        stTlsObjectPool<CMessage>::Release(msg);
+        Disconnect(SessionID);
         return;
+    }
+    std::lock_guard<SharedMutex> waitLoginHashLock(waitLogin_hash_Lock);
+
+    auto waitLoginiter = waitLogin_hash.find(SessionID);
+    if (waitLoginiter == waitLogin_hash.end())
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        Disconnect(SessionID);
+        return;
+    }
+    player = waitLoginiter->second;
+    player->m_type = enClientType::MonitorClient;
+    if (LanIP[0].compare(player->m_ipAddress) == 0 || LanIP[1].compare(player->m_ipAddress) || LanIP[2].compare(player->m_ipAddress) == 0)
+    {
+        waitLogin_hash.erase(waitLoginiter);
+        SessionID_hash.insert({SessionID, player});
     }
 
     Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_OK);

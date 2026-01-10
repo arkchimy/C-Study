@@ -871,6 +871,7 @@ void CLanServer::RecvPacket(clsSession &session)
         if (wsaRecv_retval < 0)
             WSARecvError(LastError, session.m_SeqID);
     }
+
 }
 
 int CLanServer::getAcceptTPS()

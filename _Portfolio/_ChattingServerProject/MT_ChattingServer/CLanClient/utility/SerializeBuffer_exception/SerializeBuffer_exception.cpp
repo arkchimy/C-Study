@@ -6,7 +6,7 @@
 
 static int g_mode = 0;
 
-const wchar_t *format[(BYTE)CMessage::en_Tag::MAX] =
+static const wchar_t *format[(BYTE)CClientMessage::en_Tag::MAX] =
     {
         L"\n%s\n",
         L"\n  %-15s  \n%s   \n",
@@ -15,8 +15,8 @@ const wchar_t *format[(BYTE)CMessage::en_Tag::MAX] =
         L"\n  %-15s  \n%s   \n",
         L"\n  %-15s  \n%s   \n",
 };
-const wchar_t *Stringformat[(BYTE)CMessage::en_Tag::MAX] = 
-{
+static const wchar_t *Stringformat[(BYTE)CClientMessage::en_Tag::MAX] =
+    {
     L"==================================================================================================================",
     L"Dummy가 보낸 인코딩 후 데이터  ",
     L"Server가 준 디코딩 후 데이터 ",
@@ -27,7 +27,7 @@ const wchar_t *Stringformat[(BYTE)CMessage::en_Tag::MAX] =
 };
 
 
-CMessage::CMessage()
+CClientMessage::CClientMessage()
     : ownerID(GetCurrentThreadId())
 {
 
@@ -36,7 +36,7 @@ CMessage::CMessage()
     _rearPtr = _frontPtr;
 }
 
-CMessage::~CMessage()
+CClientMessage::~CClientMessage()
 {
     _size = en_BufferSize::bufferSize;
 
@@ -47,7 +47,7 @@ CMessage::~CMessage()
     _interlockedexchange64(&iUseCnt, 1);
 }
 
-void CMessage::InitMessage()
+void CClientMessage::InitMessage()
 {
     _size = en_BufferSize::bufferSize;
 
@@ -58,7 +58,7 @@ void CMessage::InitMessage()
     _interlockedexchange64(&iUseCnt, 1);
 }
 
-void CMessage::EnCoding( )
+void CClientMessage::EnCoding( )
 {
     SerializeBufferSize len;
     BYTE RK;
@@ -110,7 +110,7 @@ void CMessage::EnCoding( )
      //   HexLog(en_Tag::ENCODE);
 }
 
-bool CMessage::DeCoding( )
+bool CClientMessage::DeCoding( )
 {
     BYTE P1 = 0, P2;
     BYTE E1 = 0, E2;
@@ -171,7 +171,7 @@ bool CMessage::DeCoding( )
     return true;
 }
 
-SSIZE_T CMessage::PutData(PVOID src, SerializeBufferSize size)
+SSIZE_T CClientMessage::PutData(PVOID src, SerializeBufferSize size)
 {
     char *r = _rearPtr;
     if (r + size > _end)
@@ -181,7 +181,7 @@ SSIZE_T CMessage::PutData(PVOID src, SerializeBufferSize size)
     return _rearPtr - r;
 }
 
-SSIZE_T CMessage::GetData(PVOID desc, SerializeBufferSize size)
+SSIZE_T CClientMessage::GetData(PVOID desc, SerializeBufferSize size)
 {
     char *f = _frontPtr;
     if (f + size > _rearPtr)
@@ -194,7 +194,7 @@ SSIZE_T CMessage::GetData(PVOID desc, SerializeBufferSize size)
 }
 
 // 지금 까지의 모든 데이터를 새로 할당받은 메모리에 복사후 그대로 진행해야 함.
-BOOL CMessage::ReSize()
+BOOL CClientMessage::ReSize()
 {
     // 직렬화 버퍼는 넣고 뺴고는 하나의 쓰레드에서 할 것으로 예상이 된다.
     SerializeBufferSize UseSize;
@@ -220,7 +220,7 @@ BOOL CMessage::ReSize()
     return TRUE;
 }
 
-void CMessage::Peek(char *out, SerializeBufferSize size)
+void CClientMessage::Peek(char *out, SerializeBufferSize size)
 {
     char *f = _frontPtr;
     if (f + size > _rearPtr)
@@ -229,7 +229,7 @@ void CMessage::Peek(char *out, SerializeBufferSize size)
 }
 
 
-void CMessage::HexLog(en_Tag tag , const wchar_t * filename)
+void CClientMessage::HexLog(en_Tag tag , const wchar_t * filename)
 {
     int current = 0;
 

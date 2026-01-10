@@ -33,7 +33,7 @@ struct stSendOverlapped : public OVERLAPPED
     stSendOverlapped(Job_Type mode) : _mode(mode) {}
     Job_Type _mode = Job_Type::MAX;
     DWORD msgCnt = 0;
-    struct CMessage *msgs[500]{0,};
+    struct CClientMessage *msgs[500]{0,};
 
 };
 struct stDBOverlapped : public OVERLAPPED
@@ -41,14 +41,14 @@ struct stDBOverlapped : public OVERLAPPED
     stDBOverlapped(Job_Type mode) : _mode(mode) {}
     Job_Type _mode = Job_Type::Post;
 
-    CMessage *msg = nullptr; // AccountNo
+    CClientMessage *msg = nullptr; // AccountNo
 };
 
 struct stPostOverlapped : public OVERLAPPED
 {
     Job_Type _mode = Job_Type::Post;
 
-    CMessage *msg = nullptr; // AccountNo
+    CClientMessage *msg = nullptr; // AccountNo
 };
 
 
@@ -66,7 +66,7 @@ class clsSession
     stSendOverlapped m_sendOverlapped = stSendOverlapped(Job_Type::Send);
     stSendOverlapped m_releaseOverlapped = stSendOverlapped(Job_Type::ReleasePost);
 
-    CTlsLockFreeQueue<struct CMessage *> m_sendBuffer;
+    CTlsLockFreeQueue<struct CClientMessage *> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
 
     ull m_SeqID = 0;
