@@ -38,36 +38,36 @@ class CLanClient : public Stub, public Proxy
     bool Connect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress = nullptr, int workerThreadCnt = 1, int bNagle = true, int reduceThreadCount = 0, int userCnt = 1); // 바인딩 IP, 서버IP / 워커스레드 수 / 나글옵션
     // 재연결
     bool ReConnect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress = nullptr); 
-    void Disconnect();
+    void Disconnect(ull SessionID);
 
     CClientMessage *CreateMessage(class clsSession &session, struct stHeader &header) const;
 
     void RecvPacket(class clsSession &session);
-    void SendPacket(CClientMessage *msg, BYTE SendType,
+    void SendPacket(ull SessionID, CClientMessage *msg, BYTE SendType,
                     std::vector<ull> *pIDVector, WORD wVecLen);
 
-    void PostReQuest_iocp(CClientMessage *msg);
-    void Unicast(CClientMessage *msg, LONG64 Account = 0);
+    void PostReQuest_iocp(ull SessionID , CClientMessage *msg);
+    void Unicast(ull SessionID, CClientMessage *msg, LONG64 Account = 0);
 
     void RecvComplete(DWORD transferred);
     void SendComplete(DWORD transferred);
 
-    void PostComplete(CClientMessage* msg);
+    void PostComplete( CClientMessage* msg);
 
 
     void ReleaseComplete();
     void ReleaseSession();
 
-    bool SessionLock();
-    void SessionUnLock();
+    bool SessionLock(ull SessionID);
+    void SessionUnLock(ull SessionID);
 
     void WSASendError(const DWORD LastError);
     void WSARecvError(const DWORD LastError);
 
-    virtual void OnEnterJoinServer() = 0; // OnConnect
+    virtual void OnEnterJoinServer(ull SessionID) = 0; // OnConnect
     virtual void OnLeaveServer() = 0;     // OnRelease
 
-    virtual void OnRecv(CClientMessage * msg) = 0; //< 하나의 패킷 수신 완료 후
+    virtual void OnRecv(ull SessionID, CClientMessage *msg) = 0; //< 하나의 패킷 수신 완료 후
 
   private:
     HANDLE _hIOCP = INVALID_HANDLE_VALUE;
@@ -75,11 +75,16 @@ class CLanClient : public Stub, public Proxy
     // PQCS 전용 Pool
     stTlsObjectPool<stPostOverlapped> postPool;
     std::vector<WinThread> _hWorkerThreads;
-    clsSession session;
+
 
     ull g_ID = 0; //  [ IDX :17  SEQ : 47 ]
 
     bool bEnCording = false;
     int headerSize = 0;
     int _bNagle = 0;
+
+    // PQCS 를 할때 session을 재사용하고있기에. LoginPacket말고 다른메세지가 먼저갈 가능성이 존재.
+    ull _seqID = 0; 
+    protected:
+    clsSession session;
 };
