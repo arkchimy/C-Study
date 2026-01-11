@@ -36,6 +36,8 @@ class CLanClient : public Stub, public Proxy
     void WorkerThread();
 
     bool Connect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress = nullptr, int workerThreadCnt = 1, int bNagle = true, int reduceThreadCount = 0, int userCnt = 1); // 바인딩 IP, 서버IP / 워커스레드 수 / 나글옵션
+    // 재연결
+    bool ReConnect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress = nullptr); 
     void Disconnect();
 
     CClientMessage *CreateMessage(class clsSession &session, struct stHeader &header) const;
@@ -76,4 +78,5 @@ class CLanClient : public Stub, public Proxy
 
     bool bEnCording = false;
     int headerSize = 0;
+    int _bNagle = 0;
 };

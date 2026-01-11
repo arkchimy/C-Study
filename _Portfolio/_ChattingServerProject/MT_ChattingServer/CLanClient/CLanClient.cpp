@@ -126,7 +126,7 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
     linger linger;
     SOCKADDR_IN serverAddr;
     SOCKET sock;
-
+    _bNagle = bNagle;
     // ConcurrentThread
     {
         GetLogicalProcess2(logicalProcess);
@@ -155,7 +155,7 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
     }
 
     setsockopt(sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
-    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&bNagle, sizeof(bNagle));
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&_bNagle, sizeof(_bNagle));
     int connectRetval;
     connectRetval = connect(sock, (const sockaddr *)&serverAddr, sizeof(serverAddr));
     if (connectRetval == SOCKET_ERROR)
@@ -169,9 +169,48 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
     OnEnterJoinServer();
 
     RecvPacket(session);
-    return false;
+    return true;
 }
+bool CLanClient::ReConnect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress )
+{
+    DWORD logicalProcess;
+    linger linger;
+    SOCKADDR_IN serverAddr;
+    SOCKET sock;
 
+    ZeroMemory(&serverAddr, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(Serverport);
+    InetPtonW(AF_INET, ServerAddress, &serverAddr.sin_addr);
+
+    linger.l_onoff = 1;
+    linger.l_linger = 0;
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == INVALID_SOCKET)
+    {
+        __debugbreak();
+    }
+
+    setsockopt(sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
+    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&_bNagle, sizeof(_bNagle));
+    int connectRetval;
+    retry:
+    connectRetval = connect(sock, (const sockaddr *)&serverAddr, sizeof(serverAddr));
+    if (connectRetval == SOCKET_ERROR)
+    {
+        goto retry;
+    }
+
+    session.m_sock = sock;
+    session.m_blive = true;
+    CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
+    OnEnterJoinServer();
+
+    RecvPacket(session);
+    return true;
+
+}
 void CLanClient::Disconnect()
 {
     closesocket(session.m_sock);
@@ -459,10 +498,10 @@ void CLanClient::ReleaseComplete()
 {
     // 로직상  Session당 한번만 호출되게 짰음.
     int retval;
-
-    OnLeaveServer();
     session.Release();
     retval = closesocket(session.m_sock);
+    OnLeaveServer();
+
 }
 
 void CLanClient::ReleaseSession()

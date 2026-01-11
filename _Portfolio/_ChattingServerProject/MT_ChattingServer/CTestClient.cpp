@@ -76,7 +76,16 @@ void CTestClient::OnEnterJoinServer()
 
 void CTestClient::OnLeaveServer()
 {
+    Parser parser;
+    parser.LoadFile(L"Config.txt");
 
+    wchar_t ip[16];
+    unsigned short port;
+
+    parser.GetValue(L"MonitorServer_IP_Address", ip, 16);
+    parser.GetValue(L"MonitorServer_IP_Port", port);
+
+    ReConnect(ip,port);
 }
 
 void CTestClient::OnRecv(CClientMessage *msg)
