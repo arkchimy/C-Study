@@ -155,15 +155,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CTestClient.cpp" />
     <ClCompile Include="LoginServer.cpp" />
-    <ClCompile Include="LoginServer_Project.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MonitorData.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CTestClient.h" />
     <ClInclude Include="LoginServer.h" />
+    <ClInclude Include="MonitorData.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\_4Course\_lib\CDB\CDB.vcxproj">
       <Project>{82ed263a-7832-4e00-b957-52a8b4134b1e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="CLanClient\CLanClient.vcxproj">
+      <Project>{39e2d828-ea33-41eb-b19b-e5604710ff6c}</Project>
     </ProjectReference>
     <ProjectReference Include="CNetworkLib\CNetworkLib.vcxproj">
       <Project>{bc14b27d-d39d-458e-be1f-20c972c7220e}</Project>

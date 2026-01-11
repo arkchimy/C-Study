@@ -6,7 +6,7 @@
 
 static int g_mode = 0;
 
-const wchar_t *format[(BYTE)CMessage::en_Tag::MAX] =
+static const wchar_t *format[(BYTE)CMessage::en_Tag::MAX] =
     {
         L"\n%s\n",
         L"\n  %-15s  \n%s   \n",
@@ -15,7 +15,7 @@ const wchar_t *format[(BYTE)CMessage::en_Tag::MAX] =
         L"\n  %-15s  \n%s   \n",
         L"\n  %-15s  \n%s   \n",
 };
-const wchar_t *Stringformat[(BYTE)CMessage::en_Tag::MAX] = 
+static const wchar_t *Stringformat[(BYTE)CMessage::en_Tag::MAX] = 
 {
     L"==================================================================================================================",
     L"Dummy가 보낸 인코딩 후 데이터  ",

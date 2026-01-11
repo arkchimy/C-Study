@@ -136,6 +136,7 @@ class CTestServer : public CLanServer
     char DBuser[ID_LEN];
     char password[Password_LEN];
     int m_lProcessCnt;
+    LONG64 m_UpdateTPS = 0; // DB처리 TPS
 };
 //// Debuging 정보
 //////////////////////////////////////////////////////////////////////////

@@ -4,7 +4,7 @@
 #include "CTlsObjectPool.h"
 
 
-int tlsPool_init_Capacity;
+int tlsPool_init_Capacity2;
 
 
 
@@ -23,24 +23,24 @@ ObjectPoolType<CMessage> * stTlsObjectPoolManager<CMessage>::GetFullPool(ObjectP
     {
         if (emptyPools.Pop(retval))
         {
-            retval->Initalize(tlsPool_init_Capacity);
+            retval->Initalize(tlsPool_init_Capacity2);
             CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
                                             L"[ Change Empty => FullPool ]", retval);
             do
             {
                 currentTotalCnt = m_TotalCount;
 
-            } while (InterlockedCompareExchange64(&m_TotalCount, currentTotalCnt + tlsPool_init_Capacity, currentTotalCnt) != currentTotalCnt);
+            } while (InterlockedCompareExchange64(&m_TotalCount, currentTotalCnt + tlsPool_init_Capacity2, currentTotalCnt) != currentTotalCnt);
         }
         else
         {
             retval = new ObjectPoolType<CMessage>();
-            retval->Initalize(tlsPool_init_Capacity);
+            retval->Initalize(tlsPool_init_Capacity2);
             do
             {
                 currentTotalCnt = m_TotalCount;
 
-            } while (InterlockedCompareExchange64(&m_TotalCount, currentTotalCnt + tlsPool_init_Capacity, currentTotalCnt) != currentTotalCnt);
+            } while (InterlockedCompareExchange64(&m_TotalCount, currentTotalCnt + tlsPool_init_Capacity2, currentTotalCnt) != currentTotalCnt);
 
             CSystemLog::GetInstance()->Log(L"CMessage", en_LOG_LEVEL::SYSTEM_Mode, L"%15s : %p - fullPools.m_size == 0 ",
                                             L"[ Create New FullPool ]", retval);
@@ -194,7 +194,7 @@ void stTlsObjectPool<CMessage>::Release(PVOID node)
                                    L"Release ", L"Node ", node, L"PoolAddress ", pool->releasePool, L"m_size", pool->releasePool->m_size);
 
     swap = pool->releasePool;
-    if (pool->releasePool->m_size == tlsPool_init_Capacity)
+    if (pool->releasePool->m_size == tlsPool_init_Capacity2)
     {
 
         pool->releasePool = instance.GetEmptyPool(swap);
