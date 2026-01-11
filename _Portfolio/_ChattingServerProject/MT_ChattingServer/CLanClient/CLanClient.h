@@ -58,6 +58,9 @@ class CLanClient : public Stub, public Proxy
     void ReleaseComplete();
     void ReleaseSession();
 
+    bool SessionLock();
+    void SessionUnLock();
+
     void WSASendError(const DWORD LastError);
     void WSARecvError(const DWORD LastError);
 

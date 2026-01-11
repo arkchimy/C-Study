@@ -94,7 +94,6 @@ void CLanClient::WorkerThread()
             break;
         case Job_Type::ReleasePost:
             ReleaseComplete();
-            OnLeaveServer();
             continue;
         case Job_Type::Post:
             PostComplete(reinterpret_cast<stPostOverlapped *>(overlapped)->msg);
@@ -166,9 +165,13 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
     session.m_sock = sock;
     session.m_blive = true;
     CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
+    session.m_ioCount = 1;
+
     OnEnterJoinServer();
 
     RecvPacket(session);
+
+    session.m_ioCount--;
     return true;
 }
 bool CLanClient::ReConnect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress )
@@ -195,19 +198,25 @@ bool CLanClient::ReConnect(wchar_t *ServerAddress, short Serverport, wchar_t *Bi
     setsockopt(sock, SOL_SOCKET, SO_LINGER, (const char *)&linger, sizeof(linger));
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char *)&_bNagle, sizeof(_bNagle));
     int connectRetval;
-    retry:
+    CSystemLog::GetInstance()->Log(L"CLanClientError", en_LOG_LEVEL::SYSTEM_Mode, L"ReConnect");
+retry:
+
     connectRetval = connect(sock, (const sockaddr *)&serverAddr, sizeof(serverAddr));
     if (connectRetval == SOCKET_ERROR)
     {
         goto retry;
     }
-
+    CSystemLog::GetInstance()->Log(L"CLanClientError", en_LOG_LEVEL::SYSTEM_Mode, L"ReConnect Success");
     session.m_sock = sock;
     session.m_blive = true;
+    session.m_ioCount = 1;
+
     CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
     OnEnterJoinServer();
 
     RecvPacket(session);
+    session.m_ioCount--;
+
     return true;
 
 }
@@ -308,10 +317,19 @@ void CLanClient::SendPacket(CClientMessage *msg, BYTE SendType, std::vector<ull>
 }
 void CLanClient::PostReQuest_iocp(CClientMessage *msg)
 {
+    if (SessionLock() == false)
+    {
+        CSystemLog::GetInstance()->Log(L"CLanClientError", en_LOG_LEVEL::ERROR_Mode, L"PostReQuest_iocp SessionLockFail");
+        return;
+    }
+
     stPostOverlapped *overlapped = (stPostOverlapped*)postPool.Alloc();
     overlapped->msg = msg;
     ZeroMemory(overlapped, sizeof(OVERLAPPED));
+    
     PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR)&session, overlapped);
+    SessionUnLock();
+
 }
 
 void CLanClient::Unicast(CClientMessage *msg, LONG64 Account)
@@ -321,6 +339,8 @@ void CLanClient::Unicast(CClientMessage *msg, LONG64 Account)
     // 여기까지 왔다면, 같은 Session으로 판단하자.
     ull local_IoCount;
 
+    if (SessionLock() == false)
+        return;
 
     {
         Profiler profile(L"LFQ_Push");
@@ -336,6 +356,8 @@ void CLanClient::Unicast(CClientMessage *msg, LONG64 Account)
 
         PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
     }
+    SessionUnLock();
+
 }
 
 void CLanClient::RecvComplete(DWORD transferred)
@@ -500,15 +522,62 @@ void CLanClient::ReleaseComplete()
     int retval;
     session.Release();
     retval = closesocket(session.m_sock);
+    CSystemLog::GetInstance()->Log(L"CLanClientError", en_LOG_LEVEL::SYSTEM_Mode, L"ReleaseComplete");
     OnLeaveServer();
 
 }
 
 void CLanClient::ReleaseSession()
 {
-    ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
+    CSystemLog::GetInstance()->Log(L"CLanClientError", en_LOG_LEVEL::SYSTEM_Mode, L"ReleaseSession");
 
+    ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
     PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR) &session, &session.m_releaseOverlapped);
+}
+bool CLanClient::SessionLock()
+{
+    /*
+        ※ 인자로 Msg들고오기 싫음.
+        => False를 리턴받는다면 호출부에서 msg폐기를 요구합니다.
+
+        * Release된 Session이라면  False를 리턴
+        * SessionID가 다르다면     False를 리턴  IO를 감소 시킨후 Release시도 ,  적어도 진입순간에는 Session은 살아있었음.
+        * 증가시킨 IO가 '1'인 경우 감소 시킨 후  Release시도 , False를 리턴
+        *
+    */
+    ull Local_ioCount;
+
+    // session의 보장 장치.
+    Local_ioCount = InterlockedIncrement(&session.m_ioCount);
+
+    if ((Local_ioCount & (ull)1 << 47) != 0)
+    {
+        // 새로운 세션으로 초기화되지않았고, r_flag가 세워져있으면 진입하지말자.
+        // 이미 r_flag가 올라가있는데 IoCount를 잘못 올린다고 문제가 되지않을 것같다.
+        return false;
+    }
+    if (Local_ioCount == 1)
+    {
+        // 원래 '0'이 었는데 내가 증가시켰다.
+        Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+        // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+
+        if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+            ReleaseSession();
+
+        return false;
+    }
+    return true;
+}
+void CLanClient::SessionUnLock() 
+{
+    ull Local_ioCount;
+
+    Local_ioCount = InterlockedDecrement(&session.m_ioCount);
+    // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
+    // TODO :  ContentsThread에서 Contents_Enq하는 경우의 수. 문제가없는가?
+    if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
+        ReleaseSession();
 }
 void CLanClient::WSASendError(const DWORD LastError)
 {
