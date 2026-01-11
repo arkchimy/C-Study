@@ -24,6 +24,8 @@ struct stPlayer
     DWORD m_Timer = 0;
 
     char m_ipAddress[16];
+    wchar_t m_wipAddress[16];
+
     USHORT m_port;
 
 
@@ -36,6 +38,9 @@ class CTestServer : public CLanServer
 {
   public:
     CTestServer(bool EnCoding = false);
+    void MonitorThread();
+
+    virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
 
 
     virtual bool OnAccept(ull SessionID, SOCKADDR_IN &addr) override ;
@@ -49,6 +54,7 @@ class CTestServer : public CLanServer
 
         // SessionID Key , Player접근.
 
+private:
     std::unordered_map<ull, stPlayer *> SessionID_hash; // LoginPack을 받은 Session.
     std::unordered_map<int, stPlayer *> ServerNo_hash;  // 중복 접속을 제거하는 용도
     std::unordered_map<ull, stPlayer *> waitLogin_hash; // LoginPack을 받기 전 Session.
@@ -62,5 +68,18 @@ class CTestServer : public CLanServer
     
     CObjectPool_UnSafeMT<stPlayer> player_pool;
     CObjectPool<stDBOverlapped> dbOverlapped_pool;
+
+    WinThread _hMonitorThread;
+
+    bool bOn = true;
+
+
+    wchar_t _bindAddr[16];
+    unsigned short _port;
+    int _ZeroCopy;
+    int _WorkerCreateCnt;
+    int _reduceThreadCount;
+    int _noDelay;
+    int _MaxSessions;
 
 };

@@ -2,16 +2,131 @@
 #include <timeapi.h>
 
 static const std::string gLoginKey = "ajfw@!cv980dSZ[fje#@fdj123948djf";
-static const std::string LanIP[3] = 
-{
-    "127.0.0.1",
-    "10.0.1.2",
-    "10.0.2.2",
+static const std::string LanIP[3] =
+    {
+        "127.0.0.1",
+        "10.0.1.2",
+        "10.0.2.2",
 };
 
 CTestServer::CTestServer(bool EnCoding)
-    : CLanServer(EnCoding)
+    : CLanServer(EnCoding),
+      _port(0),
+      _ZeroCopy(0), _WorkerCreateCnt(0), _reduceThreadCount(0), _noDelay(0), _MaxSessions(0)
 {
+
+    _hMonitorThread = WinThread(&CTestServer::MonitorThread, this);
+}
+
+// Parser의 기능으로  Address를 정하도록 하기.
+void CTestServer::MonitorThread()
+{
+
+    const wchar_t *ConfigFormat[] =
+        {
+            L"+------------------------------------ Config Info ------------------------------------+\n",
+            L"| MonitorServerIP   |  Port | Worker | ReduceConc | ZeroCopy | MaxSession |\n",
+            L"+-------------------+-------+--------+------------+----------+------------+\n",
+            L"| %-17ls | %5d | %6d | %10d | %8d | %10d |\n",
+            L"+-------------------+-------+--------+------------+----------+------------+\n",
+        };
+    const wchar_t *SessionCountFormat[] =
+        {
+            L"+---------------------------- Session Info ----------------------------+\n",
+            L"| UserCount | WaitLogin |\n",
+            L"+-----------+-----------+\n",
+            L"| %9d | %9d |\n",
+            L"+-----------+-----------+\n",
+        };
+    const wchar_t *ClientInfoFormat[] =
+        {
+            L"+---------------------------- Client Info ----------------------------+\n",
+            L"| ClientType  | Target IP         |  Port |\n",
+            L"+-------------+-------------------+-------+\n",
+            L"| %-11ls | %-17ls | %5d |\n",
+            L"+-------------+-------------------+-------+\n",
+        };
+
+    const wchar_t *ClientTypeFormat[(int)enClientType::Max] =
+        {
+            L"LoginServer",
+            L"ChatServer",
+            L"GameServer",
+            L"Monitortool", // 다른 프로토콜로 접속
+        };
+
+    // 어떤 IP가 나에게 접속하였는지.
+    // Client의 타입 과 IP를 모니터링하자.
+
+    DWORD currentTime = timeGetTime();
+    DWORD PrintTime = currentTime;
+    int frame = 0;
+    while (bOn)
+    {
+        // 프레임 단위로 점프
+        frame++;
+
+        currentTime = timeGetTime();
+
+        if (PrintTime <= currentTime)
+        {
+            // printf("Frame :  %d \n", frame);
+
+            system("cls");
+            PrintTime += 1000;
+            frame = 0;
+            std::shared_lock<SharedMutex> sessionHashLock(SessionID_hash_Lock);
+            std::shared_lock<SharedMutex> waitLoginHashLock(waitLogin_hash_Lock);
+
+            // ConfigInfo
+            {
+                wprintf(ConfigFormat[0]);
+                wprintf(ConfigFormat[1]);
+                wprintf(ConfigFormat[2]);
+                wprintf(ConfigFormat[3], _bindAddr, _port, _WorkerCreateCnt, _reduceThreadCount, _noDelay, _MaxSessions);
+                wprintf(ConfigFormat[4]);
+            }
+
+            {
+                wprintf(SessionCountFormat[0]);
+                wprintf(SessionCountFormat[1]);
+                wprintf(SessionCountFormat[2]);
+                wprintf(SessionCountFormat[3], SessionID_hash.size(), waitLogin_hash.size());
+                wprintf(SessionCountFormat[4]);
+            }
+            wprintf(ClientInfoFormat[0]);
+            wprintf(ClientInfoFormat[1]);
+            wprintf(ClientInfoFormat[2]);
+
+            for (auto &session : SessionID_hash)
+            {
+                stPlayer *player = session.second;
+
+                wprintf(ClientInfoFormat[3], ClientTypeFormat[int(player->m_type)], player->m_wipAddress, player->m_port);
+                wprintf(ClientInfoFormat[4]);
+            }
+        }
+
+        if (currentTime < PrintTime)
+        {
+            Sleep(PrintTime - currentTime);
+        }
+    }
+}
+
+BOOL CTestServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions)
+{
+    memcpy(_bindAddr, bindAddress, 16);
+
+    _port = port;
+    _ZeroCopy = ZeroCopy;
+    _WorkerCreateCnt = WorkerCreateCnt;
+    _reduceThreadCount = maxConcurrency;
+    _noDelay = useNagle;
+    _MaxSessions = maxSessions;
+
+    CLanServer::Start(bindAddress, port, ZeroCopy, WorkerCreateCnt, maxConcurrency, useNagle, maxSessions);
+    return 0;
 }
 
 bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
@@ -74,6 +189,9 @@ bool CTestServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
     player->m_ServerNo = 0;
 
     memcpy(player->m_ipAddress, ipAddress, 16);
+    MultiByteToWideChar(CP_UTF8, 0, player->m_ipAddress, -1, player->m_wipAddress, sizeof(player->m_wipAddress) / sizeof(wchar_t));
+
+
 
     player->m_port = port;
 
@@ -169,7 +287,7 @@ void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, 
                     return;
                 }
                 player = waitLoginiter->second;
-                if (LanIP[0].compare(player->m_ipAddress) == 0 || LanIP[1].compare(player->m_ipAddress) ||  LanIP[2].compare(player->m_ipAddress) == 0)
+                if (LanIP[0].compare(player->m_ipAddress) == 0 || LanIP[1].compare(player->m_ipAddress) || LanIP[2].compare(player->m_ipAddress) == 0)
                 {
                     waitLogin_hash.erase(waitLoginiter);
                     ServerNo_hash.insert({ServerNo, player});
@@ -220,17 +338,17 @@ void CTestServer::REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType
         if (element.second->m_type == enClientType::MonitorClient)
             sendTarget.emplace_back(element.first);
     }
-    Proxy::RES_MONITOR_UPDATE(SessionID, msg, 0 ,DataType, DataValue, TimeStamp, en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, true, &sendTarget, sendTarget.size());
+    Proxy::RES_MONITOR_UPDATE(SessionID, msg, 0, DataType, DataValue, TimeStamp, en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, true, &sendTarget, sendTarget.size());
 }
 
 void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
-    stPlayer* player;
+    stPlayer *player;
 
     char Loginkey[33];
-    memset(Loginkey,0,33);
-    memcpy(Loginkey, LoginSessionKey,32);
+    memset(Loginkey, 0, 33);
+    memcpy(Loginkey, LoginSessionKey, 32);
 
     if (gLoginKey.compare(Loginkey) != 0)
     {
