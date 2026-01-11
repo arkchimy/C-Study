@@ -74,7 +74,7 @@ private:
     bool bOn = true;
 
 
-    wchar_t _bindAddr[16];
+    wchar_t _bindAddr[16] = {0,};
     unsigned short _port;
     int _ZeroCopy;
     int _WorkerCreateCnt;

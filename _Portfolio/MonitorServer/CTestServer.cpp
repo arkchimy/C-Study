@@ -14,7 +14,6 @@ CTestServer::CTestServer(bool EnCoding)
       _port(0),
       _ZeroCopy(0), _WorkerCreateCnt(0), _reduceThreadCount(0), _noDelay(0), _MaxSessions(0)
 {
-
     _hMonitorThread = WinThread(&CTestServer::MonitorThread, this);
 }
 
@@ -222,6 +221,14 @@ void CTestServer::OnRelease(ull SessionID)
             player = iter->second;
 
             SessionID_hash.erase(SessionID);
+            if (player->m_type == enClientType::ChatServer || player->m_type == enClientType::LoginServer)
+            {
+                std::lock_guard<SharedMutex> ServerNohashLock(ServerNo_hash_Lock);
+                auto iter = ServerNo_hash.find(player->m_ServerNo);
+                if (iter != ServerNo_hash.end())
+                    ServerNo_hash.erase(iter);
+
+            }
             player_pool.Release(player);
             return;
         }
