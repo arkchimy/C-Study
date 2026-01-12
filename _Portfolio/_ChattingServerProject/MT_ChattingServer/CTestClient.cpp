@@ -103,7 +103,6 @@ void CTestClient::OnLeaveServer()
     sessiondID_Hash.erase(iter);
 
     player_Pool.Release(player);
-    __debugbreak();
     ReConnect(ip,port);
 
 }

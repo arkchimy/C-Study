@@ -85,8 +85,8 @@ void CLanClient::WorkerThread()
         {
         case Job_Type::Recv:
             //// FIN 의 경우에
-            // if (transferred == 0)
-            //     break;
+            if (transferred == 0)
+                session->m_blive = false;
             RecvComplete(transferred);
             break;
         case Job_Type::Send:
@@ -109,7 +109,7 @@ void CLanClient::WorkerThread()
 
         if (local_IoCount == 0)
         {
-            __debugbreak();
+            
             ull compareRetval = InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0);
             if (compareRetval != 0)
             {
@@ -234,7 +234,6 @@ retry:
 }
 void CLanClient::Disconnect(ull SessionID)
 {
-    __debugbreak();
     if (session.m_SeqID == SessionID)
     {
         closesocket(session.m_sock);
@@ -292,6 +291,8 @@ void CLanClient::RecvPacket(clsSession &session)
     if (freeSize == 0)
     {
         // Attack : 조작된 Len으로 인해 리시브 버퍼가 가득참.
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L"리시브 버퍼가 가득참");
+
         InterlockedExchange(&session.m_blive, 0);
         CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
         return;
@@ -384,7 +385,6 @@ void CLanClient::Unicast(ull SessionID, CClientMessage *msg, LONG64 Account)
 
 void CLanClient::RecvComplete(DWORD transferred)
 {
-    __debugbreak();
     stHeader header;
     ringBufferSize useSize;
 
@@ -416,13 +416,14 @@ void CLanClient::RecvComplete(DWORD transferred)
             if (bChkSum == false)
             {
                 // Attack : 조작된 패킷으로 checkSum이 다름.
+                CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" CheckSum Not Equle ");
                 InterlockedExchange(&session.m_blive, 0);
                 CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
                 static bool bOn = false;
                 if (bOn == false)
                 {
                     bOn = true;
-                    CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
+                    CSystemLog::GetInstance()->Log(L"CLanClient_Attack", en_LOG_LEVEL::ERROR_Mode,
                                                    L"%-20s ",
                                                    L" false Packet CheckSum Not Equle ");
                 }
@@ -637,17 +638,20 @@ void CLanClient::WSASendError(const DWORD LastError)
         break;
 
     case WSAEINTR: // 10004
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" WSASendError WSAEINTR ");
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
         break;
     case WSAENOTSOCK:     // 10038
     case WSAECONNABORTED: //    10053 :
     case WSAECONNRESET:   // 10054:
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" WSASendError %d",GetLastError());
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
         break;
 
     default:
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" WSASendError %d", GetLastError());
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
     }
@@ -671,12 +675,13 @@ void CLanClient::WSARecvError(const DWORD LastError)
     case WSAENOTSOCK:     // 10038
     case WSAECONNABORTED: //    10053 :
     case WSAECONNRESET:   // 10054:
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" WSARecvError %d", GetLastError());
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
         break;
 
     default:
-
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" WSARecvError %d", GetLastError());
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
     }

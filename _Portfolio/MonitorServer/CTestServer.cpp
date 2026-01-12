@@ -203,6 +203,7 @@ void CTestServer::OnRecv(ull SessionID, CMessage *msg)
     *msg >> type;
     if (PacketProc(SessionID, msg, type) == false)
     {
+        CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L" PacketProc false return ");
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
     }
@@ -366,6 +367,8 @@ void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *Lo
         //Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_SESSIONKEY);
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
+        CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L" Loginkey false return ");
+
         return;
     }
 
@@ -375,6 +378,7 @@ void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *Lo
     {
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
+        CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L" REQ_MONITOR_TOOL_LOGIN SessionID found ");
         return;
     }
     std::lock_guard<SharedMutex> waitLoginHashLock(waitLogin_hash_Lock);
@@ -382,6 +386,7 @@ void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *Lo
     auto waitLoginiter = waitLogin_hash.find(SessionID);
     if (waitLoginiter == waitLogin_hash.end())
     {
+        CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L" REQ_MONITOR_TOOL_LOGIN waitLogin_hash not found ");
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
         return;

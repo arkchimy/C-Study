@@ -903,6 +903,11 @@ void CLanServer::WSASendError(const DWORD LastError, const ull SessionID)
     case WSAECONNRESET:   // 10054:
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"[ %-10s %05d ],%10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"Send_UnDefineError", LastError,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID >> 47,
+                                       L"IO_Count", session.m_ioCount);
         break;
 
     default:
@@ -928,6 +933,7 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
     case WSA_IO_PENDING:
         if (session.m_blive == 0)
         {
+            __debugbreak();
             CancelIoEx((HANDLE)session.m_sock, &session.m_recvOverlapped);
         }
         break;
@@ -938,6 +944,11 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
     case WSAECONNRESET:   // 10054:
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+        CSystemLog::GetInstance()->Log(L"Socket", en_LOG_LEVEL::ERROR_Mode,
+                                       L"[ %-10s %05d ] %10s %05lld  %10s %012llu  %10s %4llu  %10s %3llu",
+                                       L"Recv_UnDefineError", LastError,
+                                       L"HANDLE : ", session.m_sock, L"seqID :", SessionID, L"seqIndx : ", session.m_SeqID >> 47,
+                                       L"IO_Count", session.m_ioCount);
         break;
 
     default:
