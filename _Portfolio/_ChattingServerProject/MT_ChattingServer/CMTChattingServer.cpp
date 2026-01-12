@@ -388,6 +388,42 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
 {
     stPlayer *player;
 
+    {
+        // Login응답.
+        // redis에서 읽기, 가져오고 token을 비교 같다면
+        std::string key = std::to_string(AccountNo);
+        auto future = client->get(key.c_str());
+        client->sync_commit();
+        cpp_redis::reply reply = future.get();
+
+        if (reply.is_null())
+        {
+            printf("AccountNo %lld not found in redis\n", AccountNo);
+            __debugbreak();
+            return;
+        }
+        std::string sessionKey = reply.as_string();
+
+        char SessionKeyA[66];
+        memcpy(SessionKeyA, SessionKey, 64);
+        SessionKeyA[64] = '\0';
+        SessionKeyA[65] = '\0';
+
+        key = std::to_string(AccountNo);
+
+        if (sessionKey.compare(SessionKeyA) != 0)
+        {
+            CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                           L"%-20s %10s %12s %10s ",
+                                           L"LoginError - hash is Not Equle: ", SessionKeyA,
+                                           L"현재들어온ID:", sessionKey);
+
+            stTlsObjectPool<CMessage>::Release(msg);
+            Disconnect(SessionID);
+            return;
+        }
+    }
+
     // 옳바른 연결인지는 Token에 의존.
     // Alloc을 받았다면 prePlayer_hash에 추가되어있을 것이다.
     auto prePlayeriter = prePlayer_hash.find(SessionID);
@@ -478,30 +514,30 @@ void CTestServer::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR
     _InterlockedExchange(&player->m_ContentsQIdx, idx);
 
     {
-        // Login응답.
-        // redis에서 읽기, 가져오고 token을 비교 같다면
-        std::string key = std::to_string(AccountNo);
-        auto future = client->get(key.c_str());
-        client->sync_commit();
-        cpp_redis::reply reply = future.get();
+        //// Login응답.
+        //// redis에서 읽기, 가져오고 token을 비교 같다면
+        //std::string key = std::to_string(AccountNo);
+        //auto future = client->get(key.c_str());
+        //client->sync_commit();
+        //cpp_redis::reply reply = future.get();
 
-        if (reply.is_null())
-        {
-            printf("AccountNo %lld not found in redis\n", AccountNo);
-            __debugbreak();
-            return;
-        }
-        std::string sessionKey = reply.as_string();
+        //if (reply.is_null())
+        //{
+        //    printf("AccountNo %lld not found in redis\n", AccountNo);
+        //    __debugbreak();
+        //    return;
+        //}
+        //std::string sessionKey = reply.as_string();
 
-        char SessionKeyA[66];
-        memcpy(SessionKeyA, SessionKey, 64);
-        SessionKeyA[64] = '\0';
-        SessionKeyA[65] = '\0';
+        //char SessionKeyA[66];
+        //memcpy(SessionKeyA, SessionKey, 64);
+        //SessionKeyA[64] = '\0';
+        //SessionKeyA[65] = '\0';
 
-        key = std::to_string(AccountNo);
+        //key = std::to_string(AccountNo);
 
-        if (sessionKey.compare(SessionKeyA) != 0)
-            __debugbreak();
+        //if (sessionKey.compare(SessionKeyA) != 0)
+        //    __debugbreak();
         Proxy::RES_LOGIN(SessionID, msg, true, AccountNo);
 
         InterlockedIncrement64(&m_RecvMsgArr[en_PACKET_CS_CHAT_RES_LOGIN]);

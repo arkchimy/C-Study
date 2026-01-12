@@ -93,6 +93,7 @@ void CLanClient::WorkerThread()
             SendComplete(transferred);
             break;
         case Job_Type::ReleasePost:
+            //단 한번만을 호출함을 보장하므로 IO_Count 감소 로직 안탐.
             ReleaseComplete();
             continue;
         case Job_Type::Post:
@@ -108,6 +109,7 @@ void CLanClient::WorkerThread()
 
         if (local_IoCount == 0)
         {
+            __debugbreak();
             ull compareRetval = InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0);
             if (compareRetval != 0)
             {
@@ -115,7 +117,7 @@ void CLanClient::WorkerThread()
             }
 
             ull seqID = session->m_SeqID;
-            ReleaseSession();
+            ReleaseSession(seqID);
         }
     }
 }
@@ -171,13 +173,12 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
 
     local_SeqID = Win32::AtomicIncrement<ull>(_seqID);
     InterlockedExchange(&session.m_SeqID, local_SeqID);
-    InterlockedExchange(&session.m_ioCount, 1);
+    InterlockedExchange(&session.m_ioCount, 0);
 
     CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
-    OnEnterJoinServer(local_SeqID);
 
     RecvPacket(session);
-    Win32::AtomicDecrement<ull>(_seqID);
+    OnEnterJoinServer(local_SeqID);
 
     return true;
 }
@@ -221,20 +222,19 @@ retry:
 
     local_SeqID = Win32::AtomicIncrement<ull>(_seqID);
     InterlockedExchange(&session.m_SeqID, local_SeqID);
-    InterlockedExchange(&session.m_ioCount, 1);
-
+    InterlockedExchange(&session.m_ioCount, 0);
 
     CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
-    OnEnterJoinServer(local_SeqID);
 
     RecvPacket(session);
-    Win32::AtomicDecrement<ull>(session.m_ioCount);
+    OnEnterJoinServer(local_SeqID);
 
     return true;
 
 }
 void CLanClient::Disconnect(ull SessionID)
 {
+    __debugbreak();
     if (session.m_SeqID == SessionID)
     {
         closesocket(session.m_sock);
@@ -360,7 +360,10 @@ void CLanClient::Unicast(ull SessionID, CClientMessage *msg, LONG64 Account)
     ull local_IoCount;
 
     if (SessionLock(SessionID) == false)
+    {
+
         return;
+    }
 
     {
         Profiler profile(L"LFQ_Push");
@@ -372,8 +375,7 @@ void CLanClient::Unicast(ull SessionID, CClientMessage *msg, LONG64 Account)
     {
         ZeroMemory(&session.m_sendOverlapped, sizeof(OVERLAPPED));
 
-        local_IoCount = InterlockedIncrement(&session.m_ioCount);
-
+        Win32::AtomicIncrement<ull>(session.m_ioCount);
         PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR)&session, &session.m_sendOverlapped);
     }
     SessionUnLock(SessionID);
@@ -382,6 +384,7 @@ void CLanClient::Unicast(ull SessionID, CClientMessage *msg, LONG64 Account)
 
 void CLanClient::RecvComplete(DWORD transferred)
 {
+    __debugbreak();
     stHeader header;
     ringBufferSize useSize;
 
@@ -547,8 +550,11 @@ void CLanClient::ReleaseComplete()
 
 }
 
-void CLanClient::ReleaseSession()
+void CLanClient::ReleaseSession(ull SessionID)
 {
+    if (session.m_SeqID != SessionID)
+        __debugbreak();
+
     CSystemLog::GetInstance()->Log(L"CLanClientError", en_LOG_LEVEL::SYSTEM_Mode, L"ReleaseSession");
 
     ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
@@ -588,7 +594,7 @@ bool CLanClient::SessionLock(ull SessionID)
         // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession();
+            ReleaseSession(SessionID);
 
         return false;
     }
@@ -600,7 +606,7 @@ bool CLanClient::SessionLock(ull SessionID)
         // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
 
         if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-            ReleaseSession();
+            ReleaseSession(SessionID);
 
         return false;
     }
@@ -615,7 +621,7 @@ void CLanClient::SessionUnLock(ull SessionID)
     // 앞으로 Session 초기화는 IoCount를 '0'으로 하면 안된다.
     // TODO :  ContentsThread에서 Contents_Enq하는 경우의 수. 문제가없는가?
     if (InterlockedCompareExchange(&session.m_ioCount, (ull)1 << 47, 0) == 0)
-        ReleaseSession();
+        ReleaseSession(SessionID);
 }
 void CLanClient::WSASendError(const DWORD LastError)
 {

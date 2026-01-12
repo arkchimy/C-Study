@@ -56,7 +56,7 @@ class CLanClient : public Stub, public Proxy
 
 
     void ReleaseComplete();
-    void ReleaseSession();
+    void ReleaseSession(ull SessionID);
 
     bool SessionLock(ull SessionID);
     void SessionUnLock(ull SessionID);
@@ -85,6 +85,7 @@ class CLanClient : public Stub, public Proxy
 
     // PQCS 를 할때 session을 재사용하고있기에. LoginPacket말고 다른메세지가 먼저갈 가능성이 존재.
     ull _seqID = 0; 
+
     protected:
     clsSession session;
 };

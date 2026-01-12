@@ -1,7 +1,11 @@
 #pragma once
 #include "CLanClient/CLanClient.h"
+#include <unordered_map>
 
-
+struct stPlayer
+{
+    ull m_SeqID;
+};
 class CTestClient : public CLanClient
 {
   public:
@@ -20,5 +24,9 @@ class CTestClient : public CLanClient
     virtual void REQ_MONITOR_UPDATE(ull SessionID,  CClientMessage *msg, BYTE DataType, int DataValue, int TimeStamp, WORD wType = en_PACKET_SS_MONITOR_DATA_UPDATE, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
 
     WinThread _hTimer;
+    
+    SharedMutex sessiondhash_lock;
+    std::unordered_map<ull, stPlayer *> sessiondID_Hash;
+    CObjectPool<stPlayer> player_Pool;
 
 };

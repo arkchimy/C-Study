@@ -279,6 +279,7 @@ void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, 
                 stTlsObjectPool<CMessage>::Release(msg);
                 Disconnect(player->m_sessionID);
                 Disconnect(SessionID);
+                CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L"Same ServerNo");
                 return;
             }
 
@@ -291,6 +292,7 @@ void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, 
                 {
                     stTlsObjectPool<CMessage>::Release(msg);
                     Disconnect(SessionID);
+                    CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L"WaitLoginHash Not Found");
                     return;
                 }
                 player = waitLoginiter->second;
@@ -303,6 +305,7 @@ void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, 
                 {
                     // Lan이 아닌 경우 끊기.
                     stTlsObjectPool<CMessage>::Release(msg);
+                    CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L"Session Is  Not LAN ");
                     Disconnect(SessionID);
                     return;
                 }
@@ -336,6 +339,7 @@ void CTestServer::REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType
         // Login이 오지않았는데 메세지가 옴.
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
+        CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L"LoginPacket Not Recv");
         return;
     }
 
@@ -359,8 +363,9 @@ void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *Lo
 
     if (gLoginKey.compare(Loginkey) != 0)
     {
-        Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_SESSIONKEY);
-        // DisConnect
+        //Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_ERR_SESSIONKEY);
+        stTlsObjectPool<CMessage>::Release(msg);
+        Disconnect(SessionID);
         return;
     }
 
