@@ -19,8 +19,17 @@ class CDB
     void Connect(const char *host, const char *user, const char *pass,
                  const char *db, unsigned int port = 3306)
     {
+        MYSQL *conn = mysql_init(nullptr);
+        if (!conn)
+            __debugbreak();
 
-        _connection = mysql_init(nullptr);
+        MYSQL *ret = mysql_real_connect(conn, host, user, pass, db, port, nullptr, 0);
+        if (!ret)
+        {
+            printf("connect failed, errno=%u, err=%s\n", mysql_errno(conn), mysql_error(conn));
+            __debugbreak();
+        }
+        _connection = ret;
 
         _connection = mysql_real_connect(_connection, host, user, pass, db, port, nullptr, 0);
         if (_connection == nullptr)

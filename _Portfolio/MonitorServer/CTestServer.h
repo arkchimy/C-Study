@@ -102,8 +102,10 @@ class CTestServer : public CLanServer
     CObjectPool_UnSafeMT<stPlayer> player_pool;
     CObjectPool<stDBOverlapped> dbOverlapped_pool;
 
-    WinThread _hMonitorThread;
     WinThread _hDBWorkerThread;
+    WinThread _hDBTimerThread;
+    WinThread _hMonitorThread;
+
 
     bool bOn = true;
 

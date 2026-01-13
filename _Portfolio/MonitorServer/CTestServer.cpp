@@ -66,8 +66,8 @@ CTestServer::CTestServer(bool EnCoding)
 
     }
 
-    _hMonitorThread = WinThread(&CTestServer::DBWorkerThread, this);
-    _hMonitorThread = WinThread(&CTestServer::DBTimerThread, this);
+    _hDBWorkerThread = WinThread(&CTestServer::DBWorkerThread, this);
+    _hDBTimerThread = WinThread(&CTestServer::DBTimerThread, this);
     _hMonitorThread = WinThread(&CTestServer::MonitorThread, this);
 }
 
