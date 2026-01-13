@@ -152,7 +152,9 @@ void stTlsObjectPool<CClientMessage>::Release(PVOID node)
 
 
     msg = reinterpret_cast<CClientMessage *>(node);
-    
+    if (msg->K == 0x32)
+        __debugbreak();
+
     iUseCnt = InterlockedDecrement64(&msg->iUseCnt);
 
 

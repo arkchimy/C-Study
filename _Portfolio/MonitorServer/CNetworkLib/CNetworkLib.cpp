@@ -118,6 +118,7 @@ void CLanServer::WorkerThread()
             {
                 // CancleIO 유도
                 session->m_blive = false;
+                CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L" transferred == 0 ");
             }
 
             RecvComplete(*session, transferred);
@@ -471,6 +472,7 @@ void CLanServer::RecvComplete(clsSession &session, DWORD transferred)
                     CSystemLog::GetInstance()->Log(L"Attack", en_LOG_LEVEL::ERROR_Mode,
                                                    L"%-20s ",
                                                    L" false Packet CheckSum Not Equle ");
+                    __debugbreak();
                 }
                 stTlsObjectPool<CMessage>::Release(msg);
                 return;
@@ -902,14 +904,12 @@ void CLanServer::WSASendError(const DWORD LastError, const ull SessionID)
         break;
 
     case WSAEINTR: // 10004
-        session.m_blive = 0;
-        local_IoCount = _InterlockedDecrement(&session.m_ioCount);
-        break;
     case WSAENOTSOCK:     // 10038
     case WSAECONNABORTED: //    10053 :
     case WSAECONNRESET:   // 10054:
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" WSASendError %d", GetLastError());
         break;
 
     default:
@@ -945,6 +945,7 @@ void CLanServer::WSARecvError(const DWORD LastError, const ull SessionID)
     case WSAECONNRESET:   // 10054:
         session.m_blive = 0;
         local_IoCount = _InterlockedDecrement(&session.m_ioCount);
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" WSASendError %d", GetLastError());
         break;
 
     default:

@@ -58,7 +58,7 @@ void CLanClient::WorkerThread()
     DWORD transferred;
     unsigned long long key;
     OVERLAPPED *overlapped;
-    clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
+    clsClientSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
     ull local_IoCount;
 
     while (1)
@@ -79,14 +79,17 @@ void CLanClient::WorkerThread()
             // CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"GetQueuedCompletionStatus Overlapped is nullptr");
             continue;
         }
-        session = reinterpret_cast<clsSession *>(key);
+        session = reinterpret_cast<clsClientSession *>(key);
         // TODO : JumpTable 생성 되는 지?
-        switch (reinterpret_cast<stOverlapped *>(overlapped)->_mode)
+        switch (reinterpret_cast<stClientOverlapped *>(overlapped)->_mode)
         {
         case Job_Type::Recv:
             //// FIN 의 경우에
             if (transferred == 0)
+            {
+                CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L"transferred value : 0");
                 session->m_blive = false;
+            }
             RecvComplete(transferred);
             break;
         case Job_Type::Send:
@@ -97,19 +100,39 @@ void CLanClient::WorkerThread()
             ReleaseComplete();
             continue;
         case Job_Type::Post:
-            PostComplete(reinterpret_cast<stPostOverlapped *>(overlapped)->msg);
+            PostComplete(reinterpret_cast<stClientPostOverlapped *>(overlapped)->msg);
             //Pool을 따로 두고있음.
             postPool.Release(overlapped);
             break;
         default:
-            CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stOverlapped *>(overlapped)->_mode);
+            CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::DEBUG_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stClientOverlapped *>(overlapped)->_mode);
             __debugbreak();
         }
         local_IoCount = InterlockedDecrement(&session->m_ioCount);
+        switch (reinterpret_cast<stClientOverlapped *>(overlapped)->_mode)
+        {
+        case Job_Type::Recv:
+            CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::DEBUG_Mode, L" Job_Type::Recv SessiondID : %05lld ,IOcount : %lld", session->m_SeqID, local_IoCount);
+            break;
+        case Job_Type::Send:
+            CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::DEBUG_Mode, L" Job_Type::Send SessiondID : %05lld ,IOcount : %lld", session->m_SeqID, local_IoCount);
+            break;
+        case Job_Type::ReleasePost:
+            // 단 한번만을 호출함을 보장하므로 IO_Count 감소 로직 안탐.
+            ReleaseComplete();
+            continue;
+        case Job_Type::Post:
+            CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::DEBUG_Mode, L" Job_Type::Post SessiondID : %05lld ,IOcount : %lld", session->m_SeqID, local_IoCount);
+            break;
+        default:
+            CSystemLog::GetInstance()->Log(L"GQCS.txt", en_LOG_LEVEL::ERROR_Mode, L"UnDefine Error Overlapped_mode : %d", reinterpret_cast<stClientOverlapped *>(overlapped)->_mode);
+            __debugbreak();
+        }
+        
 
         if (local_IoCount == 0)
         {
-            
+            __debugbreak();
             ull compareRetval = InterlockedCompareExchange(&session->m_ioCount, (ull)1 << 47, 0);
             if (compareRetval != 0)
             {
@@ -168,17 +191,22 @@ bool CLanClient::Connect(wchar_t *ServerAddress, short Serverport, wchar_t *Bind
         __debugbreak();
     }
     session.m_sock = sock;
-    session.m_blive = true;
+    session.m_blive = 1;
+    //InterlockedExchange(&session.m_blive, 1);
 
 
     local_SeqID = Win32::AtomicIncrement<ull>(_seqID);
+
+
     InterlockedExchange(&session.m_SeqID, local_SeqID);
     InterlockedExchange(&session.m_ioCount, 0);
 
     CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
 
     RecvPacket(session);
+    CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::ERROR_Mode, L" Connect RecvPacket SessiondID : %05lld ,IOcount : %lld", local_SeqID, session.m_ioCount);
     OnEnterJoinServer(local_SeqID);
+    CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::ERROR_Mode, L" Connect OnEnterJoinServer SessiondID : %05lld ,IOcount : %lld", local_SeqID, session.m_ioCount);
 
     return true;
 }
@@ -222,13 +250,16 @@ retry:
 
     local_SeqID = Win32::AtomicIncrement<ull>(_seqID);
     InterlockedExchange(&session.m_SeqID, local_SeqID);
-    InterlockedExchange(&session.m_ioCount, 0);
+    InterlockedExchange(&session.m_ioCount, 1);
 
     CreateIoCompletionPort((HANDLE)session.m_sock, _hIOCP, (ULONG_PTR)&session, 0);
 
     RecvPacket(session);
+    CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::ERROR_Mode, L" ReConnect RecvPacket SessiondID : %05lld ,IOcount : %lld", local_SeqID, session.m_ioCount);
+    
     OnEnterJoinServer(local_SeqID);
-
+    CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::ERROR_Mode, L" ReConnect OnEnterJoinServer SessiondID : %05lld ,IOcount : %lld", local_SeqID, session.m_ioCount);
+    Win32::AtomicDecrement(session.m_ioCount);
     return true;
 
 }
@@ -236,12 +267,13 @@ void CLanClient::Disconnect(ull SessionID)
 {
     if (session.m_SeqID == SessionID)
     {
+        CSystemLog::GetInstance()->Log(L"session_blive", en_LOG_LEVEL::ERROR_Mode, L" Disconnect  call ");
         closesocket(session.m_sock);
         OnLeaveServer();
     }
 }
 
-CClientMessage *CLanClient::CreateMessage(clsSession &session, stHeader &header) const
+CClientMessage *CLanClient::CreateMessage(clsClientSession &session, stHeader &header) const
 {
     // TODO : Header를 읽고, 생성하고
 
@@ -266,7 +298,7 @@ CClientMessage *CLanClient::CreateMessage(clsSession &session, stHeader &header)
     }
     return msg;
 }
-void CLanClient::RecvPacket(clsSession &session)
+void CLanClient::RecvPacket(clsClientSession &session)
 {
     ringBufferSize freeSize;
     ringBufferSize directEnQsize;
@@ -341,12 +373,13 @@ void CLanClient::PostReQuest_iocp(ull SessionID , CClientMessage *msg)
         return;
     }
 
-    stPostOverlapped *overlapped = (stPostOverlapped*)postPool.Alloc();
+    stClientPostOverlapped *overlapped = (stClientPostOverlapped*)postPool.Alloc();
     overlapped->msg = msg;
     msg->ownerID = SessionID;
     ZeroMemory(overlapped, sizeof(OVERLAPPED));
     
-    Win32::AtomicIncrement<ull>(session.m_ioCount);
+    ull local_IoCount = Win32::AtomicIncrement<ull>(session.m_ioCount);
+    CSystemLog::GetInstance()->Log(L"CLanClient_IoCount", en_LOG_LEVEL::DEBUG_Mode, L" PostReQuest_iocp : %05lld ,IOcount : %lld", SessionID, local_IoCount);
     PostQueuedCompletionStatus(_hIOCP, 0, (ULONG_PTR)&session, overlapped);
 
     SessionUnLock(SessionID);
@@ -633,6 +666,7 @@ void CLanClient::WSASendError(const DWORD LastError)
     case WSA_IO_PENDING:
         if (session.m_blive == 0)
         {
+            __debugbreak();
             CancelIoEx((HANDLE)session.m_sock, &session.m_sendOverlapped);
         }
         break;
@@ -667,6 +701,7 @@ void CLanClient::WSARecvError(const DWORD LastError)
     case WSA_IO_PENDING:
         if (session.m_blive == 0)
         {
+            __debugbreak();
             CancelIoEx((HANDLE)session.m_sock, &session.m_recvOverlapped);
         }
         break;

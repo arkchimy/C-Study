@@ -68,6 +68,7 @@ void CTestClient::OnEnterJoinServer(ull SessionID)
     *msg << ServerNo;
     
     CSystemLog::GetInstance()->Log(L"ClientError", en_LOG_LEVEL::SYSTEM_Mode, L"OnEnterJoinServer SessionID : %lld", SessionID);
+
     PostReQuest_iocp(SessionID , msg);
 
 }
@@ -121,7 +122,7 @@ void CTestClient::OnRecv(ull SessionID , CClientMessage *msg)
     {
         stTlsObjectPool<CClientMessage>::Release(msg);
         CSystemLog::GetInstance()->Log(L"ClientError", en_LOG_LEVEL::SYSTEM_Mode, L" OnRecv PacketProc DisConnect %lld", msg->ownerID);
-        Disconnect(msg->ownerID);
+        Disconnect(SessionID);
     }
 }
 

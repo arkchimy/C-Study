@@ -4,19 +4,19 @@
 #include "../utility/SerializeBuffer_exception/SerializeBuffer_exception.h"
 #include "../utility/CTlsObjectPool/CTlsObjectPool.h"
 
-clsSession::clsSession(SOCKET sock)
+clsClientSession::clsClientSession(SOCKET sock)
     : m_sock(sock)
 {
     m_blive = 1;
 }
 
-clsSession::~clsSession()
+clsClientSession::~clsClientSession()
 {
     closesocket(m_sock);
     __debugbreak();
 }
 
-void clsSession::Release()
+void clsClientSession::Release()
 {
     CClientMessage *msg;
     while (m_sendBuffer.Pop(msg))

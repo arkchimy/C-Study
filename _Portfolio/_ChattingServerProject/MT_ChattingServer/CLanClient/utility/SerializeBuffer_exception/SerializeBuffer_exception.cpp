@@ -76,14 +76,14 @@ void CClientMessage::EnCoding( )
     local_Front = _begin + offsetof(stHeader, byCheckSum);
     len = SerializeBufferSize(_rearPtr - local_Front);
 
-    //struct stHeader
-    //{
-    //  public:
-    //    BYTE byCode;
-    //    SHORT sDataLen;
-    //    BYTE byRandKey;
-    //    BYTE byCheckSum;
-    //};
+    /*struct stHeader
+    {
+      public:
+        BYTE byCode;
+        USHORT sDataLen;
+        BYTE byRandKey;
+        BYTE byCheckSum;
+    };*/
     memcpy(_begin + offsetof(stHeader, byRandKey), &RK, sizeof(BYTE));
 
     //if (local_Front[1] == 0x06)
@@ -95,7 +95,7 @@ void CClientMessage::EnCoding( )
     }
     memcpy(local_Front, &total, sizeof(total));
     //if (bDebug)
-    //    HexLog(en_Tag::ENCODE_BEFORE);
+    //HexLog(en_Tag::ENCODE_BEFORE);
 
     for (; &local_Front[current - 1] != _rearPtr; current++)
     {
@@ -107,7 +107,7 @@ void CClientMessage::EnCoding( )
         local_Front[current - 1] = E;
     }
     //if (bDebug)
-     //   HexLog(en_Tag::ENCODE);
+    //HexLog(en_Tag::ENCODE);
 }
 
 bool CClientMessage::DeCoding( )
@@ -123,16 +123,14 @@ bool CClientMessage::DeCoding( )
     SerializeBufferSize len;
     int current = 1;
     //HexLog(en_Tag::DECODE_BEFORE);
-    // struct stHeader
-    //{
-    //  public:
-    //    BYTE byCode;
-    //    BYTE byType; //
-    //    SHORT sDataLen;
-    //    BYTE byRandKey;
-    //    BYTE byCheckSum;
-
-    //};
+    /*struct stHeader
+    {
+      public:
+        BYTE byCode;
+        USHORT sDataLen;
+        BYTE byRandKey;
+        BYTE byCheckSum;
+    };*/
     //HexLog(en_Tag::DECODE_BEFORE);
     RK = *(_begin + offsetof(stHeader, byRandKey));
 

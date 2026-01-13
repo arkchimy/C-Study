@@ -40,9 +40,9 @@ class CLanClient : public Stub, public Proxy
     bool ReConnect(wchar_t *ServerAddress, short Serverport, wchar_t *BindipAddress = nullptr); 
     void Disconnect(ull SessionID);
 
-    CClientMessage *CreateMessage(class clsSession &session, struct stHeader &header) const;
+    CClientMessage *CreateMessage(class clsClientSession &session, struct stHeader &header) const;
 
-    void RecvPacket(class clsSession &session);
+    void RecvPacket(class clsClientSession &session);
     void SendPacket(ull SessionID, CClientMessage *msg, BYTE SendType,
                     std::vector<ull> *pIDVector, WORD wVecLen);
 
@@ -73,7 +73,7 @@ class CLanClient : public Stub, public Proxy
     HANDLE _hIOCP = INVALID_HANDLE_VALUE;
 
     // PQCS 전용 Pool
-    stTlsObjectPool<stPostOverlapped> postPool;
+    stTlsObjectPool<stClientPostOverlapped> postPool;
     std::vector<WinThread> _hWorkerThreads;
 
 
@@ -87,5 +87,5 @@ class CLanClient : public Stub, public Proxy
     ull _seqID = 0; 
 
     protected:
-    clsSession session;
+    clsClientSession session;
 };

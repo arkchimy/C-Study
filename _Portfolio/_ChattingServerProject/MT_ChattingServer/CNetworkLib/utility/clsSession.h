@@ -52,7 +52,10 @@ struct stReleaseOverlapped : stOverlapped
 class clsSession
 {
   public:
-    clsSession() = default;
+    clsSession() 
+    {
+        const char ch[] = "CMessage"; 
+    }
     clsSession(SOCKET sock);
     ~clsSession();
 
@@ -63,7 +66,7 @@ class clsSession
     stSendOverlapped m_sendOverlapped;
     stReleaseOverlapped m_releaseOverlapped;
 
-    CTlsLockFreeQueue<struct CMessage *> m_sendBuffer;
+    CTlsLockFreeQueue<CMessage *> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
 
     ull m_SeqID = 0;

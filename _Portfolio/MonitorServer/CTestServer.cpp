@@ -17,7 +17,7 @@ CTestServer::CTestServer(bool EnCoding)
     _hMonitorThread = WinThread(&CTestServer::MonitorThread, this);
 }
 
-// Parser의 기능으로  Address를 정하도록 하기.
+// Parser의 기능으로  Address를 정하도록 하기.                                                  
 void CTestServer::MonitorThread()
 {
 
@@ -262,7 +262,7 @@ void CTestServer::REQ_MONITOR_LOGIN(ull SessionID, CMessage *msg, int ServerNo, 
     {
         stTlsObjectPool<CMessage>::Release(msg);
         Disconnect(SessionID);
-
+        CSystemLog::GetInstance()->Log(L"MonitorServer_DisConnect", en_LOG_LEVEL::SYSTEM_Mode, L" 50 <= ServerNo ");
         return;
     }
     {

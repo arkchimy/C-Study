@@ -165,9 +165,10 @@ bool CMessage::DeCoding( )
     if (local_Front[0] != total)
     {
         // Attack : 내가 만든 패킷이 아닐경우.
+        HexLog(en_Tag::DECODE);
         return false;
     }
-    //HexLog(en_Tag::DECODE);
+    
     return true;
 }
 

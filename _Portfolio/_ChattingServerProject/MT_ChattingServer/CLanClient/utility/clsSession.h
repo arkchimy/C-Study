@@ -21,46 +21,49 @@ enum class Job_Type : BYTE
     Post,
     MAX,
 };
-// _mode 판단을 stOverlapped 기준으로 하므로 첫 멤버변수 _mode 로 할것. 
-struct stOverlapped : OVERLAPPED
+// _mode 판단을 stClientOverlapped 기준으로 하므로 첫 멤버변수 _mode 로 할것. 
+struct stClientOverlapped : OVERLAPPED
 {
     Job_Type _mode;
-    stOverlapped(Job_Type m) : _mode(m) { }
+    stClientOverlapped(Job_Type m) : _mode(m) { }
 };
 
-struct stSendOverlapped : stOverlapped
+struct stClientSendOverlapped : stClientOverlapped
 {
     DWORD msgCnt = 0;
     CClientMessage *msgs[500]{};
-    stSendOverlapped() : stOverlapped(Job_Type::Send) {}
+    stClientSendOverlapped() : stClientOverlapped(Job_Type::Send) {}
 };
 
-struct stPostOverlapped : stOverlapped
+struct stClientPostOverlapped : stClientOverlapped
 {
     CClientMessage *msg = nullptr;
-    stPostOverlapped() : stOverlapped(Job_Type::Post) {}
+    stClientPostOverlapped() : stClientOverlapped(Job_Type::Post) {}
 };
 
-struct stReleaseOverlapped : stOverlapped
+struct stClientReleaseOverlapped : stClientOverlapped
 {
-    stReleaseOverlapped() : stOverlapped(Job_Type::ReleasePost) {}
+    stClientReleaseOverlapped() : stClientOverlapped(Job_Type::ReleasePost) {}
 };
 
-class clsSession
+class clsClientSession
 {
   public:
-    clsSession() = default;
-    clsSession(SOCKET sock);
-    ~clsSession();
+    clsClientSession()
+    {
+        const char ch[] = "CClientMessage";
+    }
+    clsClientSession(SOCKET sock);
+    ~clsClientSession();
 
     void Release();
 
     SOCKET m_sock = 0;
-    stOverlapped m_recvOverlapped = stOverlapped(Job_Type::Recv);
-    stSendOverlapped m_sendOverlapped;
-    stReleaseOverlapped m_releaseOverlapped;
+    stClientOverlapped m_recvOverlapped = stClientOverlapped(Job_Type::Recv);
+    stClientSendOverlapped m_sendOverlapped;
+    stClientReleaseOverlapped m_releaseOverlapped;
 
-    CTlsLockFreeQueue<struct CClientMessage *> m_sendBuffer;
+    CTlsLockFreeQueue<CClientMessage *> m_sendBuffer;
     CRingBuffer m_recvBuffer; 
 
     ull m_SeqID = 0;
