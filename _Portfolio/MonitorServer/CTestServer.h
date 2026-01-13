@@ -14,6 +14,26 @@ enum class enClientType : uint8_t
     Max,
 };
 
+// DB연동서버
+enum
+{
+    IP_LEN = 16,
+    DBName_LEN = 16,
+    schema_LEN = 16,
+    ID_LEN = 16,
+    Password_LEN = 16,
+};
+
+struct stDBinfoSet
+{
+    struct stDBinfo
+    {
+        BYTE DataType;
+        int DataValue;
+        int TimeStamp;
+    };
+    std::list<stDBinfo> infos;
+};
 
 struct stPlayer
 {
@@ -38,6 +58,18 @@ class CTestServer : public CLanServer
 {
   public:
     CTestServer(bool EnCoding = false);
+    //  DB
+    void DBWorkerThread();
+    void DBTimerThread();
+    // 실직적 DB저장
+    void DB_StoreRequest();
+    void HandleDBLogInsert(CMessage *msg);
+    // 정보 추가
+    void HandleDBLogPost(CMessage *msg);
+    void DB_LogPost(BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp);
+
+
+
     void MonitorThread();
 
     virtual BOOL Start(const wchar_t *bindAddress, short port, int ZeroCopy, int WorkerCreateCnt, int maxConcurrency, int useNagle, int maxSessions);
@@ -53,8 +85,9 @@ class CTestServer : public CLanServer
     virtual void REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType = en_PACKET_CS_MONITOR_TOOL_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
 
         // SessionID Key , Player접근.
-
-private:
+  private:
+    void EnsureMonthlyLogTable(const char *yyyymm);
+  private:
     std::unordered_map<ull, stPlayer *> SessionID_hash; // LoginPack을 받은 Session.
     std::unordered_map<int, stPlayer *> ServerNo_hash;  // 중복 접속을 제거하는 용도
     std::unordered_map<ull, stPlayer *> waitLogin_hash; // LoginPack을 받기 전 Session.
@@ -70,6 +103,7 @@ private:
     CObjectPool<stDBOverlapped> dbOverlapped_pool;
 
     WinThread _hMonitorThread;
+    WinThread _hDBWorkerThread;
 
     bool bOn = true;
 
@@ -82,4 +116,19 @@ private:
     int _noDelay;
     int _MaxSessions;
 
+
+    char LogDB_IPAddress[IP_LEN];
+    USHORT DBPort;
+    char schema[schema_LEN];
+    char DBuser[ID_LEN];
+    char password[Password_LEN];
+
+    //DBWorkerThread가 사용하는  hiocp
+    HANDLE m_hDBIOCP;
+
+    int m_lProcessCnt;
+    LONG64 m_UpdateTPS = 0; // DB처리 TPS
+    LONG64 m_DBMessageCnt = 0;
+
+    std::unordered_map<BYTE, stDBinfoSet> _dbinfoSet_hash;
 };

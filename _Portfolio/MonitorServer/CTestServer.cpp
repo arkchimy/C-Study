@@ -1,6 +1,25 @@
 #include "CTestServer.h"
 #include <timeapi.h>
+#include "../../_4Course/_lib/CDB/CDB.h"
 
+static void MakeYYYYMM_FromEpochSec(int epochSec, char outYYYYMM[7])
+{
+    time_t tt = (time_t)epochSec;
+    tm tmLocal{};
+#ifdef _WIN32
+    localtime_s(&tmLocal, &tt);
+#else
+    localtime_r(&tt, &tmLocal);
+#endif
+    // YYYYMM (6 chars + '\0')
+    // tm_year: 1900부터, tm_mon: 0~11
+    sprintf_s(outYYYYMM, 7, "%04d%02d", tmLocal.tm_year + 1900, tmLocal.tm_mon + 1);
+}
+
+
+thread_local CDB db;
+
+//TODO : 하드코딩 파써로 바꾸기.
 static const std::string gLoginKey = "ajfw@!cv980dSZ[fje#@fdj123948djf";
 static const std::string LanIP[3] =
     {
@@ -14,8 +33,252 @@ CTestServer::CTestServer(bool EnCoding)
       _port(0),
       _ZeroCopy(0), _WorkerCreateCnt(0), _reduceThreadCount(0), _noDelay(0), _MaxSessions(0)
 {
+    mysql_library_init(0, nullptr, nullptr);
+
+    int DBThreadCnt;
+    {
+        WCHAR DBIPAddress[16];
+        WCHAR RedisIp[16];
+        WCHAR DBId[100];
+        WCHAR DBPassword[100];
+        WCHAR DBName[100];
+
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
+
+ 
+        parser.GetValue(L"DBPort", DBPort);
+
+        parser.GetValue(L"DBIPAddress", DBIPAddress, IP_LEN);
+        parser.GetValue(L"DBId", DBId, ID_LEN);
+        parser.GetValue(L"DBPassword", DBPassword, Password_LEN);
+        parser.GetValue(L"DBName", DBName, DBName_LEN);
+
+
+        size_t i;
+        wcstombs_s(&i, LogDB_IPAddress, IP_LEN, DBIPAddress, IP_LEN);
+
+        wcstombs_s(&i, DBuser, ID_LEN, DBId, ID_LEN);
+        wcstombs_s(&i, password, Password_LEN, DBPassword, Password_LEN);
+        wcstombs_s(&i, schema, schema_LEN, DBName, schema_LEN);
+
+        m_hDBIOCP = (HANDLE)CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, NULL, 1);
+
+    }
+
+    _hMonitorThread = WinThread(&CTestServer::DBWorkerThread, this);
+    _hMonitorThread = WinThread(&CTestServer::DBTimerThread, this);
     _hMonitorThread = WinThread(&CTestServer::MonitorThread, this);
 }
+
+void CTestServer::DBWorkerThread()
+{
+    DWORD transferred;
+    ull key;
+    OVERLAPPED *overlapped;
+    clsSession *session; // 특정 Msg를 목적으로 nullptr을 PQCS하는 경우가 존재.
+
+    stDBOverlapped *dbOverlapped;
+
+    db.Connect(LogDB_IPAddress, DBuser, password, schema, DBPort);
+
+    while (1)
+    {
+        // 지역변수 초기화
+        {
+            transferred = 0;
+            key = 0;
+            overlapped = nullptr;
+            session = nullptr;
+        }
+        GetQueuedCompletionStatus(m_hDBIOCP, &transferred, &key, &overlapped, INFINITE);
+
+        Win32::AtomicDecrement(m_DBMessageCnt);
+
+        dbOverlapped = reinterpret_cast<stDBOverlapped *>(overlapped);
+        if (overlapped == nullptr)
+            __debugbreak();
+        switch (dbOverlapped->_mode)
+        {
+        case Job_Type::Post:
+            HandleDBLogPost(dbOverlapped->msg);
+            break;
+        case Job_Type::DBStore:
+            HandleDBLogInsert(dbOverlapped->msg);
+            break;
+        }
+        // TODO : DB_VerifySession의 반환값에 따른 동작이 이게 맞나?
+
+        dbOverlapped_pool.Release(dbOverlapped);
+    }
+}
+
+void CTestServer::DBTimerThread()
+{
+    while (1)
+    {
+        Sleep(5000);
+        DB_StoreRequest();
+    }
+}
+
+
+
+void CTestServer::DB_StoreRequest()
+{
+    //특정 쓰레드에서 해당 메세지를 생성후 dbIOCP에 Enq
+    stDBOverlapped *overlapped = (stDBOverlapped*)dbOverlapped_pool.Alloc();
+    overlapped->_mode = Job_Type::DBStore;
+    overlapped->msg = nullptr;
+
+    PostQueuedCompletionStatus(m_hDBIOCP, 0, NULL, overlapped);
+}
+
+void CTestServer::HandleDBLogInsert(CMessage *msg)
+{
+    if (msg != nullptr)
+        __debugbreak(); // Timer가 nullptr로 보내는 게 정상
+
+    // DBWorkerThread 단일이라면, 여기서 _dbinfoSet_hash 접근은 락 없이도 OK
+    // (Post도 동일 쓰레드에서 HandleDBLogPost로만 push하니까)
+
+    constexpr int kMaxRowsPerInsert = 500; // 적당히 (너무 크면 max_allowed_packet 영향)
+
+    // ServerNo별로 쌓인 list를 로컬로 빼서 처리
+    for (auto &kv : _dbinfoSet_hash)
+    {
+        const BYTE serverNo = kv.first;
+        stDBinfoSet &set = kv.second;
+
+        if (set.infos.empty())
+            continue;
+
+        // 1) 빠르게 로컬로 이동 (원본 비움)
+        std::list<stDBinfoSet::stDBinfo> local;
+        local.splice(local.end(), set.infos); // set.infos는 비워짐
+
+        // 2) 월별(YYYYMM)로 그룹핑 (5초 flush면 보통 한 달 안에서만 움직이지만 안전하게)
+        //    간단히: 순회하며 현재 월이 바뀌면 flush
+        char curYYYYMM[7] = {0};
+        char yyyymm[7] = {0};
+
+        std::string sql;
+        sql.reserve(64 * 1024);
+
+        int rowsInCurrentInsert = 0;
+        bool hasOpenInsert = false;
+
+        auto flushCurrentInsert = [&]()
+        {
+            if (!hasOpenInsert)
+                return;
+            sql.push_back(';');
+
+            CDB::ResultSet r = db.Query("%s", sql.c_str());
+            if (!r.Sucess())
+            {
+                printf("Insert Error: %s\nSQL: %s\n", r.Error().c_str(), sql.c_str());
+                __debugbreak();
+            }
+
+            sql.clear();
+            rowsInCurrentInsert = 0;
+            hasOpenInsert = false;
+        };
+
+        for (auto &info : local)
+        {
+            MakeYYYYMM_FromEpochSec(info.TimeStamp, yyyymm);
+
+            // 월이 바뀌면 이전 INSERT flush
+            if (curYYYYMM[0] == '\0')
+            {
+                strcpy_s(curYYYYMM, yyyymm);
+                EnsureMonthlyLogTable(curYYYYMM);
+            }
+            else if (strcmp(curYYYYMM, yyyymm) != 0)
+            {
+                flushCurrentInsert();
+                strcpy_s(curYYYYMM, yyyymm);
+                EnsureMonthlyLogTable(curYYYYMM);
+            }
+
+            // 새로운 INSERT 시작
+            if (!hasOpenInsert)
+            {
+                // auto_increment no는 빼고, 컬럼을 명시하는 게 안전
+                // logtime은 epoch seconds -> FROM_UNIXTIME 사용
+                char head[256];
+                sprintf_s(head, sizeof(head),
+                          "INSERT INTO `logdb`.`monitorlog_%s` (`logtime`,`serverno`,`type`,`avg`,`min`,`max`) VALUES ",
+                          curYYYYMM);
+                sql.append(head);
+                hasOpenInsert = true;
+            }
+            else
+            {
+                sql.push_back(',');
+            }
+
+            // 지금은 단일 값만 있으니 avg=min=max=DataValue로 저장
+            // (나중에 5분 집계 후 저장 구조로 확장 가능)
+            char row[256];
+            sprintf_s(row, sizeof(row),
+                      "(FROM_UNIXTIME(%d),%u,%u,%d,%d,%d)",
+                      info.TimeStamp,
+                      (unsigned)serverNo,
+                      (unsigned)info.DataType,
+                      info.DataValue, info.DataValue, info.DataValue);
+            sql.append(row);
+
+            rowsInCurrentInsert++;
+            if (rowsInCurrentInsert >= kMaxRowsPerInsert)
+            {
+                flushCurrentInsert();
+            }
+        }
+
+        // 남은 것 flush
+        flushCurrentInsert();
+    }
+}
+
+
+void CTestServer::HandleDBLogPost(CMessage *msg)
+{
+    BYTE ServerNo;
+    BYTE DataType;
+    int DataValue;
+    int TimeStamp;
+
+    *msg >> ServerNo;
+    *msg >> DataType;
+    *msg >> DataValue;
+    *msg >> TimeStamp;
+
+
+     stDBinfoSet& infoSet = _dbinfoSet_hash[ServerNo];
+    infoSet.infos.emplace_back(DataType, DataValue, TimeStamp);
+    stTlsObjectPool<CMessage>::Release(msg);
+}
+
+void CTestServer::DB_LogPost(BYTE ServerNo, BYTE DataType, int DataValue, int TimeStamp)
+{
+    CMessage *msg = (CMessage*)stTlsObjectPool<CMessage>::Alloc();
+    *msg << ServerNo;
+    *msg << DataType;
+    *msg << DataValue;
+    *msg << TimeStamp;
+
+    stDBOverlapped *overlapped = (stDBOverlapped*)dbOverlapped_pool.Alloc();
+    overlapped->_mode = Job_Type::Post;
+    overlapped->msg = msg;
+
+    PostQueuedCompletionStatus(m_hDBIOCP, 0, NULL, overlapped);
+    Win32::AtomicIncrement(m_DBMessageCnt);
+
+}
+
 
 // Parser의 기능으로  Address를 정하도록 하기.                                                  
 void CTestServer::MonitorThread()
@@ -350,7 +613,9 @@ void CTestServer::REQ_MONITOR_UPDATE(ull SessionID, CMessage *msg, BYTE DataType
         if (element.second->m_type == enClientType::MonitorClient)
             sendTarget.emplace_back(element.first);
     }
-    Proxy::RES_MONITOR_UPDATE(SessionID, msg, 0, DataType, DataValue, TimeStamp, en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, true, &sendTarget, sendTarget.size());
+    DB_LogPost(iter->second->m_ServerNo, DataType, DataValue, TimeStamp);
+
+    Proxy::RES_MONITOR_UPDATE(SessionID, msg, iter->second->m_ServerNo, DataType, DataValue, TimeStamp, en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE, true, &sendTarget, sendTarget.size());
 }
 
 void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *LoginSessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
@@ -400,4 +665,40 @@ void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *Lo
     }
 
     Proxy::RES_MONITOR_TOOL_LOGIN(SessionID, msg, (BYTE)dfMONITOR_TOOL_LOGIN_OK);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void CTestServer::EnsureMonthlyLogTable(const char *yyyymm)
+{
+    // monitorlog_YYYYMM 테이블이 없으면 템플릿으로 생성
+    // (table name은 파라미터 바인딩 불가 -> 문자열 포맷으로 만들어야 함)
+    CDB::ResultSet r = db.Query(
+        "CREATE TABLE IF NOT EXISTS `logdb`.`monitorlog_%s` LIKE `logdb`.`monitorlog_template`;",
+        yyyymm);
+    if (!r.Sucess())
+    {
+        printf("EnsureMonthlyLogTable Error: %s\n", r.Error().c_str());
+        __debugbreak();
+    }
 }

@@ -19,6 +19,7 @@ enum class Job_Type : BYTE
     // 해당 msg의 완료통지로 세션 끊김 절차.
     ReleasePost,
     Post,
+    DBStore,
     MAX,
 };
 // _mode 판단을 stOverlapped 기준으로 하므로 첫 멤버변수 _mode 로 할것. 
