@@ -120,10 +120,10 @@ void CTestServer::MonitorThread()
         PdhOpenQuery(NULL, NULL, &hQuery);
 
         PDH_HCOUNTER Process_PrivateByte;
-        PdhAddCounter(hQuery, L"\\Process(MT_ChattingServer)\\Private Bytes", NULL, &Process_PrivateByte);
+        PdhAddCounter(hQuery, L"\\Process(LoginServer_Project)\\Private Bytes", NULL, &Process_PrivateByte);
 
         PDH_HCOUNTER Process_NonpagedByte;
-        PdhAddCounter(hQuery, L"\\Process(MT_ChattingServer)\\Pool Nonpaged Bytes", NULL, &Process_NonpagedByte);
+        PdhAddCounter(hQuery, L"\\Process(LoginServer_Project)\\Pool Nonpaged Bytes", NULL, &Process_NonpagedByte);
 
         PDH_HCOUNTER Available_Byte;
         PdhAddCounter(hQuery, L"\\Memory\\Available MBytes", NULL, &Available_Byte);

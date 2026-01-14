@@ -222,6 +222,7 @@ void CTestServer::MonitorThread()
 
                 // 갱신 데이터 얻음
                 // PDH_FMT_COUNTERVALUE counterVal;
+
                 PdhGetFormattedCounterValue(Process_PrivateByte, PDH_FMT_LARGE, NULL, &Process_PrivateByteVal);
                 wprintf(L"Process_PrivateByte : %lld Byte\n", Process_PrivateByteVal.largeValue);
 
@@ -296,15 +297,21 @@ void CTestServer::MonitorThread()
             // MonitorData
             {
                 //InterlockedExchange((DWORD *)&g_MonitorData[enMonitorType::TimeStamp], currenttt);
+                int totalCountentSize = 0;
+
+                for (auto& contentQ : m_CotentsQ_vec)
+                {
+                    totalCountentSize += contentQ.m_size;
+                }
                 g_MonitorData[enMonitorType::TimeStamp] = (int)currenttt;
                 g_MonitorData[enMonitorType::On] = bOn;
                 g_MonitorData[enMonitorType::Cpu] = (int)CPUTime.ProcessTotal();
                 g_MonitorData[enMonitorType::Memory] = (int)(Process_PrivateByteVal.largeValue / 1024 / 1024);
                 g_MonitorData[enMonitorType::SessionCnt] = (int)GetSessionCount();
-                g_MonitorData[enMonitorType::UserCnt] = (int)GetprePlayer_hash();
+                g_MonitorData[enMonitorType::UserCnt] = (int)GetAccountNo_hash();
                 g_MonitorData[enMonitorType::TotalSendTps] = (int)TotalTPS;
                 g_MonitorData[enMonitorType::TotalPackPool_Cnt] = (int)stTlsObjectPool<CMessage>::instance.m_TotalCount;
-                g_MonitorData[enMonitorType::UpdatePackPool_Cnt] = (int)stTlsObjectPool<CMessage>::instance.m_TotalCount;
+                g_MonitorData[enMonitorType::UpdatePackPool_Cnt] = totalCountentSize;
 
                 SetEvent(g_hMonitorEvent);
             }
