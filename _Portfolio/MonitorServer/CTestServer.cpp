@@ -115,9 +115,18 @@ void CTestServer::DBWorkerThread()
 
 void CTestServer::DBTimerThread()
 {
+    int dbReQuest_interval;
+    {
+
+        Parser parser;
+        parser.LoadFile(L"Config.txt");
+
+        parser.GetValue(L"dbReQuest_interval", dbReQuest_interval);
+    }
+
     while (1)
     {
-        Sleep(300000);
+        Sleep(dbReQuest_interval);
         DB_StoreRequest();
     }
 }
@@ -136,6 +145,8 @@ void CTestServer::DB_StoreRequest()
 
 void CTestServer::HandleDBLogInsert(CMessage *msg)
 {
+    static ull rowCount = 0;
+
     if (msg != nullptr)
         __debugbreak(); // Timer가 nullptr로 보내는 게 정상
 
@@ -186,15 +197,15 @@ void CTestServer::HandleDBLogInsert(CMessage *msg)
             sql.push_back(';');
 
             CDB::ResultSet r = db.Query("%s", sql.c_str());
-            CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request %s",sql.c_str());
+            CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request ");
             if (!r.Sucess())
             {
                 printf("Insert Error: %s\nSQL tail: %.200s\n", r.Error().c_str(),
                        sql.size() > 200 ? (sql.c_str() + sql.size() - 200) : sql.c_str());
-                CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request Falied %s", sql.c_str());
+                CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request Falied ");
                 __debugbreak();
             }
-            CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request Success %s", sql.c_str());
+            CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request Success total_Row %lld ", rowCount);
 
             sql.clear();
             hasOpenInsert = false;
@@ -218,7 +229,8 @@ void CTestServer::HandleDBLogInsert(CMessage *msg)
                 EnsureMonthlyLogTable(curYYYYMM);
             }
 
-        
+            rowCount++;
+
             if (!hasOpenInsert)
             {
                 char head[256];
