@@ -234,6 +234,7 @@ class CDB
             }
             return out; // INSERT/UPDATE면 정상적으로 res==nullptr
         }
+        free(Querybuffer);
 
         out._pResult = res;
         out.InitHashTable(); // ⭐ 여기서 컬럼명->인덱스 매핑 완성

@@ -186,13 +186,16 @@ void CTestServer::HandleDBLogInsert(CMessage *msg)
             sql.push_back(';');
 
             CDB::ResultSet r = db.Query("%s", sql.c_str());
+            CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request %s",sql.c_str());
             if (!r.Sucess())
             {
                 printf("Insert Error: %s\nSQL tail: %.200s\n", r.Error().c_str(),
                        sql.size() > 200 ? (sql.c_str() + sql.size() - 200) : sql.c_str());
+                CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request Falied %s", sql.c_str());
                 __debugbreak();
             }
-    
+            CSystemLog::GetInstance()->Log(L"DB_Query", en_LOG_LEVEL::SYSTEM_Mode, L"DB_Qeury Request Success %s", sql.c_str());
+
             sql.clear();
             hasOpenInsert = false;
             rowsInCurrentInsert = 0;
