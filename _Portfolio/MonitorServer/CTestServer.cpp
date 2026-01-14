@@ -35,10 +35,10 @@ CTestServer::CTestServer(bool EnCoding)
 {
     mysql_library_init(0, nullptr, nullptr);
 
-    int DBThreadCnt;
+
     {
         WCHAR DBIPAddress[16];
-        WCHAR RedisIp[16];
+  
         WCHAR DBId[100];
         WCHAR DBPassword[100];
         WCHAR DBName[100];
@@ -117,7 +117,7 @@ void CTestServer::DBTimerThread()
 {
     while (1)
     {
-        Sleep(5000);
+        Sleep(300000);
         DB_StoreRequest();
     }
 }
@@ -153,12 +153,11 @@ void CTestServer::HandleDBLogInsert(CMessage *msg)
         if (set.infos.empty())
             continue;
 
-        // 1) 빠르게 로컬로 이동 (원본 비움)
-        std::list<stDBinfoSet::stDBinfo> local;
-        local.splice(local.end(), set.infos); // set.infos는 비워짐
 
-        // 2) 월별(YYYYMM)로 그룹핑 (5초 flush면 보통 한 달 안에서만 움직이지만 안전하게)
-        //    간단히: 순회하며 현재 월이 바뀌면 flush
+        std::list<stDBinfoSet::stDBinfo> local;
+        local.splice(local.end(), set.infos); 
+
+
         char curYYYYMM[7] = {0};
         char yyyymm[7] = {0};
 
@@ -172,25 +171,38 @@ void CTestServer::HandleDBLogInsert(CMessage *msg)
         {
             if (!hasOpenInsert)
                 return;
+            if (rowsInCurrentInsert == 0)
+            {
+ 
+                sql.clear();
+                hasOpenInsert = false;
+                return;
+            }
+
+    
+            while (!sql.empty() && (sql.back() == ',' || sql.back() == ' '))
+                sql.pop_back();
+
             sql.push_back(';');
 
             CDB::ResultSet r = db.Query("%s", sql.c_str());
             if (!r.Sucess())
             {
-                printf("Insert Error: %s\nSQL: %s\n", r.Error().c_str(), sql.c_str());
+                printf("Insert Error: %s\nSQL tail: %.200s\n", r.Error().c_str(),
+                       sql.size() > 200 ? (sql.c_str() + sql.size() - 200) : sql.c_str());
                 __debugbreak();
             }
-
+    
             sql.clear();
-            rowsInCurrentInsert = 0;
             hasOpenInsert = false;
+            rowsInCurrentInsert = 0;
         };
 
         for (auto &info : local)
         {
             MakeYYYYMM_FromEpochSec(info.TimeStamp, yyyymm);
 
-            // 월이 바뀌면 이전 INSERT flush
+           
             if (curYYYYMM[0] == '\0')
             {
                 strcpy_s(curYYYYMM, yyyymm);
@@ -203,41 +215,37 @@ void CTestServer::HandleDBLogInsert(CMessage *msg)
                 EnsureMonthlyLogTable(curYYYYMM);
             }
 
-            // 새로운 INSERT 시작
+        
             if (!hasOpenInsert)
             {
-                // auto_increment no는 빼고, 컬럼을 명시하는 게 안전
-                // logtime은 epoch seconds -> FROM_UNIXTIME 사용
                 char head[256];
                 sprintf_s(head, sizeof(head),
                           "INSERT INTO `logdb`.`monitorlog_%s` (`logtime`,`serverno`,`type`,`avg`,`min`,`max`) VALUES ",
                           curYYYYMM);
                 sql.append(head);
+
                 hasOpenInsert = true;
-            }
-            else
-            {
-                sql.push_back(',');
+                rowsInCurrentInsert = 0;
             }
 
-            // 지금은 단일 값만 있으니 avg=min=max=DataValue로 저장
-            // (나중에 5분 집계 후 저장 구조로 확장 가능)
+        
+            if (rowsInCurrentInsert > 0)
+                sql.push_back(',');
+
+            // 이제 row를 붙인다
             char row[256];
             sprintf_s(row, sizeof(row),
-                      "(FROM_UNIXTIME(%d),%u,%u,%d,%d,%d)",
+                      "(FROM_UNIXTIME(%d),%u,%u,%f,%f,%f)",
                       info.TimeStamp,
                       (unsigned)serverNo,
                       (unsigned)info.DataType,
-                      info.DataValue, info.DataValue, info.DataValue);
+                      info._avg, info._min, info._max);
             sql.append(row);
 
             rowsInCurrentInsert++;
-            if (rowsInCurrentInsert >= kMaxRowsPerInsert)
-            {
-                flushCurrentInsert();
-            }
         }
-
+     
+        set.InitInfoSet();
         // 남은 것 flush
         flushCurrentInsert();
     }
@@ -258,7 +266,19 @@ void CTestServer::HandleDBLogPost(CMessage *msg)
 
 
      stDBinfoSet& infoSet = _dbinfoSet_hash[ServerNo];
-    infoSet.infos.emplace_back(DataType, DataValue, TimeStamp);
+
+    infoSet.stats[DataType]._count++;
+    infoSet.stats[DataType]._sum += DataValue;
+
+    if (infoSet.stats[DataType]._min > DataValue)
+        infoSet.stats[DataType]._min = DataValue;
+
+    if (infoSet.stats[DataType]._max < DataValue)
+        infoSet.stats[DataType]._max = DataValue;
+    
+    infoSet.stats[DataType]._avg = infoSet.stats[DataType]._sum / infoSet.stats[DataType]._count; 
+
+    infoSet.infos.emplace_back(DataType, DataValue, TimeStamp, infoSet.stats[DataType]._avg, infoSet.stats[DataType]._min, infoSet.stats[DataType]._max);
     stTlsObjectPool<CMessage>::Release(msg);
 }
 
@@ -623,8 +643,8 @@ void CTestServer::REQ_MONITOR_TOOL_LOGIN(ull SessionID, CMessage *msg, WCHAR *Lo
     clsSession &session = sessions_vec[SessionID >> 47];
     stPlayer *player;
 
-    char Loginkey[33];
-    memset(Loginkey, 0, 33);
+    char Loginkey[33]{0,};
+
     memcpy(Loginkey, LoginSessionKey, 32);
 
     if (gLoginKey.compare(Loginkey) != 0)

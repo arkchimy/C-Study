@@ -30,13 +30,6 @@ class CDB
             __debugbreak();
         }
         _connection = ret;
-
-        _connection = mysql_real_connect(_connection, host, user, pass, db, port, nullptr, 0);
-        if (_connection == nullptr)
-        {
-            printf("Mysql connection error : %s", mysql_error(_connection));
-            __debugbreak();
-        }
     }
 
     friend class stRAIIBegin;
@@ -202,7 +195,7 @@ class CDB
         va_list va;
         HRESULT cchRetval;
 
-        char Querybuffer[1000];
+        char Querybuffer[10000];
 
         va_start(va, sqlFormat);
         cchRetval = StringCchVPrintfA(Querybuffer, sizeof(Querybuffer) / sizeof(wchar_t), sqlFormat, va);

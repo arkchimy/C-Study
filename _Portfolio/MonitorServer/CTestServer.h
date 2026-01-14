@@ -28,11 +28,47 @@ struct stDBinfoSet
 {
     struct stDBinfo
     {
+        stDBinfo(BYTE t, int v, int ts, double a, double min, double max)
+            : DataType(t), DataValue(v), TimeStamp(ts), _avg(a), _min(min), _max(max)
+        {
+
+        }
         BYTE DataType;
         int DataValue;
         int TimeStamp;
+        double _avg;
+        double _min;
+        double _max;
     };
+    struct stDBStat
+    {
+        stDBStat() = default;
+
+        double _sum = 0;
+
+        double _avg = 0;
+        double _min = INT_MAX;
+        double _max = INT_MIN;
+
+        int64_t _count = 0;
+    };
+    void InitInfoSet()
+    {
+        infos.clear();
+        for (auto& stat : stats)
+        {
+            stat.second._sum = 0;
+
+            stat.second._avg = 0;
+            stat.second._min = INT_MAX;
+            stat.second._max = INT_MIN;
+
+            stat.second._count = 0;
+        }
+    }
+    
     std::list<stDBinfo> infos;
+    std::map<BYTE, stDBStat> stats; // 누적 시키는 데이터
 };
 
 struct stPlayer
