@@ -195,10 +195,26 @@ class CDB
         va_list va;
         HRESULT cchRetval;
 
-        char Querybuffer[10000];
+        char* Querybuffer = nullptr;
 
         va_start(va, sqlFormat);
-        cchRetval = StringCchVPrintfA(Querybuffer, sizeof(Querybuffer) / sizeof(wchar_t), sqlFormat, va);
+
+        va_list va_len;
+        va_copy(va_len, va);
+
+        int needed = _vscprintf(sqlFormat, va_len);
+        va_end(va_len);
+
+        if (needed < 0)
+            __debugbreak();
+
+        Querybuffer = (char*)malloc(needed + 1);
+
+        if (Querybuffer == nullptr)
+            __debugbreak();
+
+        cchRetval = StringCchVPrintfA(Querybuffer, (size_t)needed + 1, sqlFormat, va);
+        
         va_end(va);
 
         if (mysql_query(_connection, Querybuffer) != 0)
