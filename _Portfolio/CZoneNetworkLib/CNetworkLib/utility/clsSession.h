@@ -17,6 +17,7 @@
 using ull = unsigned long long;
 class clsSession;
 
+
 enum class Job_Type : BYTE
 {
     Recv,
@@ -56,10 +57,11 @@ struct stReleaseOverlapped : stOverlapped
 class IZone
 {
   public:
-    virtual void OnAccept(ull SessionId, SOCKADDR_IN &addr) = 0;
+    virtual void OnEnterWorld(ull SessionId, SOCKADDR_IN &addr) = 0;
     virtual void OnRecv(ull SessionId, struct CMessage *msg) = 0;
     virtual void OnUpdate() = 0;
-    virtual void OnRelease(ull SessiondId) = 0;
+    virtual void OnLeaveWorld(ull SessiondId) = 0;
+
 };
 
 class ZoneSet
@@ -77,8 +79,11 @@ class ZoneSet
     }
 
   private:
-    void ThreadMain();
-    void RegisterEventHandle(HANDLE hEvent);
+    void ZoneThread();
+    void ZoneTimerThread();
+
+    void ReleaseSession(clsSession& session);
+
   private:
     IZone *m_zone;
     WinThread m_Thread;
@@ -91,6 +96,9 @@ class ZoneSet
   public:
     bool *m_bOn; // Server의 Running을 가리키는 포인터
     HANDLE _hEvent;
+
+    //TODO : 좀 더 좋은 방법 없을까.
+    class CLanServer * _server = nullptr;
 };
 
 
@@ -120,7 +128,13 @@ class clsSession
     ull m_ioCount = 0;
     ull m_blive = 0;
     ull m_flag = 0; // SendFlag
+    
+    // session이 살아있다면  1 << 63 을 켜둔다.   0이면 나가기. 
+    ull m_ReleaseAndDBReQuest = 0;
 
     ZoneSet *m_zoneSet;
+
+    // EnterZone 을 할떄마다 Addr을 msg를 통한 전달이 불필요해보임.
+    SOCKADDR_IN _addr;
 
 };

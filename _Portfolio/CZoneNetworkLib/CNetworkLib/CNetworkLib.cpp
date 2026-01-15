@@ -218,7 +218,9 @@ void CLanServer::AcceptThread()
             session.m_sock = client_sock;
             session.m_blive = true;
             session.m_flag = 0;
-
+            // DB요청 카운트에 의해 추가된 부분
+            session.m_ReleaseAndDBReQuest = (ull)1 << 63 ;
+            
             InterlockedExchange(&session.m_SeqID, m_SeqID);
             InterlockedExchange(&session.m_ioCount, 1); // 1로 시작하므로써 0으로 초기화때 Contents에서 오인하는 일을 방지.
         }
@@ -646,13 +648,13 @@ void CLanServer::ReleaseComplete(clsSession& session)
 {
     // 로직상  Session당 한번만 호출되게 짰음.
 
-
+    
     OnRelease(session.m_SeqID);
-    session.Release();
-    closesocket(session.m_sock);
+    //session.Release();
+    //closesocket(session.m_sock);
 
-    m_SessionIdxStack.Push(session.m_SeqID >> 47);
-    _interlockeddecrement64(&m_SessionCount);
+    //m_SessionIdxStack.Push(session.m_SeqID >> 47);
+    //_interlockeddecrement64(&m_SessionCount);
     
 }
 bool CLanServer::SessionLock(ull SessionID)
@@ -957,6 +959,13 @@ void CLanServer::ReleaseSession(ull SessionID)
     clsSession &session = sessions_vec[SessionID >> 47];
     ZeroMemory(&session.m_releaseOverlapped, sizeof(OVERLAPPED));
     PostQueuedCompletionStatus(m_hIOCP, 0, (ULONG_PTR) & session, &session.m_releaseOverlapped);
+
+}
+
+void CLanServer::PushSessionStack(ull SessionID)
+{
+    m_SessionIdxStack.Push(SessionID >> 47);
+    _interlockeddecrement64(&m_SessionCount);
 
 }
 

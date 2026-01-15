@@ -107,6 +107,12 @@ class CLanServer : public Stub, public Proxy
     void WSARecvError(const DWORD LastError, const ull SessionID);
     void ReleaseSession(ull SessionID);
 
+    void PushSessionStack(ull SessionID);
+
+    clsSession *GetSession(ull SessionID) 
+    {
+        return &sessions_vec[SessionID >> 47];
+    }
   protected:
     // SignalOnForStop에서 사용할 이벤트객체
     HANDLE hReadyForStopEvent = INVALID_HANDLE_VALUE; 

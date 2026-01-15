@@ -6,78 +6,212 @@
 
 #include <timeapi.h>
 
+#include "../CNetworkLib.h"
 
 
 ZoneSet::ZoneSet(IZone *zone, const wchar_t *ThreadName, bool *bOn, int deltaTime, HANDLE hEvent)
 
     : m_zone(zone), m_bOn(bOn), _deltaTime(deltaTime), _hEvent(hEvent)
 {
+    if (_hEvent == INVALID_HANDLE_VALUE)
+        m_Thread = WinThread(&ZoneSet::ZoneThread, this);
+    else
+        m_Thread = WinThread(&ZoneSet::ZoneTimerThread, this);
 
-    m_Thread = WinThread(&ZoneSet::ThreadMain, this);
     SetThreadDescription(m_Thread.native_handle(), ThreadName);
 }
-
-void ZoneSet::ThreadMain()
+void ZoneSet::ZoneThread()
 {
     DWORD currentTime = timeGetTime();
     DWORD TargetTime = currentTime;
     CMessage *msg;
 
     timeBeginPeriod(1);
-
-    if (_hEvent != INVALID_HANDLE_VALUE)
+    while (*m_bOn == true)
     {
-        while (*m_bOn == true)
+
+        TargetTime += _deltaTime;
+
+        // Zone자체의 Q에서 빼기.
+        while (q.Pop(msg))
         {
-            WaitForSingleObject(_hEvent, _deltaTime);
-            // Zone자체의 Q에서 빼기.
-            while (q.Pop(msg))
+            ull SessionId = msg->ownerID;
+            stTlsObjectPool<CMessage>::Release(msg);
+            clsSession *session = _server->GetSession(SessionId);
+            for (clsSession *element : sessions)
             {
-                ull SessionId = msg->ownerID;
-                m_zone->OnRecv(SessionId, msg);
-            }
-            for (clsSession *session : sessions)
-            {
-                while (session->m_ZoneBuffer.Pop(msg))
+                if (element == session)
                 {
-                    m_zone->OnRecv(session->m_SeqID, msg);
+                    // 같은 Session 주소가 존재함.
+                    __debugbreak();
                 }
             }
-            m_zone->OnUpdate();
-            m_zone->OnRelease(0); // 연결이 끊어진 session에 대한 판정을 어떻게할지는 또 고민이네...
 
+            // session에 남아있는 msg 처분.
+            while (session->m_ZoneBuffer.Pop(msg))
+            {
+                stTlsObjectPool<CMessage>::Release(msg);
+            }
+            sessions.push_back(session);
+            m_zone->OnEnterWorld(SessionId, session->_addr);
+         
         }
-    }
-    else
-    {
-        while (*m_bOn == true)
+        for (clsSession *session : sessions)
         {
-
-            TargetTime += _deltaTime;
-
-            // Zone자체의 Q에서 빼기.
-            while (q.Pop(msg))
+            while (session->m_ZoneBuffer.Pop(msg))
             {
-                ull SessionId = msg->ownerID;
-                m_zone->OnRecv(SessionId, msg);
+                m_zone->OnRecv(session->m_SeqID, msg);
             }
-            for (clsSession *session : sessions)
+        }
+        m_zone->OnUpdate();
+        for (auto iter = sessions.begin(); iter != sessions.end();)
+        {
+            clsSession *session = *iter;
+            // DB요청도  IOCP에서도 연결끊김이 확인되면 호출
+            if (session->m_ReleaseAndDBReQuest == 0)
             {
-                while (session->m_ZoneBuffer.Pop(msg))
+                ull SessionID = session->m_SeqID;
+                ReleaseSession(*session);
+                iter = sessions.erase(iter);
+
+                m_zone->OnLeaveWorld(SessionID);
+                continue;
+            }
+            else if (session->m_zoneSet != this)
+            {
+                // MoveZone이 호출됬다면 this 와 다름.
+                if (session->m_ReleaseAndDBReQuest == (ull)1 << 63)
                 {
-                    m_zone->OnRecv(session->m_SeqID, msg);
+                    // DB 처리가 끝났다면
+                    ull SessionID;
+                    ZoneSet *targetZone;
+                    CMessage *msg;
+
+                    SessionID = session->m_SeqID;
+                    targetZone = session->m_zoneSet;
+
+                    iter = sessions.erase(iter);
+                    m_zone->OnLeaveWorld(SessionID);
+
+                    msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+
+                    msg->ownerID = SessionID;
+                    targetZone->Push(msg);
+
+                    continue;
                 }
             }
-            m_zone->OnUpdate();
-            m_zone->OnRelease(0); // 연결이 끊어진 session에 대한 판정을 어떻게할지는 또 고민이네...
 
-            currentTime = timeGetTime();
+            iter++;
+        }
 
-            if (currentTime < TargetTime)
-            {
-                Sleep(TargetTime - currentTime);
-            }
+        currentTime = timeGetTime();
+
+        if (currentTime < TargetTime)
+        {
+            Sleep(TargetTime - currentTime);
         }
     }
     timeEndPeriod(1);
+}
+
+
+void ZoneSet::ZoneTimerThread()
+{
+
+    CMessage *msg;
+
+    timeBeginPeriod(1);
+
+    while (*m_bOn == true)
+    {
+        WaitForSingleObject(_hEvent, _deltaTime);
+        // Zone자체의 Q에서 빼기.
+        while (q.Pop(msg))
+        {
+            ull SessionId = msg->ownerID;
+            stTlsObjectPool<CMessage>::Release(msg);
+
+            clsSession* session = _server->GetSession(SessionId);
+            for (clsSession* element : sessions)
+            {
+                if (element == session)
+                {
+                    //같은 Session 주소가 존재함.
+                    __debugbreak();
+                }
+            }
+            // 폐기
+            while (session->m_ZoneBuffer.Pop(msg))
+            {
+                stTlsObjectPool<CMessage>::Release(msg);
+            }
+            sessions.push_back(session);
+            m_zone->OnEnterWorld(SessionId, session->_addr);
+     
+
+        }
+        for (clsSession *session : sessions)
+        {
+            while (session->m_ZoneBuffer.Pop(msg))
+            {
+                m_zone->OnRecv(session->m_SeqID, msg);
+            }
+        }
+        m_zone->OnUpdate();
+        for (auto iter = sessions.begin(); iter != sessions.end();)
+        {
+            clsSession *session = *iter;
+            // DB요청도  IOCP에서도 연결끊김이 확인되면 호출
+            if (session->m_ReleaseAndDBReQuest == 0)
+            {
+                ull SessionID = session->m_SeqID;
+                ReleaseSession(*session);
+                iter = sessions.erase(iter);
+
+                m_zone->OnLeaveWorld(SessionID); 
+                continue;
+            }
+            else if (session->m_zoneSet != this)
+            {
+                // MoveZone이 호출됬다면 this 와 다름.
+                if (session->m_ReleaseAndDBReQuest == (ull)1 << 63)
+                {
+                    //DB 처리가 끝났다면
+                    ull SessionID;
+                    ZoneSet *targetZone;
+                    CMessage *msg;
+
+
+                    SessionID = session->m_SeqID;
+                    targetZone = session->m_zoneSet;
+
+                    iter = sessions.erase(iter);
+                    m_zone->OnLeaveWorld(SessionID); 
+
+                    msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
+
+                    msg->ownerID = SessionID;
+                    targetZone->Push(msg);
+
+                    continue;
+                    
+                }
+
+            }
+
+            iter++;
+        }
+    }
+    
+  
+    timeEndPeriod(1);
+}
+
+
+void ZoneSet::ReleaseSession(clsSession &session)
+{
+    session.Release();
+    closesocket(session.m_sock);
+    _server->PushSessionStack(session.m_SeqID);
 }
