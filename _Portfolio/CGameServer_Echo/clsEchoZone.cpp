@@ -52,11 +52,11 @@ void clsEchoZone::OnUpdate()
     DWORD currentTime = timeGetTime();
     DWORD distance;
 
-    for (auto &&iter : SessionID_hash)
+    for (auto& iter : SessionID_hash)
     {
         stPlayer *player = iter.second;
         distance = currentTime - player->_lastRecvTime;
-        if (distance >= sessionTimeoutMs)
+        if (distance >= _sessionTimeoutMs)
         {
             _server->Disconnect(player->_SessionID);
         }
@@ -69,6 +69,39 @@ void clsEchoZone::OnLeaveWorld(ull SessionID)
     if (iter == SessionID_hash.end())
         __debugbreak();
     SessionID_hash.erase(SessionID);
+
+}
+
+void clsEchoZone::OnDisConnect(ull SessionID)
+{
+    clsLoginZone *loginZone;
+
+    // 해당 SessionID 매칭 데이터가 있다면 말이 안 됨.
+    auto iter = SessionID_hash.find(SessionID);
+    if (iter != SessionID_hash.end())
+        __debugbreak();
+
+    {
+        std::shared_lock<SharedMutex> lock(_server->_zoneMutex);
+
+        auto iter = _server->_zoneMap.find((ZoneKeyType)enZoneType::LoginZone);
+        if (iter == _server->_zoneMap.end())
+            __debugbreak();
+        loginZone = dynamic_cast<clsLoginZone *>(iter->second->GetZone());
+    }
+
+    // TODO : 이게 최선인가.
+    {
+        std::shared_lock<SharedMutex> lock(loginZone->_SessionTable_Mutex);
+        auto iter = loginZone->SessionID_hash.find(SessionID);
+        if (iter == loginZone->SessionID_hash.end())
+            __debugbreak();
+        stPlayer *player = iter->second;
+
+        SessionID_hash.erase(iter);
+        // Player반환은 여기서.
+        loginZone->player_pool.Release(player);
+    }
 
 }
 

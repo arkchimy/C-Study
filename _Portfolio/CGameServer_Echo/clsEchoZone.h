@@ -12,10 +12,11 @@ class clsEchoZone : public IZone
     };
   public:
     // 이 함수를 컨텐츠 개발자가 구현해야함.
-    void OnEnterWorld(ull SessionID, SOCKADDR_IN &addr);
-    void OnRecv(ull SessionID, struct CMessage *msg);
-    void OnUpdate();
-    void OnLeaveWorld(ull SessionID);
+    virtual void OnEnterWorld(ull SessionID, SOCKADDR_IN &addr);
+    virtual void OnRecv(ull SessionID, struct CMessage *msg);
+    virtual void OnUpdate();
+    virtual void OnLeaveWorld(ull SessionID);
+    virtual void OnDisConnect(ull SessionID);
 
     bool PacketProc(ull SessionID, CMessage *msg);
 
@@ -33,7 +34,7 @@ class clsEchoZone : public IZone
     // 하트비트를 돌기위한 자료구조.
     std::unordered_map<ull, stPlayer *> SessionID_hash;
 
-    DWORD sessionTimeoutMs = 60000;
+    DWORD _sessionTimeoutMs = 60000;
 
     ull _msgTypeCntArr[Max]{0,};
     ull totalPacketCnt = 0;

@@ -76,7 +76,7 @@ void ZoneSet::ZoneThread()
                 ReleaseSession(*session);
                 iter = sessions.erase(iter);
 
-                m_zone->OnLeaveWorld(SessionID);
+                m_zone->OnDisConnect(SessionID);
                 continue;
             }
             else if (session->m_zoneSet != this)
@@ -171,7 +171,7 @@ void ZoneSet::ZoneTimerThread()
                 ReleaseSession(*session);
                 iter = sessions.erase(iter);
 
-                m_zone->OnLeaveWorld(SessionID); 
+                m_zone->OnDisConnect(SessionID); 
                 continue;
             }
             else if (session->m_zoneSet != this)

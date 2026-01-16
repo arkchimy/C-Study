@@ -57,10 +57,11 @@ struct stReleaseOverlapped : stOverlapped
 class IZone
 {
   public:
-    virtual void OnEnterWorld(ull SessionId, SOCKADDR_IN &addr) = 0;
-    virtual void OnRecv(ull SessionId, struct CMessage *msg) = 0;
+    virtual void OnEnterWorld(ull SessionID, SOCKADDR_IN &addr) = 0;
+    virtual void OnRecv(ull SessionID, struct CMessage *msg) = 0;
     virtual void OnUpdate() = 0;
-    virtual void OnLeaveWorld(ull SessiondId) = 0;
+    virtual void OnLeaveWorld(ull SessionID) = 0;
+    virtual void OnDisConnect(ull SessionID) = 0;
 
 
     class CZoneServer *_server = nullptr;

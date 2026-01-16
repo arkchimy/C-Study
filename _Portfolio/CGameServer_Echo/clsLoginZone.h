@@ -18,15 +18,12 @@ class clsLoginZone : public IZone
     virtual void OnRecv(ull SessionID, struct CMessage *msg);
     virtual void OnUpdate();
     virtual void OnLeaveWorld(ull SessionID);
+    virtual void OnDisConnect(ull SessionID);
+
 
     bool PacketProc(ull SessionID, CMessage *msg);
 
     void REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType = en_PACKET_CS_GAME_REQ_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
-
-    void RES_LOGIN(ull SessionID, CMessage *msg, BYTE Status, INT64 AccountNo, WORD wType = en_PACKET_CS_GAME_RES_LOGIN, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
-
-    void REQ_HEARTBEAT(ull SessionID, CMessage *msg, WORD wType = en_PACKET_CS_GAME_REQ_HEARTBEAT, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
-    void RES_HEARTBEAT(ull SessionID, CMessage *msg, WORD wType = en_PACKET_CS_GAME_REQ_HEARTBEAT, BYTE bBroadCast = false, std::vector<ull> *pIDVector = nullptr, size_t wVectorLen = 0);
 
 
  
@@ -41,9 +38,10 @@ class clsLoginZone : public IZone
     // 인증전  SessionID와 시간
     std::unordered_map<ull, stPlayer *> prePlayer_hash;
 
+    CObjectPool<stPlayer> player_pool;
+
     private:
-    DWORD _prePlayerTimeoutMs = 10000; //10초
-    DWORD _sessionTimeoutMs = 60000;   // 60초
+    DWORD _sessionTimeoutMs = 10000;   // 10초
     
   public:
     ull _msgTypeCntArr[Max]{0,};

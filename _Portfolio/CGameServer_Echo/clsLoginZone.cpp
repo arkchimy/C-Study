@@ -2,26 +2,105 @@
 
 void clsLoginZone::OnEnterWorld(ull SessionID, SOCKADDR_IN &addr)
 {
+    stPlayer *player;
 
+    {
+        std::lock_guard<SharedMutex> lock(_SessionTable_Mutex);
+        auto prePlayerIter = prePlayer_hash.find(SessionID);
+        auto sessionIDIter = SessionID_hash.find(SessionID);
+
+        // 이미 있었다면 문제임
+        if (prePlayerIter != prePlayer_hash.end() || sessionIDIter != SessionID_hash.end())
+        {
+            __debugbreak();
+        }
+
+        player = (stPlayer *)player_pool.Alloc();
+
+        player->_lastRecvTime = timeGetTime();
+        player->_addr = addr;
+        player->_SessionID = SessionID;
+        
+        prePlayer_hash.insert({SessionID, player});
+    }
 
 }
 
 void clsLoginZone::OnRecv(ull SessionID, CMessage *msg)
 {
+    auto iter = prePlayer_hash.find(SessionID);
+    if (iter == prePlayer_hash.end())
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        return;
+    }
     if (PacketProc(SessionID, msg) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
         _server->Disconnect(SessionID);
     }
+    iter->second->_lastRecvTime = timeGetTime();
+
     totalPacketCnt++;
 }
 
 void clsLoginZone::OnUpdate()
 {
+    DWORD currentTime = timeGetTime();
+    DWORD distance;
+
+    for (auto& iter : prePlayer_hash)
+    {
+        stPlayer *player = iter.second;
+        distance = currentTime - player->_lastRecvTime;
+        if (distance >= _sessionTimeoutMs)
+        {
+            _server->Disconnect(player->_SessionID);
+        }
+    }
 }
 
 void clsLoginZone::OnLeaveWorld(ull SessionID)
 {
+    auto iter = prePlayer_hash.find(SessionID);
+
+    // 없다면 문제임
+    if (iter == prePlayer_hash.end())
+    {
+        __debugbreak();
+    }
+    prePlayer_hash.erase(iter);
+}
+
+void clsLoginZone::OnDisConnect(ull SessionID)
+{
+    stPlayer *player;
+
+    auto iter = prePlayer_hash.find(SessionID);
+
+    // 없다면 문제임
+    if (iter == prePlayer_hash.end())
+    {
+        __debugbreak();
+    }
+    player = iter->second;
+    // 중복제거로인한 다른 sessionID가 들어가있을수 있음.
+    if (player->_SessionID == SessionID)
+        prePlayer_hash.erase(iter);
+    {
+        std::lock_guard<SharedMutex> lock(_SessionTable_Mutex);
+        auto iter = SessionID_hash.find(SessionID);
+        if (iter == SessionID_hash.end())
+        {
+            //삭제하려는데 없음.
+            __debugbreak();
+        }
+
+        SessionID_hash.erase(iter);
+        // Player반환은 여기서.
+        player_pool.Release(player);
+    }
+    
 }
 
 bool clsLoginZone::PacketProc(ull SessionID, CMessage *msg)
@@ -92,79 +171,52 @@ bool clsLoginZone::PacketProc(ull SessionID, CMessage *msg)
         _msgTypeCntArr[LoginPacket]++;
         break;
     }
-    case en_PACKET_CS_GAME_REQ_HEARTBEAT:
-    {
-        try
-        {
-            REQ_HEARTBEAT(SessionID, msg);
-        }
-        catch (const MessageException &e)
-        {
-            switch (e.type())
-            {
-            case MessageException::ErrorType::HasNotData:
-                break;
-            case MessageException::ErrorType::NotEnoughSpace:
-                break;
-            }
-            return false;
-        }
-        _msgTypeCntArr[HeartBeatPacket]++;
-        break;
-    }
+
     default:
         return false;
     }
-
+    
     return true;
 }
 
 void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
-    // 전환 완료 메세지가 없으므로
-    _server->RequeseMoveZone(SessionID, (ZoneKeyType)enZoneType::EchoZone);
+    stPlayer *player;
+
+    {
+        auto iter = Account_hash.find(AccountNo);
+        // 중복 로그인이라면 있던 player를 끊음.
+        if (iter != Account_hash.end())
+        {
+            player = iter->second;
+            _server->Disconnect(player->_SessionID);
+        }
+        Account_hash.erase(iter);
+
+    }
+
+    {
+        auto prePlayeriter = prePlayer_hash.find(SessionID);
+        if (prePlayeriter == prePlayer_hash.end())
+        {
+            //  LoginPacket를 두번 보낸 공격일 수 있음.
+            // TODO : 공격이 아니라면 있을 수 없으므로 일단은 납둠.
+            __debugbreak();
+        }
+        player = prePlayeriter->second;
+        Account_hash.insert({AccountNo, player});
+
+        std::lock_guard<SharedMutex> lock(_SessionTable_Mutex);
+
+        // 전환 완료 메세지가 없으므로
+        auto iter = SessionID_hash.find(SessionID);
+        if (iter != SessionID_hash.end())
+        {
+            // 이제 추가하는 것이라 있으면 안됨.
+            __debugbreak();
+        }
+        SessionID_hash.insert({SessionID, player});
+        _server->RequeseMoveZone(SessionID, (ZoneKeyType)enZoneType::EchoZone);
+    }
     
-}
-
-void clsLoginZone::RES_LOGIN(ull SessionID, CMessage *msg, BYTE Status, INT64 AccountNo, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
-{
-    // 보내고 끊어지는 기능 넣을떄를 기대하고 납둠.
-    stHeader header;
-
-    header.byCode = 0x77;
-    msg->InitMessage();
-
-    msg->PutData(&header, sizeof(stHeader));
-    *msg << wType;
-    *msg << Status;
-    *msg << AccountNo;
-    short *pheaderlen = (short *)(msg->_frontPtr + offsetof(stHeader, sDataLen));
-    *pheaderlen = msg->_rearPtr - msg->_frontPtr - _server->GetheaderSize();
-
-    if (_server->GetisEncode())
-        msg->EnCoding();
-
-    _server->SendPacket(SessionID, msg, bBroadCast, pIDVector, wVectorLen);
-}
-
-void clsLoginZone::REQ_HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
-{
-
-    RES_HEARTBEAT(SessionID, msg);
-}
-
-void clsLoginZone::RES_HEARTBEAT(ull SessionID, CMessage *msg, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
-{
-    stHeader header;
-
-    header.byCode = 0x77;
-    msg->InitMessage();
-
-    msg->PutData(&header, sizeof(stHeader));
-    *msg << wType;
-    short *pheaderlen = (short *)(msg->_frontPtr + offsetof(stHeader, sDataLen));
-    *pheaderlen = msg->_rearPtr - msg->_frontPtr - _server->GetheaderSize();
-    if (_server->GetisEncode())
-        msg->EnCoding();
-    _server->SendPacket(SessionID, msg, bBroadCast, pIDVector, wVectorLen);
 }

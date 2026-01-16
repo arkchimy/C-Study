@@ -19,6 +19,7 @@ void fnCZoneNetworkLib()
             virtual void OnRecv(ull SessionId, struct CMessage *msg) {};
             virtual void OnUpdate() {};
             virtual void OnLeaveWorld(ull SessiondId){};
+            virtual void OnDisConnect(ull SessionID){};
         };
 
         class clsContentsZone : public IZone
@@ -29,6 +30,7 @@ void fnCZoneNetworkLib()
             virtual void OnRecv(ull SessionId, struct CMessage *msg) {};
             virtual void OnUpdate() {};
             virtual void OnLeaveWorld(ull SessiondId){};
+            virtual void OnDisConnect(ull SessionID){};
         };
     
 
