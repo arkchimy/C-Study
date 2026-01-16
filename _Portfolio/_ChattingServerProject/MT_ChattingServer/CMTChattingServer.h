@@ -76,7 +76,7 @@ class CTestServer : public CLanServer
     LONG64 m_UpdateMessage_Queue; // Update 이후 남아있는 Msg의 수.
     LONG64 m_UpdateTPS;
     LONG64 m_RecvTPS; // OnRecv를 통한 RecvTPS 측정
-
+    //Type별 메세지
     LONG64 m_RecvMsgArr[en_PACKET_CS_CHAT__Max]{
         0,
     }; // Update에서 ContentsQ에서 빼는 MsgTPS

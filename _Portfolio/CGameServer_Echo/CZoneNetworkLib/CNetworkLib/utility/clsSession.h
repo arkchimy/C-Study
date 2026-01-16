@@ -62,6 +62,8 @@ class IZone
     virtual void OnUpdate() = 0;
     virtual void OnLeaveWorld(ull SessiondId) = 0;
 
+
+    class CZoneServer *_server = nullptr;
 };
 
 class ZoneSet
@@ -78,7 +80,7 @@ class ZoneSet
     {
         q.Push(msg);
     }
-
+    IZone *GetZone() { return m_zone; }
   private:
     void ZoneThread();
     void ZoneTimerThread();
@@ -99,7 +101,7 @@ class ZoneSet
     HANDLE _hEvent;
 
     //TODO : 좀 더 좋은 방법 없을까.
-    class CLanServer * _server = nullptr;
+    class CZoneServer *_server = nullptr;
 };
 
 

@@ -113,6 +113,8 @@ class CLanServer : public Stub, public Proxy
     {
         return &sessions_vec[SessionID >> 47];
     }
+    bool GetisEncode() { return bEnCording; }
+    int GetheaderSize() { return headerSize; }
   protected:
     // SignalOnForStop에서 사용할 이벤트객체
     HANDLE hReadyForStopEvent = INVALID_HANDLE_VALUE; 

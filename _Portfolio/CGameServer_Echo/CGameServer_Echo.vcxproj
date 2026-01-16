@@ -76,6 +76,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -90,6 +91,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -104,6 +107,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -118,6 +122,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -127,7 +133,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="CGameServer_Echo.cpp" />
+    <ClCompile Include="clsEchoZone.cpp" />
+    <ClCompile Include="clsLoginZone.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="CTestServer.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="clsEchoZone.h" />
+    <ClInclude Include="clsLoginZone.h" />
+    <ClInclude Include="CTestServer.h" />
+    <ClInclude Include="enZoneType.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="CZoneNetworkLib\CDB\CDB.vcxproj">
+      <Project>{82ed263a-7832-4e00-b957-52a8b4134b1e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="CZoneNetworkLib\CNetworkLib\CNetworkLib.vcxproj">
+      <Project>{bc14b27d-d39d-458e-be1f-20c972c7220e}</Project>
+    </ProjectReference>
+    <ProjectReference Include="CZoneNetworkLib\CZoneNetworkLib.vcxproj">
+      <Project>{ceb26f2f-1782-41ea-8b02-67e57ded635e}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

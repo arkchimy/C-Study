@@ -5,7 +5,11 @@
 void fnCZoneNetworkLib()
 {
     
-    
+    enum class enZoneType : ZoneKeyType
+    {
+        LoginZone = 0,
+        EchoZone
+    };
         // IZone을 상속받아서 기능을 구현해둔다.
         class clsLoginZone : public IZone
         {
@@ -29,22 +33,21 @@ void fnCZoneNetworkLib()
     
 
     // CZoneServer을 상속받는 Server 구현.
-    class TestServer : public CZoneServer
+    class CTestServer : public CZoneServer
     {
       public:
-        TestServer(int iEncording )
+        CTestServer(int iEncording )
             : CZoneServer(iEncording)
         {
             //LoginZone은 하나만 등록해야하고.
-            RegisterLoginZone<clsLoginZone>(L"LoginServer", 4000);
+            RegisterLoginZone<clsLoginZone>(L"LoginServer", 4000, (ZoneKeyType)enZoneType::LoginZone);
 
             // 동일한 방식으로 상속받아 구현한 class를 여기에 등록한다.
-            RegisterZone<clsContentsZone>( L"Contents이름", 20);
+            RegisterZone<clsContentsZone>(L"Contents이름", 20, (ZoneKeyType)enZoneType::EchoZone);
         }
     };
     //  TestServer생성시에 LoginZone을 넘겨주게 설계.
-    clsLoginZone *Loginzone = new clsLoginZone();
-    TestServer *server = new TestServer(true);
+    CTestServer *server = new CTestServer(true);
 
 
 }
@@ -85,7 +88,7 @@ void CZoneServer::OnRelease(ull SessionID)
 
 
 
-void CZoneServer::RequeseMoveZone(ull SessionID, IZone *targetZone)
+void CZoneServer::RequeseMoveZone(ull SessionID, ZoneKeyType targetZone)
 {
     //  이 단계에서 session이 Release될수 있을까?
     // RequeseMoveZone 의 호출은 속해있는 Zone 내부에서 호출한 것.

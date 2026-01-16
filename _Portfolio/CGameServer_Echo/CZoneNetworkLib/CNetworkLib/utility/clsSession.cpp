@@ -7,6 +7,7 @@
 #include <timeapi.h>
 
 #include "../CNetworkLib.h"
+#include "../../CZoneNetworkLib.h"
 
 
 ZoneSet::ZoneSet(IZone *zone, const wchar_t *ThreadName, bool *bOn, int deltaTime, HANDLE hEvent)
@@ -19,6 +20,7 @@ ZoneSet::ZoneSet(IZone *zone, const wchar_t *ThreadName, bool *bOn, int deltaTim
         m_Thread = WinThread(&ZoneSet::ZoneTimerThread, this);
 
     SetThreadDescription(m_Thread.native_handle(), ThreadName);
+    m_zone->_server = _server;
 }
 void ZoneSet::ZoneThread()
 {

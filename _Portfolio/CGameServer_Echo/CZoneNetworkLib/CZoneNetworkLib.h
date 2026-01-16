@@ -3,6 +3,9 @@
 #define WIN32_LEAN_AND_MEAN             // 거의 사용되지 않는 내용을 Windows 헤더에서 제외합니다.
 #include "CNetworkLib/CNetworkLib.h"
 
+//Zone을 구분할 유일한 Key값을 저장하는 자료형타입.
+using ZoneKeyType = uint8_t;
+
 enum enZoneMsgType : uint8_t
 {
     EnterZone,
@@ -21,7 +24,7 @@ class CZoneServer : public CLanServer
         // TODO : ZoneSet가 들고있는 Zone에 대한 할당해제는 ZoneSet이 해줌
         //        
         std::lock_guard<SharedMutex> lock(_zoneMutex);
-        for (std::pair< IZone * const , ZoneSet *>& element : _zoneMap)
+        for (std::pair<const ZoneKeyType, ZoneSet *> &element : _zoneMap)
         {
             delete element.second;
         }
@@ -36,30 +39,32 @@ class CZoneServer : public CLanServer
 
   public:
     template <typename T>
-    void RegisterLoginZone(const wchar_t *ThreadName, int deltaTime);
+    void RegisterLoginZone(const wchar_t *ThreadName, int deltaTime, ZoneKeyType key);
 
     template <typename T>
-    void RegisterZone(const wchar_t *ThreadName, int deltaTime);
+    void RegisterZone(const wchar_t *ThreadName, int deltaTime, ZoneKeyType key);
 
-    void RequeseMoveZone(ull SessionID, IZone *targetZone);
+    void RequeseMoveZone(ull SessionID, ZoneKeyType targetZone);
+
     //////////////////////////////////////////
     private:
     ZoneSet *m_LoginZone = nullptr;
-   
-    //  동기화 객체의 필요성 : 중간에 Zone을 생성하여 등록하는 경우 
-    // _zoneMap의 iterator가 틀어질 수도있음.
-    SharedMutex _zoneMutex;
-    std::map<IZone *, ZoneSet *> _zoneMap;
 
     // OnRecv를 통해 해당 이벤트를 SetEvent 시켜야하므로 서버의OnRecv에서 접근할 수 있어야함.
     HANDLE _hLoginEvent = INVALID_HANDLE_VALUE;
 
     ull _bLoginZoneChk = false;
 
+  public:
+    //  동기화 객체의 필요성 : 중간에 Zone을 생성하여 등록하는 경우
+    // _zoneMap의 iterator가 틀어질 수도있음.
+
+    SharedMutex _zoneMutex;
+    std::map<ZoneKeyType, ZoneSet *> _zoneMap;
 };
 
 template <typename T>
-inline void CZoneServer::RegisterLoginZone( const wchar_t *ThreadName, int deltaTime)
+inline void CZoneServer::RegisterLoginZone(const wchar_t *ThreadName, int deltaTime, ZoneKeyType key)
 {
     // 이벤트 방식과 Frame 방식 을 고려해야할듯.
     // ContentsLogic의 경우는 프레임이 존재하므로 겸사겸사 하트비트가능.
@@ -81,7 +86,7 @@ inline void CZoneServer::RegisterLoginZone( const wchar_t *ThreadName, int delta
 }
 
 template <typename T>
-inline void CZoneServer::RegisterZone(const wchar_t *ThreadName, int deltaTime)
+inline void CZoneServer::RegisterZone(const wchar_t *ThreadName, int deltaTime, ZoneKeyType key)
 {
     // 단 T의 타입은 IZone의 자식 클래스여야함.
     static_assert(std::is_base_of_v<IZone, T>, " T is not from IZone ");
@@ -95,12 +100,12 @@ inline void CZoneServer::RegisterZone(const wchar_t *ThreadName, int deltaTime)
 
     {
         std::lock_guard<SharedMutex> lock(_zoneMutex);
-        if (_zoneMap.find(newZone) != _zoneMap.end())
+        if (_zoneMap.find(key) != _zoneMap.end())
         {
             // zone 의 중복 등록  무시할 수도있지만, 수정하도록 유도
             __debugbreak();
         }
-        _zoneMap.insert({newZone, zoneSet});
+        _zoneMap.insert({key, zoneSet});
     }
 
     zoneSet->_server = this;
