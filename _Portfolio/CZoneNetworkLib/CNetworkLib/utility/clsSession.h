@@ -72,6 +72,7 @@ class ZoneSet
     ~ZoneSet()
     {
         m_Thread.join();
+        delete m_zone;
     }
     void Push(CMessage *msg)
     {

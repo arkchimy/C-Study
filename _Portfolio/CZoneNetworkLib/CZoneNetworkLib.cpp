@@ -32,19 +32,19 @@ void fnCZoneNetworkLib()
     class TestServer : public CZoneServer
     {
       public:
-        TestServer(int iEncording, IZone *LoginZone)
-            : CZoneServer(iEncording, LoginZone)
+        TestServer(int iEncording )
+            : CZoneServer(iEncording)
         {
             //LoginZone은 하나만 등록해야하고.
- 
-            clsContentsZone *zone = new clsContentsZone();
+            RegisterLoginZone<clsLoginZone>(L"LoginServer", 4000);
+
             // 동일한 방식으로 상속받아 구현한 class를 여기에 등록한다.
-            RegisterZone(zone, L"Contents이름",20);
+            RegisterZone<clsContentsZone>( L"Contents이름", 20);
         }
     };
     //  TestServer생성시에 LoginZone을 넘겨주게 설계.
     clsLoginZone *Loginzone = new clsLoginZone();
-    TestServer *server = new TestServer(1, Loginzone);
+    TestServer *server = new TestServer(true);
 
 
 }
@@ -57,7 +57,6 @@ bool CZoneServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
     CMessage* msg = (CMessage*)stTlsObjectPool<CMessage>::Alloc();
 
     session._addr = addr;
-
     msg->ownerID = SessionID;
 
     session.m_zoneSet = m_LoginZone;
@@ -83,37 +82,8 @@ void CZoneServer::OnRelease(ull SessionID)
 
 }
 
-void CZoneServer::RegisterLoginZone(IZone *zone, int deltaTime)
-{
-    // 이벤트 방식과 Frame 방식 을 고려해야할듯.
-    // ContentsLogic의 경우는 프레임이 존재하므로 겸사겸사 하트비트가능.
-    // LoginLogic의 경우 프레임으로 돌 이유가 없음. 이벤트가 필요.
 
-    if(InterlockedCompareExchange(&_bLoginZoneChk,1,0) != 0)
-    {
-        // LoginZone 2개 이상 등록한 경우
-        __debugbreak();
-    }
 
-    _hLoginEvent = CreateEvent(nullptr, 0, 0, nullptr);
-    m_LoginZone = new ZoneSet(zone, L"LoginZoneThread", &bOn, deltaTime, _hLoginEvent);
-    m_LoginZone->_server = this;
-}
-
-void CZoneServer::RegisterZone(IZone *zone, const wchar_t *ThreadName, int deltaTime)
-{
-    if (_bLoginZoneChk == false)
-    {
-        // LoginZone 등록되지 않은 경우
-        __debugbreak();
-    }
-
-    ZoneSet *zoneSet = new ZoneSet(zone, ThreadName, &bOn, deltaTime);
-    // 해당 Server가 관리하는 zoneSet목록
-    _zoneList.push_back(zoneSet);
-    zoneSet->_server = this;
-
-}
 
 void CZoneServer::RequeseMoveZone(ull SessionID, IZone *targetZone)
 {
@@ -122,11 +92,16 @@ void CZoneServer::RequeseMoveZone(ull SessionID, IZone *targetZone)
     // 동기적으로 이루어지므로 해제될 가능성 Zero
 
     clsSession &session = sessions_vec[SessionID >> 47];
-    auto iter = _zoneMap.find(targetZone);
-    if (iter == _zoneMap.end())
+
     {
-        //_zoneMap 에 등록이 되지않은 상황.
-        __debugbreak();
+        std::shared_lock<SharedMutex> lock(_zoneMutex);
+
+        auto iter = _zoneMap.find(targetZone);
+        if (iter == _zoneMap.end())
+        {
+            //_zoneMap 에 등록이 되지않은 상황.
+            __debugbreak();
+        }
+        session.m_zoneSet = iter->second;
     }
-    session.m_zoneSet = iter->second;
 }
