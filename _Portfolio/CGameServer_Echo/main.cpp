@@ -3,10 +3,60 @@
 
 #include <iostream>
 #include "CTestServer.h"
+#include "../../_3Course/lib/CrushDump_lib/CrushDump_lib/CrushDump_lib.h"
+
 
 int main()
 {
+    CDump::SetHandlerDump();
+    stWSAData wsa;
+
+    wchar_t bindAddr[16];
+    wchar_t RedisIpAddress[16];
+    short bindPort;
+
+    int iZeroCopy;
+    int iEnCording;
+    int WorkerThreadCnt, ContentsThreadCnt;
+    int reduceThreadCount;
+    int NoDelay;
+    int maxSessions;
+
+    LINGER linger{1, 0};
+    int iRingBufferSize;
+    int ContentsRingBufferSize;
+
     CTestServer *server = new CTestServer(true);
+    {
+        Parser parser;
+
+        if (parser.LoadFile(L"Config.txt") == false)
+            CSystemLog::GetInstance()->Log(L"ParserError.txt", en_LOG_LEVEL::ERROR_Mode, L"LoadFileError %d", GetLastError());
+        parser.GetValue(L"ServerAddr", bindAddr, 16);
+        parser.GetValue(L"ServerPort", bindPort);
+
+        parser.GetValue(L"LingerOn", linger.l_onoff);
+        parser.GetValue(L"ZeroCopy", iZeroCopy);
+
+        parser.GetValue(L"WorkerThreadCnt", WorkerThreadCnt);
+        parser.GetValue(L"ReduceThreadCount", reduceThreadCount);
+        parser.GetValue(L"NoDelay", NoDelay);
+        parser.GetValue(L"MaxSessions", maxSessions);
+
+        parser.GetValue(L"ContentsThreadCnt", ContentsThreadCnt);
+        parser.GetValue(L"RingBufferSize", iRingBufferSize);
+        parser.GetValue(L"ContentsRingBufferSize", ContentsRingBufferSize);
+        parser.GetValue(L"EnCording", iEnCording);
+
+        parser.GetValue(L"RedisIpAddress", RedisIpAddress, CZoneServer::IP_LEN);
+
+        CRingBuffer::s_BufferSize = iRingBufferSize;
+    }
+    size_t i;
+    wcstombs_s(&i, server->RedisIpAddress, CZoneServer::IP_LEN, RedisIpAddress, CZoneServer::IP_LEN);
+
+    server->Start(bindAddr, bindPort, iZeroCopy, WorkerThreadCnt, reduceThreadCount, NoDelay, maxSessions);
+
     while (1)
     {
 

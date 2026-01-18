@@ -70,7 +70,7 @@ class IZone
 class ZoneSet
 {
   public:
-    ZoneSet(IZone *zone, const wchar_t *ThreadName, bool *bOn, int deltaTime , HANDLE hEvent = INVALID_HANDLE_VALUE);
+    ZoneSet(IZone *zone, const wchar_t *ThreadName, int deltaTime, CZoneServer *server , HANDLE hEvent = INVALID_HANDLE_VALUE);
 
     ~ZoneSet()
     {
@@ -98,7 +98,8 @@ class ZoneSet
     std::list<clsSession *> sessions;
 
   public:
-    bool *m_bOn; // Server의 Running을 가리키는 포인터
+    //Zone마다의 On 여부
+    bool _bOn ; 
     HANDLE _hEvent;
 
     //TODO : 좀 더 좋은 방법 없을까.

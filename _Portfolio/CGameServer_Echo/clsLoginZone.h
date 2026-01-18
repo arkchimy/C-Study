@@ -33,8 +33,8 @@ class clsLoginZone : public IZone
     // 해당 Hash 는 다른 Zone에서도 접근함.
     std::unordered_map<ull, stPlayer *> SessionID_hash;
     // 중복 로그인 주의
-    std::unordered_map<INT64, stPlayer *> Account_hash;
 
+    std::unordered_map<INT64, stPlayer *> Account_hash;
     // 인증전  SessionID와 시간
     std::unordered_map<ull, stPlayer *> prePlayer_hash;
 

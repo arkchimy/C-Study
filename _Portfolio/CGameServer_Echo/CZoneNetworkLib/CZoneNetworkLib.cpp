@@ -67,8 +67,9 @@ bool CZoneServer::OnAccept(ull SessionID, SOCKADDR_IN &addr)
     session.m_zoneSet = m_LoginZone;
     m_LoginZone->Push(msg);
 
+    SetEvent(m_LoginZone->_hEvent);
 
-    return false;
+    return true;
 }
 
 //  IOCP 에서 알려주는 용도
@@ -76,6 +77,7 @@ void CZoneServer::OnRecv(ull SessionID, CMessage *msg)
 {
     clsSession &session = sessions_vec[SessionID >> 47];
     session.m_ZoneBuffer.Push(msg);
+
 }
 
 //  IOCP 에서 알려주는 용도

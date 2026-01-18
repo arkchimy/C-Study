@@ -1,7 +1,25 @@
 #include "clsLoginZone.h"
 
+#include <cpp_redis/cpp_redis>
+
+#pragma comment(lib, "cpp_redis.lib")
+#pragma comment(lib, "tacopie.lib")
+#pragma comment(lib, "ws2_32.lib")
+
+thread_local cpp_redis::client *client;
+thread_local bool bRedisOnce ;
+
 void clsLoginZone::OnEnterWorld(ull SessionID, SOCKADDR_IN &addr)
 {
+    // 한번 만.
+    if (bRedisOnce == false)
+    {
+        bRedisOnce = true;
+        client = new cpp_redis::client();
+
+        client->connect(_server->RedisIpAddress, 6379);
+    }
+
     stPlayer *player;
 
     {
@@ -20,10 +38,9 @@ void clsLoginZone::OnEnterWorld(ull SessionID, SOCKADDR_IN &addr)
         player->_lastRecvTime = timeGetTime();
         player->_addr = addr;
         player->_SessionID = SessionID;
-        
+
         prePlayer_hash.insert({SessionID, player});
     }
-
 }
 
 void clsLoginZone::OnRecv(ull SessionID, CMessage *msg)
@@ -32,6 +49,7 @@ void clsLoginZone::OnRecv(ull SessionID, CMessage *msg)
     if (iter == prePlayer_hash.end())
     {
         stTlsObjectPool<CMessage>::Release(msg);
+        _server->Disconnect(SessionID);
         return;
     }
     if (PacketProc(SessionID, msg) == false)
@@ -49,7 +67,7 @@ void clsLoginZone::OnUpdate()
     DWORD currentTime = timeGetTime();
     DWORD distance;
 
-    for (auto& iter : prePlayer_hash)
+    for (auto &iter : prePlayer_hash)
     {
         stPlayer *player = iter.second;
         distance = currentTime - player->_lastRecvTime;
@@ -77,7 +95,7 @@ void clsLoginZone::OnDisConnect(ull SessionID)
     stPlayer *player;
 
     auto iter = prePlayer_hash.find(SessionID);
-
+    //CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect %lld", SessionID);
     // 없다면 문제임
     if (iter == prePlayer_hash.end())
     {
@@ -92,15 +110,17 @@ void clsLoginZone::OnDisConnect(ull SessionID)
         auto iter = SessionID_hash.find(SessionID);
         if (iter == SessionID_hash.end())
         {
-            //삭제하려는데 없음.
-            __debugbreak();
+            // 삭제하려는데 없음.
+            // LoginPacket을 보내기전에 끊은 경우. 정상인 케이스
+            // __debugbreak();
         }
-
-        SessionID_hash.erase(iter);
+        else
+        {
+            SessionID_hash.erase(iter);
+        }
         // Player반환은 여기서.
         player_pool.Release(player);
     }
-    
 }
 
 bool clsLoginZone::PacketProc(ull SessionID, CMessage *msg)
@@ -175,13 +195,55 @@ bool clsLoginZone::PacketProc(ull SessionID, CMessage *msg)
     default:
         return false;
     }
-    
+
     return true;
 }
 
 void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHAR *SessionKey, WORD wType, BYTE bBroadCast, std::vector<ull> *pIDVector, size_t wVectorLen)
 {
     stPlayer *player;
+
+    {
+        // Login응답.
+        // redis에서 읽기, 가져오고 token을 비교 같다면
+
+        std::string key = std::to_string(AccountNo);
+        auto future = client->get(key.c_str());
+        client->sync_commit();
+        cpp_redis::reply reply = future.get();
+
+        if (reply.is_null())
+        {
+            //TODO : Token 현재 비교안함.
+            // 
+            //printf("AccountNo %lld not found in redis\n", AccountNo);
+            //__debugbreak();
+            //return;
+        }
+        else
+        {
+            std::string sessionKey = reply.as_string();
+
+            char SessionKeyA[66];
+            memcpy(SessionKeyA, SessionKey, 64);
+            SessionKeyA[64] = '\0';
+            SessionKeyA[65] = '\0';
+
+            key = std::to_string(AccountNo);
+
+            if (sessionKey.compare(SessionKeyA) != 0)
+            {
+                CSystemLog::GetInstance()->Log(L"ContentsLog", en_LOG_LEVEL::ERROR_Mode,
+                                               L"%-20s %10s %12s %10s ",
+                                               L"LoginError - hash is Not Equle: ", SessionKeyA,
+                                               L"현재들어온ID:", sessionKey);
+
+                stTlsObjectPool<CMessage>::Release(msg);
+                _server->Disconnect(SessionID);
+                return;
+            }
+        }
+    }
 
     {
         auto iter = Account_hash.find(AccountNo);
@@ -191,7 +253,6 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
             player = iter->second;
             _server->Disconnect(player->_SessionID);
         }
-        Account_hash.erase(iter);
 
     }
 
@@ -204,19 +265,21 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
             __debugbreak();
         }
         player = prePlayeriter->second;
+        player->_AccountNo = AccountNo;
         Account_hash.insert({AccountNo, player});
 
-        std::lock_guard<SharedMutex> lock(_SessionTable_Mutex);
-
-        // 전환 완료 메세지가 없으므로
-        auto iter = SessionID_hash.find(SessionID);
-        if (iter != SessionID_hash.end())
         {
-            // 이제 추가하는 것이라 있으면 안됨.
-            __debugbreak();
+            std::lock_guard<SharedMutex> lock(_SessionTable_Mutex);
+
+            // 전환 완료 메세지가 없으므로
+            auto iter = SessionID_hash.find(SessionID);
+            if (iter != SessionID_hash.end())
+            {
+                // 이제 추가하는 것이라 있으면 안됨.
+                __debugbreak();
+            }
+            SessionID_hash.insert({SessionID, player});
+            _server->RequeseMoveZone(SessionID, (ZoneKeyType)enZoneType::EchoZone);
         }
-        SessionID_hash.insert({SessionID, player});
-        _server->RequeseMoveZone(SessionID, (ZoneKeyType)enZoneType::EchoZone);
     }
-    
 }

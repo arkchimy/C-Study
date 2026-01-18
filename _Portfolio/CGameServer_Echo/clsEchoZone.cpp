@@ -13,6 +13,7 @@ void clsEchoZone::OnEnterWorld(ull SessionID, SOCKADDR_IN &addr)
             __debugbreak();
 
         {
+            //해당  Session이 존재하는지 판단.
             std::shared_lock<SharedMutex> lock(_server->_zoneMutex);
 
             auto iter = _server->_zoneMap.find((ZoneKeyType)enZoneType::LoginZone);
@@ -34,11 +35,19 @@ void clsEchoZone::OnEnterWorld(ull SessionID, SOCKADDR_IN &addr)
             msg = (CMessage *)stTlsObjectPool<CMessage>::Alloc();
             RES_LOGIN(SessionID, msg, 1, player->_AccountNo);
         }
+
     }
 }
 
 void clsEchoZone::OnRecv(ull SessionID, CMessage *msg)
 {
+    auto iter = SessionID_hash.find(SessionID);
+    if (iter == SessionID_hash.end())
+    {
+        stTlsObjectPool<CMessage>::Release(msg);
+        _server->Disconnect(SessionID);
+        return;
+    }
     if (PacketProc(SessionID, msg) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
@@ -75,10 +84,12 @@ void clsEchoZone::OnLeaveWorld(ull SessionID)
 void clsEchoZone::OnDisConnect(ull SessionID)
 {
     clsLoginZone *loginZone;
+    stPlayer *player;
 
-    // 해당 SessionID 매칭 데이터가 있다면 말이 안 됨.
+    //CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"EchoZone_DisConnect %lld", SessionID);
+    // 해당 SessionID 매칭 데이터가 없다면 말이 안 됨.
     auto iter = SessionID_hash.find(SessionID);
-    if (iter != SessionID_hash.end())
+    if (iter == SessionID_hash.end())
         __debugbreak();
 
     {
@@ -91,17 +102,19 @@ void clsEchoZone::OnDisConnect(ull SessionID)
     }
 
     // TODO : 이게 최선인가.
+
     {
-        std::shared_lock<SharedMutex> lock(loginZone->_SessionTable_Mutex);
+        std::lock_guard<SharedMutex> lock(loginZone->_SessionTable_Mutex);
         auto iter = loginZone->SessionID_hash.find(SessionID);
         if (iter == loginZone->SessionID_hash.end())
             __debugbreak();
-        stPlayer *player = iter->second;
+        player = iter->second;
 
-        SessionID_hash.erase(iter);
-        // Player반환은 여기서.
-        loginZone->player_pool.Release(player);
+        SessionID_hash.erase(SessionID);
+        loginZone->SessionID_hash.erase(iter);
     }
+    // Player반환은 여기서.
+    loginZone->player_pool.Release(player);
 
 }
 

@@ -47,7 +47,7 @@ class CZoneServer : public CLanServer
     void RequeseMoveZone(ull SessionID, ZoneKeyType targetZone);
 
     //////////////////////////////////////////
-    private:
+    protected:
     ZoneSet *m_LoginZone = nullptr;
 
     // OnRecv를 통해 해당 이벤트를 SetEvent 시켜야하므로 서버의OnRecv에서 접근할 수 있어야함.
@@ -61,6 +61,19 @@ class CZoneServer : public CLanServer
 
     SharedMutex _zoneMutex;
     std::map<ZoneKeyType, ZoneSet *> _zoneMap;
+
+        // DB연동서버
+    enum
+    {
+        IP_LEN = 16,
+        DBName_LEN = 16,
+        schema_LEN = 16,
+        ID_LEN = 16,
+        Password_LEN = 16,
+    };
+    char RedisIpAddress[IP_LEN]{
+        0,
+    }; // port 6379
 };
 
 template <typename T>
@@ -81,8 +94,17 @@ inline void CZoneServer::RegisterLoginZone(const wchar_t *ThreadName, int deltaT
     T *LoginZone = new T();
     _hLoginEvent = CreateEvent(nullptr, 0, 0, nullptr);
 
-    m_LoginZone = new ZoneSet(LoginZone, ThreadName, &bOn, deltaTime, _hLoginEvent);
-    m_LoginZone->_server = this;
+    m_LoginZone = new ZoneSet(LoginZone, ThreadName, deltaTime, this , _hLoginEvent);
+
+    {
+        std::lock_guard<SharedMutex> lock(_zoneMutex);
+        if (_zoneMap.find(key) != _zoneMap.end())
+        {
+            // zone 의 중복 등록  무시할 수도있지만, 수정하도록 유도
+            __debugbreak();
+        }
+        _zoneMap.insert({key, m_LoginZone});
+    }
 }
 
 template <typename T>
@@ -94,8 +116,7 @@ inline void CZoneServer::RegisterZone(const wchar_t *ThreadName, int deltaTime, 
         " T need default constructor ");
 
     T *newZone = new T();
-
-    ZoneSet *zoneSet = new ZoneSet(newZone, ThreadName, &bOn, deltaTime);
+    ZoneSet *zoneSet = new ZoneSet(newZone, ThreadName,  deltaTime,this);
     // 해당 Server가 관리하는 zoneSet목록
 
     {
@@ -108,5 +129,4 @@ inline void CZoneServer::RegisterZone(const wchar_t *ThreadName, int deltaTime, 
         _zoneMap.insert({key, zoneSet});
     }
 
-    zoneSet->_server = this;
 }

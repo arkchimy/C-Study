@@ -10,17 +10,18 @@
 #include "../../CZoneNetworkLib.h"
 
 
-ZoneSet::ZoneSet(IZone *zone, const wchar_t *ThreadName, bool *bOn, int deltaTime, HANDLE hEvent)
+ZoneSet::ZoneSet(IZone *zone, const wchar_t *ThreadName, int deltaTime, CZoneServer *server, HANDLE hEvent)
 
-    : m_zone(zone), m_bOn(bOn), _deltaTime(deltaTime), _hEvent(hEvent)
+    : m_zone(zone), _deltaTime(deltaTime), _hEvent(hEvent), _bOn(true), _server(server)
 {
+    m_zone->_server = _server;
     if (_hEvent == INVALID_HANDLE_VALUE)
         m_Thread = WinThread(&ZoneSet::ZoneThread, this);
     else
         m_Thread = WinThread(&ZoneSet::ZoneTimerThread, this);
 
     SetThreadDescription(m_Thread.native_handle(), ThreadName);
-    m_zone->_server = _server;
+
 }
 void ZoneSet::ZoneThread()
 {
@@ -29,7 +30,7 @@ void ZoneSet::ZoneThread()
     CMessage *msg;
 
     timeBeginPeriod(1);
-    while (*m_bOn == true)
+    while (_bOn == true)
     {
 
         TargetTime += _deltaTime;
@@ -125,7 +126,7 @@ void ZoneSet::ZoneTimerThread()
 
     timeBeginPeriod(1);
 
-    while (*m_bOn == true)
+    while (_bOn == true)
     {
         WaitForSingleObject(_hEvent, _deltaTime);
         // Zone자체의 Q에서 빼기.
