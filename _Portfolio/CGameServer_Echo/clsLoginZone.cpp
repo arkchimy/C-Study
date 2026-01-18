@@ -56,6 +56,7 @@ void clsLoginZone::OnRecv(ull SessionID, CMessage *msg)
     {
         stTlsObjectPool<CMessage>::Release(msg);
         _server->Disconnect(SessionID);
+        return;
     }
     iter->second->_lastRecvTime = timeGetTime();
 
@@ -68,15 +69,15 @@ void clsLoginZone::OnUpdate()
     DWORD distance;
 
     //TODO : 하트비트 현재 하고있지않음.
-    //for (auto &iter : prePlayer_hash)
-    //{
-    //    stPlayer *player = iter.second;
-    //    distance = currentTime - player->_lastRecvTime;
-    //    if (distance >= _sessionTimeoutMs)
-    //    {
-    //        _server->Disconnect(player->_SessionID);
-    //    }
-    //}
+    /*for (auto &iter : prePlayer_hash)
+    {
+        stPlayer *player = iter.second;
+        distance = currentTime - player->_lastRecvTime;
+        if (distance >= _sessionTimeoutMs)
+        {
+            _server->Disconnect(player->_SessionID);
+        }
+    }*/
 }
 
 void clsLoginZone::OnLeaveWorld(ull SessionID)
@@ -96,6 +97,8 @@ void clsLoginZone::OnDisConnect(ull SessionID)
     stPlayer *player;
 
     auto iter = prePlayer_hash.find(SessionID);
+    CSystemLog::GetInstance()->Log(L"OnDisConnect_NoError", en_LOG_LEVEL::ERROR_Mode,
+                                   L"LoginZone_DisConnect SessionID : %lld AccountNo : %lld", SessionID , iter->second->_AccountNo);
     //CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect %lld", SessionID);
     // 없다면 문제임
     if (iter == prePlayer_hash.end())
@@ -103,6 +106,10 @@ void clsLoginZone::OnDisConnect(ull SessionID)
         __debugbreak();
     }
     player = iter->second;
+
+
+    INT64 AccountNo;
+
     // 중복제거로인한 다른 sessionID가 들어가있을수 있음.
     if (player->_SessionID == SessionID)
         prePlayer_hash.erase(iter);
@@ -119,6 +126,17 @@ void clsLoginZone::OnDisConnect(ull SessionID)
         {
             SessionID_hash.erase(iter);
         }
+
+        AccountNo = player->_AccountNo;
+        {
+            auto iter = Account_hash.find(AccountNo);
+            // 중복 로그인이라면 있던 player를 끊음.
+            if (iter != Account_hash.end())
+            {
+                Account_hash.erase(iter);
+            }
+        }
+
         // Player반환은 여기서.
         player_pool.Release(player);
     }
@@ -241,12 +259,15 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
 
                 stTlsObjectPool<CMessage>::Release(msg);
                 _server->Disconnect(SessionID);
+      
                 return;
             }
         }
     }
 
     {
+        std::lock_guard<SharedMutex> lock(_SessionTable_Mutex);
+
         auto iter = Account_hash.find(AccountNo);
         // 중복 로그인이라면 있던 player를 끊음.
         if (iter != Account_hash.end())
@@ -254,11 +275,11 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
             player = iter->second;
             _server->Disconnect(player->_SessionID);
             Account_hash.erase(iter);
+            CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect SessionID : %lld AccountNo : %lld",
+                                           player->_SessionID,AccountNo);
+
         }
 
-    }
-
-    {
         auto prePlayeriter = prePlayer_hash.find(SessionID);
         if (prePlayeriter == prePlayer_hash.end())
         {
@@ -271,7 +292,6 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
         Account_hash.insert({AccountNo, player});
 
         {
-            std::lock_guard<SharedMutex> lock(_SessionTable_Mutex);
 
             // 전환 완료 메세지가 없으므로
             auto iter = SessionID_hash.find(SessionID);

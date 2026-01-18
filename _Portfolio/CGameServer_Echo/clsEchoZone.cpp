@@ -53,6 +53,8 @@ void clsEchoZone::OnRecv(ull SessionID, CMessage *msg)
         stTlsObjectPool<CMessage>::Release(msg);
         _server->Disconnect(SessionID);
     }
+    stPlayer *player = iter->second;
+    player->_lastRecvTime = timeGetTime();
     totalPacketCnt++;
 }
 
@@ -61,7 +63,7 @@ void clsEchoZone::OnUpdate()
     DWORD currentTime = timeGetTime();
     DWORD distance;
 
-    for (auto& iter : SessionID_hash)
+    /*for (auto& iter : SessionID_hash)
     {
         stPlayer *player = iter.second;
         distance = currentTime - player->_lastRecvTime;
@@ -69,7 +71,7 @@ void clsEchoZone::OnUpdate()
         {
             _server->Disconnect(player->_SessionID);
         }
-    }
+    }*/
 }
 
 void clsEchoZone::OnLeaveWorld(ull SessionID)
@@ -91,7 +93,7 @@ void clsEchoZone::OnDisConnect(ull SessionID)
     auto iter = SessionID_hash.find(SessionID);
     if (iter == SessionID_hash.end())
         __debugbreak();
-
+    
     {
         std::shared_lock<SharedMutex> lock(_server->_zoneMutex);
 
@@ -109,6 +111,14 @@ void clsEchoZone::OnDisConnect(ull SessionID)
         if (iter == loginZone->SessionID_hash.end())
             __debugbreak();
         player = iter->second;
+
+        auto Accountiter = loginZone->Account_hash.find(player->_AccountNo);
+
+        // 중복 로그인이라면 있던 player를 끊음.
+        if (Accountiter != loginZone->Account_hash.end())
+        {
+            loginZone->Account_hash.erase(Accountiter);
+        }
 
         SessionID_hash.erase(SessionID);
         loginZone->SessionID_hash.erase(iter);

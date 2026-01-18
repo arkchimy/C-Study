@@ -74,10 +74,12 @@ void ZoneSet::ZoneThread()
             if (session->m_ReleaseAndDBReQuest == 0)
             {
                 ull SessionID = session->m_SeqID;
+                m_zone->OnDisConnect(SessionID);
+
                 ReleaseSession(*session);
                 iter = sessions.erase(iter);
 
-                m_zone->OnDisConnect(SessionID);
+    
                 continue;
             }
             else if (session->m_zoneSet != this)
@@ -169,10 +171,13 @@ void ZoneSet::ZoneTimerThread()
             if (session->m_ReleaseAndDBReQuest == 0)
             {
                 ull SessionID = session->m_SeqID;
+
+                m_zone->OnDisConnect(SessionID); 
+
                 ReleaseSession(*session);
                 iter = sessions.erase(iter);
 
-                m_zone->OnDisConnect(SessionID); 
+
                 continue;
             }
             else if (session->m_zoneSet != this)
