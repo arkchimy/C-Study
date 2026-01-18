@@ -392,6 +392,11 @@ void CTestServer::DB_VerifySession( CMessage *msg)
                 RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, Dummy2_ChatServerIP, ChatServerPort);
                 return;
             }
+            else
+            {
+                RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
+                return;
+            }
         }
         RES_LOGIN(SessionID, msg, AccountNo, retval, ID, Nickname, GameServerIP, GameServerPort, ChatServerIP, ChatServerPort);
         

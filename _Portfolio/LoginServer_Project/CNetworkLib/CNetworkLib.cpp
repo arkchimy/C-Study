@@ -295,7 +295,7 @@ BOOL CLanServer::Start(const wchar_t *bindAddress, short port, int ZeroCopy, int
 
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(port);
-    InetPtonW(AF_INET, bindAddress, &serverAddr.sin_addr);
+    InetPtonW(AF_INET, L"0.0.0.0", &serverAddr.sin_addr);
 
     if (ZeroCopy)
     {

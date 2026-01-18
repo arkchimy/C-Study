@@ -46,6 +46,7 @@ int main()
         parser.GetValue(L"ServerPort", bindPort);
 
         parser.GetValue(L"ChatServerIP", ChatServerbindAddr, 16);
+
         parser.GetValue(L"Dummy1_ChatServerIP", Dummy1_ChatServerbindAddr, 16);
         parser.GetValue(L"Dummy2_ChatServerIP", Dummy2_ChatServerbindAddr, 16);
 
