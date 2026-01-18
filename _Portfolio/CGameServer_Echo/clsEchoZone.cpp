@@ -46,12 +46,17 @@ void clsEchoZone::OnRecv(ull SessionID, CMessage *msg)
     {
         stTlsObjectPool<CMessage>::Release(msg);
         _server->Disconnect(SessionID);
+        CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"EchoZone_DisConnect %20s SessionID : %lld ",
+                                       L"SessionID_hash Not Found", SessionID);
         return;
     }
     if (PacketProc(SessionID, msg) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
         _server->Disconnect(SessionID);
+        CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"EchoZone_DisConnect %20s SessionID : %lld ",
+                                       L" PacketProc false return ", SessionID);
+        return;
     }
     stPlayer *player = iter->second;
     player->_lastRecvTime = timeGetTime();

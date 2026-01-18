@@ -50,12 +50,17 @@ void clsLoginZone::OnRecv(ull SessionID, CMessage *msg)
     {
         stTlsObjectPool<CMessage>::Release(msg);
         _server->Disconnect(SessionID);
+
+        CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect %20s SessionID : %lld ",
+                                       L"prePlayer_hash Not Found", SessionID);
         return;
     }
     if (PacketProc(SessionID, msg) == false)
     {
         stTlsObjectPool<CMessage>::Release(msg);
         _server->Disconnect(SessionID);
+        CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect %20s SessionID : %lld ",
+                                       L" PacketProc false return ", SessionID);
         return;
     }
     iter->second->_lastRecvTime = timeGetTime();
@@ -97,8 +102,8 @@ void clsLoginZone::OnDisConnect(ull SessionID)
     stPlayer *player;
 
     auto iter = prePlayer_hash.find(SessionID);
-    CSystemLog::GetInstance()->Log(L"OnDisConnect_NoError", en_LOG_LEVEL::ERROR_Mode,
-                                   L"LoginZone_DisConnect SessionID : %lld AccountNo : %lld", SessionID , iter->second->_AccountNo);
+    //CSystemLog::GetInstance()->Log(L"OnDisConnect_NoError", en_LOG_LEVEL::ERROR_Mode,
+    //                               L"LoginZone_DisConnect SessionID : %lld AccountNo : %lld", SessionID , iter->second->_AccountNo);
     //CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect %lld", SessionID);
     // 없다면 문제임
     if (iter == prePlayer_hash.end())
@@ -259,7 +264,9 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
 
                 stTlsObjectPool<CMessage>::Release(msg);
                 _server->Disconnect(SessionID);
-      
+
+                CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect %20s SessionID : %lld ",
+                                               L" REQ_LOGIN false return ", SessionID);
                 return;
             }
         }
@@ -275,7 +282,7 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
             player = iter->second;
             _server->Disconnect(player->_SessionID);
             Account_hash.erase(iter);
-            CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect SessionID : %lld AccountNo : %lld",
+            CSystemLog::GetInstance()->Log(L"OnDisConnect", en_LOG_LEVEL::ERROR_Mode, L"LoginZone_DisConnect %20s SessionID : %lld AccountNo : %lld",
                                            player->_SessionID,AccountNo);
 
         }
