@@ -67,15 +67,16 @@ void clsLoginZone::OnUpdate()
     DWORD currentTime = timeGetTime();
     DWORD distance;
 
-    for (auto &iter : prePlayer_hash)
-    {
-        stPlayer *player = iter.second;
-        distance = currentTime - player->_lastRecvTime;
-        if (distance >= _sessionTimeoutMs)
-        {
-            _server->Disconnect(player->_SessionID);
-        }
-    }
+    //TODO : 하트비트 현재 하고있지않음.
+    //for (auto &iter : prePlayer_hash)
+    //{
+    //    stPlayer *player = iter.second;
+    //    distance = currentTime - player->_lastRecvTime;
+    //    if (distance >= _sessionTimeoutMs)
+    //    {
+    //        _server->Disconnect(player->_SessionID);
+    //    }
+    //}
 }
 
 void clsLoginZone::OnLeaveWorld(ull SessionID)
@@ -252,6 +253,7 @@ void clsLoginZone::REQ_LOGIN(ull SessionID, CMessage *msg, INT64 AccountNo, WCHA
         {
             player = iter->second;
             _server->Disconnect(player->_SessionID);
+            Account_hash.erase(iter);
         }
 
     }
